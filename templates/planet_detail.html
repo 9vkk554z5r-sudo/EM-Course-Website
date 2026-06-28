@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}{{ planet.name }}{% block scripts %}
+<script src="{{ url_for('static', filename='js/three.min.js') }}"></script>
+<script>
+var solarPapers = [
+{% for p in papers %}
+{title: {{ p.title[:25]|tojson }}, url: {{ (p.url or '')|tojson }}},
+{% endfor %}
+];
+var pName = {{ planet.name|tojson }};
+var pColor = {{ planet.color|tojson }};
+
+document.addEventListener('DOMContentLoaded', function() {
+var c = document.getElementById('solar-system');
+if (!c || typeof THREE === 'undefined' || solarPapers.length === 0) return;
+var W = c.clientWidth, H = 400;
+var scene = new THREE.Scene();
+var camera = new THREE.PerspectiveCamera(50, W/H, 0.1, 1000);
+camera.position.z = 12;
+var renderer = new THREE.WebGLRenderer({alpha:true,antialias:true});
+renderer.setSize(W,H);renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+c.appendChild(renderer.domElement);
+
+// Background stars
+var sg=new THREE.BufferGeometry();
+var sp=new Float32Array(500*3);
+for(var i=0;i<500*3;i++)sp[i]=(Math.random()-0.5)*60;
+sg.setAttribute('position',new THREE.BufferAttribute(sp,3));
+scene.add(new THREE.Points(sg,new THREE.PointsMaterial({color:0xffffff,size:0.06,transparent:true,opacity:0.5})));
+
+// Central planet
+var col=new THREE.Color(pColor||'#F5D76E');
+var cSize=Math.max(1.5,Math.min(3,solarPapers.length*0.2));
+var cGeo=new THREE.SphereGeometry(cSize,32,32);
+var cMat=new THREE.MeshPhongMaterial({color:col,emissive:col,emissiveIntensity:0.6,shininess:40});
+var center=new THREE.Mesh(cGeo,cMat);scene.add(center);
+
+// Gradient glow sprite
+var gcv2=document.createElement('canvas');gcv2.width=256;gcv2.height=256;
+var gctx2=gcv2.getContext('2d');var grad2=gctx2.createRadialGradient(128,128,0,128,128,128);
+grad2.addColorStop(0,'rgba(245,215,110,0.6)');grad2.addColorStop(0.3,'rgba(245,215,110,0.25)');
+grad2.addColorStop(0.6,'rgba(245,215,110,0.1)');grad2.addColorStop(1,'rgba(245,215,110,0)');
+gctx2.fillStyle=grad2;gctx2.fillRect(0,0,256,256);
+var gtex2=new THREE.CanvasTexture(gcv2);gtex2.needsUpdate=true;
+var gsm2=new THREE.SpriteMaterial({map:gtex2,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false});
+var gsprite2=new THREE.Sprite(gsm2);gsprite2.scale.set(cSize*6,cSize*6,1);scene.add(gsprite2);
+
+// Lights
+var l1=new THREE.DirectionalLight(0xffffff,1.2);l1.position.set(10,20,10);scene.add(l1);
+scene.add(new THREE.AmbientLight(0x404060));
+
+// Orbiting papers
+var papers3d=[];
+solarPapers.forEach(function(p,i){
+var size=0.35+Math.random()*0.25;
+var pCol=new THREE.Color().setHSL((i/solarPapers.length)*0.8,0.8,0.6);
+var pGeo=new THREE.SphereGeometry(size,12,12);
+var pMat=new THREE.MeshPhongMaterial({color:pCol,emissive:pCol,emissiveIntensity:0.2});
+var mesh=new THREE.Mesh(pGeo,pMat);
+var angle=(i/solarPapers.length)*Math.PI*2;
+var radius=4+Math.random()*2;
+var height=(Math.random()-0.5)*3;
+mesh.position.set(Math.cos(angle)*radius,height,Math.sin(angle)*radius);
+mesh.userData={url:p.url,index:i};
+scene.add(mesh);papers3d.push({mesh:mesh,angle:angle,radius:radius,height:height,speed:0.2+Math.random()*0.3});
+
+// Label sprite
+var canvas=document.createElement('canvas');canvas.width=256;canvas.height=64;
+var ctx=canvas.getContext('2d');ctx.fillStyle='rgba(0,0,0,0.5)';ctx.fillRect(8,8,240,48);
+ctx.fillStyle='#fff';ctx.font='bold 14px Inter,sans-serif';ctx.textAlign='center';
+ctx.fillText(p.title.slice(0,18)+(p.title.length>18?'..':''),128,42);
+var tex=new THREE.CanvasTexture(canvas);tex.needsUpdate=true;
+var spriteMat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false});
+var sprite=new THREE.Sprite(spriteMat);sprite.position.set(Math.cos(angle)*radius,height+1.2,Math.sin(angle)*radius);
+sprite.scale.set(2.5,0.7,1);scene.add(sprite);
+mesh.userData.sprite=sprite;
+});
+
+// Raycaster
+var raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();
+var hovered=null;
+c.addEventListener('mousemove',function(e){
+var r=c.getBoundingClientRect();
+mouse.x=((e.clientX-r.left)/r.width)*2-1;
+mouse.y=-((e.clientY-r.top)/r.height)*2+1;
+raycaster.setFromCamera(mouse,camera);
+var hits=raycaster.intersectObjects(papers3d.map(function(p){return p.mesh;}));
+if(hits.length>0){c.style.cursor='pointer';hovered=hits[0].object;}
+else{c.style.cursor='grab';hovered=null;}
+});
+c.addEventListener('click',function(){if(wasDragged)return;if(hovered&&hovered.userData.url)window.open(hovered.userData.url,'_blank');});
+
+// Orbit controls
+var isDragging=false,px,py,rx=0,ry=0,wasDragged=false;
+c.addEventListener('mousedown',function(e){isDragging=true;wasDragged=false;px=e.clientX;py=e.clientY;});
+window.addEventListener('mouseup',function(){isDragging=false;});
+c.addEventListener('mousemove',function(e){if(isDragging){wasDragged=true;ry+=(e.clientX-px)*0.008;rx+=(e.clientY-py)*0.008;px=e.clientX;py=e.clientY;}});
+
+// Fix click with wasDragged
+c.addEventListener('click',function(){if(wasDragged)return;if(hovered&&hovered.userData.url)window.open(hovered.userData.url,'_blank');});
+
+// Animation
+var autoRotate=true;
+c.addEventListener('mousedown',function(){autoRotate=false;});
+window.addEventListener('mouseup',function(){setTimeout(function(){autoRotate=true;},3000);});
+
+function animate(){
+requestAnimationFrame(animate);
+if(autoRotate&&!isDragging)ry+=0.003;
+papers3d.forEach(function(p){
+p.angle+=0.01*p.speed;
+p.mesh.position.x=Math.cos(p.angle)*p.radius;
+p.mesh.position.z=Math.sin(p.angle)*p.radius;
+p.mesh.rotation.y+=0.02;
+if(p.mesh.userData.sprite){
+p.mesh.userData.sprite.position.x=Math.cos(p.angle)*p.radius;
+p.mesh.userData.sprite.position.z=Math.sin(p.angle)*p.radius;
+}
+});
+camera.position.x=Math.sin(ry)*Math.cos(rx)*12;
+camera.position.y=Math.sin(rx)*6+2;
+camera.position.z=Math.cos(ry)*Math.cos(rx)*12;
+camera.lookAt(0,0,0);
+renderer.render(scene,camera);
+}
+animate();
+
+window.addEventListener('resize',function(){W=c.clientWidth;H=400;camera.aspect=W/H;camera.updateProjectionMatrix();renderer.setSize(W,H);});
+});
+</script>
+{% endblock %}
+{% block content %}
+<div class="page-header"><h1>🪐 {{ planet.name }}</h1>
+<p class="text-muted">{{ planet.topic }} · {{ papers|length }} 篇文献</p>
+<a href="{{ url_for('planets') }}" class="btn btn-sm btn-outline">← 返回星群</a>
+</div>
+<div id="solar-system" style="height:400px;margin-bottom:20px;background:radial-gradient(ellipse at center,#0a0f24 0%,#000 100%);border-radius:12px;cursor:grab;"></div>
+<div class="card"><div class="card-header"><h2>添加文献到本星球</h2></div><div class="card-body">
+<form method="POST" action="{{ url_for('planet_add_paper', pid=planet.id) }}" class="form">
+<div class="form-group"><input type="text" name="title" placeholder="文献标题" required style="width:100%"></div>
+<div class="form-row"><div class="form-group flex-grow"><input type="text" name="authors" placeholder="作者"></div>
+<div class="form-group"><input type="text" name="journal" placeholder="期刊"></div>
+<div class="form-group"><input type="number" name="year" placeholder="年份"></div></div>
+<div class="form-row"><div class="form-group flex-grow"><input type="text" name="doi" placeholder="DOI"></div>
+<div class="form-group flex-grow"><input type="text" name="url" placeholder="URL"></div></div>
+<div class="form-group"><textarea name="abstract" rows="2" placeholder="摘要（可选）" style="width:100%"></textarea></div>
+<button type="submit" class="btn btn-primary">添加到星球</button>
+</form></div></div>
+<div class="card"><div class="card-header"><h2>文献列表</h2>
+<div class="sort-links">
+<a href="?sort=date_desc" class="btn btn-sm btn-outline {% if sort=='date_desc' %}active{% endif %}">最新</a>
+<a href="?sort=date_asc" class="btn btn-sm btn-outline {% if sort=='date_asc' %}active{% endif %}">最早</a>
+<a href="?sort=author" class="btn btn-sm btn-outline {% if sort=='author' %}active{% endif %}">作者</a>
+<a href="?sort=journal" class="btn btn-sm btn-outline {% if sort=='journal' %}active{% endif %}">期刊</a>
+</div></div><div class="card-body">
+{% if papers %}{% for p in papers %}
+<div class="paper-item"><div class="paper-top"><span class="paper-title">{{ p.title }}</span>
+<a href="{{ url_for('planet_delete_paper', pid=planet.id, ppid=p.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('移除？')">✕</a></div>
+<div class="paper-meta"><span>{{ p.authors }}</span>·<span>{{ p.journal }}</span>·<span>{{ p.year }}</span>
+{% if p.doi %}<a href="https://doi.org/{{ p.doi }}" target="_blank">DOI</a>{% endif %}</div>
+{% if p.abstract %}<p class="paper-abstract">{{ p.abstract[:200] }}{% if p.abstract|length>200 %}...{% endif %}</p>{% endif %}
+</div>{% endfor %}
+{% else %}<p class="empty-state">这个星球还没有文献，快添加第一篇吧！</p>{% endif %}
+</div></div>
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/three.min.js') }}"></script>
+<script>
+var solarPapers = [
+{% for p in papers %}
+{title: {{ p.title[:25]|tojson }}, url: {{ (p.url or '')|tojson }}},
+{% endfor %}
+];
+var pName = {{ planet.name|tojson }};
+var pColor = {{ planet.color|tojson }};
+
+document.addEventListener('DOMContentLoaded', function() {
+var c = document.getElementById('solar-system');
+if (!c || typeof THREE === 'undefined' || solarPapers.length === 0) return;
+var W = c.clientWidth, H = 400;
+var scene = new THREE.Scene();
+var camera = new THREE.PerspectiveCamera(50, W/H, 0.1, 1000);
+camera.position.z = 12;
+var renderer = new THREE.WebGLRenderer({alpha:true,antialias:true});
+renderer.setSize(W,H);renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+c.appendChild(renderer.domElement);
+
+// Background stars
+var sg=new THREE.BufferGeometry();
+var sp=new Float32Array(500*3);
+for(var i=0;i<500*3;i++)sp[i]=(Math.random()-0.5)*60;
+sg.setAttribute('position',new THREE.BufferAttribute(sp,3));
+scene.add(new THREE.Points(sg,new THREE.PointsMaterial({color:0xffffff,size:0.06,transparent:true,opacity:0.5})));
+
+// Central planet
+var col=new THREE.Color(pColor||'#F5D76E');
+var cSize=Math.max(1.5,Math.min(3,solarPapers.length*0.2));
+var cGeo=new THREE.SphereGeometry(cSize,32,32);
+var cMat=new THREE.MeshPhongMaterial({color:col,emissive:col,emissiveIntensity:0.6,shininess:40});
+var center=new THREE.Mesh(cGeo,cMat);scene.add(center);
+
+// Gradient glow sprite
+var gcv2=document.createElement('canvas');gcv2.width=256;gcv2.height=256;
+var gctx2=gcv2.getContext('2d');var grad2=gctx2.createRadialGradient(128,128,0,128,128,128);
+grad2.addColorStop(0,'rgba(245,215,110,0.6)');grad2.addColorStop(0.3,'rgba(245,215,110,0.25)');
+grad2.addColorStop(0.6,'rgba(245,215,110,0.1)');grad2.addColorStop(1,'rgba(245,215,110,0)');
+gctx2.fillStyle=grad2;gctx2.fillRect(0,0,256,256);
+var gtex2=new THREE.CanvasTexture(gcv2);gtex2.needsUpdate=true;
+var gsm2=new THREE.SpriteMaterial({map:gtex2,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false});
+var gsprite2=new THREE.Sprite(gsm2);gsprite2.scale.set(cSize*6,cSize*6,1);scene.add(gsprite2);
+
+// Lights
+var l1=new THREE.DirectionalLight(0xffffff,1.2);l1.position.set(10,20,10);scene.add(l1);
+scene.add(new THREE.AmbientLight(0x404060));
+
+// Orbiting papers
+var papers3d=[];
+solarPapers.forEach(function(p,i){
+var size=0.35+Math.random()*0.25;
+var pCol=new THREE.Color().setHSL((i/solarPapers.length)*0.8,0.8,0.6);
+var pGeo=new THREE.SphereGeometry(size,12,12);
+var pMat=new THREE.MeshPhongMaterial({color:pCol,emissive:pCol,emissiveIntensity:0.2});
+var mesh=new THREE.Mesh(pGeo,pMat);
+var angle=(i/solarPapers.length)*Math.PI*2;
+var radius=4+Math.random()*2;
+var height=(Math.random()-0.5)*3;
+mesh.position.set(Math.cos(angle)*radius,height,Math.sin(angle)*radius);
+mesh.userData={url:p.url,index:i};
+scene.add(mesh);papers3d.push({mesh:mesh,angle:angle,radius:radius,height:height,speed:0.2+Math.random()*0.3});
+
+// Label sprite
+var canvas=document.createElement('canvas');canvas.width=256;canvas.height=64;
+var ctx=canvas.getContext('2d');ctx.fillStyle='rgba(0,0,0,0.5)';ctx.fillRect(8,8,240,48);
+ctx.fillStyle='#fff';ctx.font='bold 14px Inter,sans-serif';ctx.textAlign='center';
+ctx.fillText(p.title.slice(0,18)+(p.title.length>18?'..':''),128,42);
+var tex=new THREE.CanvasTexture(canvas);tex.needsUpdate=true;
+var spriteMat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false});
+var sprite=new THREE.Sprite(spriteMat);sprite.position.set(Math.cos(angle)*radius,height+1.2,Math.sin(angle)*radius);
+sprite.scale.set(2.5,0.7,1);scene.add(sprite);
+mesh.userData.sprite=sprite;
+});
+
+// Raycaster
+var raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();
+var hovered=null;
+c.addEventListener('mousemove',function(e){
+var r=c.getBoundingClientRect();
+mouse.x=((e.clientX-r.left)/r.width)*2-1;
+mouse.y=-((e.clientY-r.top)/r.height)*2+1;
+raycaster.setFromCamera(mouse,camera);
+var hits=raycaster.intersectObjects(papers3d.map(function(p){return p.mesh;}));
+if(hits.length>0){c.style.cursor='pointer';hovered=hits[0].object;}
+else{c.style.cursor='grab';hovered=null;}
+});
+c.addEventListener('click',function(){if(hovered&&hovered.userData.url)window.open(hovered.userData.url,'_blank');});
+
+{% endblock %}

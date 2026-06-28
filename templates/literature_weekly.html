@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ _("每周文献更新", "Weekly Updates") }}{% endblock %}
+{% block content %}
+<div class="page-header"><h1>📬 {{ _("每周文献更新", "Weekly Literature Updates") }}</h1><p class="text-muted">{{ _("通过OpenAlex获取近一周的最新文献，支持收藏", "Powered by OpenAlex - bookmark papers to your collection") }}</p></div>
+<div class="card"><div class="card-header"><h2>{{ _("搜索关键词", "Search Keyword") }}</h2></div><div class="card-body">
+<form method="POST" class="form">
+<div class="form-row"><div class="form-group flex-grow"><input type="text" name="keyword" placeholder="{{ _("cryo-EM, single-particle analysis...", "cryo-EM...") }}" value="{{ keyword }}" required></div>
+<div class="form-group"><select name="days"><option value="7">7 {{ _("天", "days") }}</option><option value="14">14 {{ _("天", "days") }}</option><option value="30">30 {{ _("天", "days") }}</option></select></div>
+<button type="submit" class="btn btn-primary">🔍 {{ _("搜索", "Search") }}</button></div></form></div></div>
+{% if result %}
+<div class="card"><div class="card-header"><h2>{{ _("搜索结果", "Results") }}: {{ result.keyword }}</h2></div><div class="card-body">
+{% if result.results %}{% for r in result.results %}
+<div class="paper-item"><div class="paper-title">{{ r.title[:80] }}{% if r.title|length>80 %}...{% endif %}</div>
+<div class="paper-meta">{{ r.authors }} &middot; {{ r.journal }} ({{ r.date[:4] if r.date else "N/A" }})</div>
+<div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap">
+<select class="bm-cat" style="font-size:0.72rem;padding:3px 6px;border-radius:4px;background:rgba(10,15,36,0.6);color:var(--text-primary);border:1px solid rgba(59,130,246,0.2)">
+<option value="">{{ _("\u9009\u62e9\u5206\u7c7b", "Category") }}</option></select>
+<button class="btn btn-sm btn-primary" onclick='bookmarkPaper(this,"{{ r.title|e }}","{{ r.authors|e }}","{{ r.journal|e }}",{{ r.date[:4] if r.date else "null" }},"{{ r.doi|e }}","","weekly")'>📌 {{ _("\u6536\u85cf", "Bookmark") }}</button></div>
+</div>{% endfor %}{% else %}
+<p class="text-muted">{{ _("该关键词暂无最新文献", "No recent papers for this keyword") }}</p>{% endif %}
+</div></div>{% endif %}
+<script>
+function bookmarkPaper(btn,title,authors,journal,year,doi,url,source) {
+    var sel=btn.parentElement.querySelector(".bm-cat");
+    var catId=sel?sel.value:"";
+    fetch("/api/literature/bookmark",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({title:title,authors:authors,journal:journal,year:year,doi:doi,url:url,source:source,category_id:catId||null})})
+    .then(function(r){return r.json()}).then(function(d){if(d.ok)alert("{{ _("已收藏!", "Bookmarked!") }}");else alert(d.error);});
+}
+function loadCatOptions(){fetch("/api/literature/categories").then(function(r){return r.json()}).then(function(cats){document.querySelectorAll(".bm-cat").forEach(function(sel){cats.forEach(function(c){var opt=document.createElement("option");opt.value=c.id;opt.textContent=c.name;sel.appendChild(opt);});});});}
+document.addEventListener("DOMContentLoaded",loadCatOptions);
+</script>
+{% endblock %}

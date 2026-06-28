@@ -1,0 +1,12 @@
+{% extends "admin_base.html" %}
+{% block title %}管理后台 — 概览{% endblock %}
+{% block admin_content %}
+<div class="page-header"><h1>管理后台概览</h1></div>
+<div class="stats-grid">
+    <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-info"><span class="stat-value">{{ total_users }}</span><span class="stat-label">注册用户</span></div></div>
+    <div class="stat-card"><div class="stat-icon">📚</div><div class="stat-info"><span class="stat-value">{{ total_checkins }}</span><span class="stat-label">总打卡次数</span></div></div>
+    <div class="stat-card"><div class="stat-icon">📰</div><div class="stat-info"><span class="stat-value">{{ total_literature }}</span><span class="stat-label">文献总数</span></div></div>
+    <div class="stat-card"><div class="stat-icon">🎬</div><div class="stat-info"><span class="stat-value">{{ total_videos }}</span><span class="stat-label">实验视频</span></div></div>
+    <div class="stat-card"><div class="stat-icon">🧠</div><div class="stat-info"><span class="stat-value">{{ total_knowledge }}</span><span class="stat-label">知识点</span></div></div>
+</div>
+{% endblock %}

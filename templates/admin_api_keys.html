@@ -1,0 +1,17 @@
+{% extends "admin_base.html" %}
+{% block title %}API Key 管理{% endblock %}
+{% block admin_content %}
+<div class="page-header"><h1>🔑 API Key 管理</h1><p class="text-muted">添加 LLM API Key 来驱动 Agent 功能</p></div>
+<div class="card"><div class="card-header"><h2>添加 API Key</h2></div><div class="card-body">
+<form method="POST" class="form">
+<div class="form-row"><div class="form-group"><select name="provider"><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="custom">自定义</option></select></div>
+<div class="form-group"><input type="text" name="key_name" placeholder="名称" value="default"></div></div>
+<div class="form-group"><input type="password" name="api_key" placeholder="sk-..." style="width:100%" required></div>
+<button type="submit" class="btn btn-primary">保存</button>
+</form></div></div>
+<div class="card"><div class="card-header"><h2>已保存的 Keys ({{ keys|length }})</h2></div><div class="card-body">
+{% for k in keys %}<div class="paper-item"><span class="paper-title">{{ k.provider }} - {{ k.key_name }}</span>
+<div class="paper-meta">{{ k.created_at.strftime('%Y-%m-%d') }} | {{ k.encrypted_key[:12] }}...</div>
+<a href="{{ url_for('admin_delete_api_key', k_id=k.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('删除？')">删除</a>
+</div>{% else %}<p class="text-muted">暂无 API Key</p>{% endfor %}</div></div>
+{% endblock %}

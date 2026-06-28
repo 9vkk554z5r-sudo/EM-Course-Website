@@ -1,0 +1,56 @@
+{% extends "admin_base.html" %}
+{% block title %}知识库管理{% endblock %}
+{% block admin_content %}
+<div class="page-header"><h1>🧠 知识库管理</h1></div>
+
+<div class="card"><div class="card-header"><h2>AI 生成知识点 (LLM)</h2></div><div class="card-body">
+<form method="POST" action="{{ url_for('admin_llm_generate') }}" class="form">
+<div class="form-row"><div class="form-group flex-grow"><input type="text" name="topic" placeholder="输入主题，如: 冷冻电镜单颗粒分析" required style="width:100%"></div>
+<button type="submit" class="btn btn-primary">🤖 AI 生成</button></div>
+<p class="text-muted">需要先在 API Keys 页面配置 OpenAI/DeepSeek 密钥</p>
+</form></div></div>
+
+<div class="card"><div class="card-header"><h2>手动添加知识点</h2></div><div class="card-body">
+<form method="POST" action="{{ url_for('admin_add_knowledge') }}" class="form">
+<div class="form-row"><div class="form-group flex-grow"><input type="text" name="title" placeholder="知识点标题" required></div>
+<div class="form-group"><select name="difficulty">
+<option value="beginner">初级</option><option value="intermediate">中级</option><option value="advanced">高级</option>
+</select></div>
+<div class="form-group"><input type="text" name="category" placeholder="分类" value="general"></div></div>
+<div class="form-group"><textarea name="content" rows="4" placeholder="知识点内容" required></textarea></div>
+<button type="submit" class="btn btn-primary">添加</button>
+</form></div></div>
+
+<div class="card"><div class="card-header"><h2>现有知识点</h2></div><div class="card-body">
+<div class="knowledge-list">{% for p in points %}
+<div class="knowledge-item">
+<div class="knowledge-top"><h4>{{ p.title }}</h4>
+<span class="badge" style="background:{% if p.difficulty=='beginner' %}#10b981{% elif p.difficulty=='intermediate' %}#f59e0b{% else %}#ef4444{% endif %};">{{ difficulties.get(p.difficulty, p.difficulty) }}</span></div>
+<p class="text-muted">{{ p.category }} · {{ p.content[:100] }}{% if p.content|length>100 %}...{% endif %}</p>
+<div class="knowledge-actions">
+<button class="btn btn-sm" onclick="editKp({{ p.id }},{{ p.title|tojson }},{{ p.content|tojson }},{{ p.difficulty|tojson }},{{ p.category|tojson }})">编辑</button>
+<a href="{{ url_for('admin_delete_knowledge', kp_id=p.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('删除？')">删除</a>
+</div></div>{% endfor %}</div></div></div>
+<script>
+function editKp(id, title, content, difficulty, category) {
+    var m = document.getElementById('editModal');
+    m.style.display='flex';
+    document.getElementById('editTitle').value=title;
+    document.getElementById('editContent').value=content;
+    document.getElementById('editDifficulty').value=difficulty;
+    document.getElementById('editCategory').value=category;
+    document.getElementById('editForm').action='/admin/knowledge/edit/'+id;
+}
+</script>
+<div id="editModal" class="modal" style="display:none">
+<div class="modal-content"><h3>编辑知识点</h3>
+<form method="POST" id="editForm">
+<div class="form-group"><input type="text" name="title" id="editTitle" required></div>
+<div class="form-group"><select name="difficulty" id="editDifficulty">
+<option value="beginner">初级</option><option value="intermediate">中级</option><option value="advanced">高级</option></select></div>
+<div class="form-group"><input type="text" name="category" id="editCategory"></div>
+<div class="form-group"><textarea name="content" id="editContent" rows="5" required></textarea></div>
+<button type="submit" class="btn btn-primary">保存</button>
+<button type="button" class="btn btn-outline" onclick="document.getElementById('editModal').style.display='none'">取消</button>
+</form></div></div>
+{% endblock %}

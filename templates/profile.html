@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}个人中心 — 电子显微学前沿课程{% endblock %}
+{% block content %}
+<div class="profile-page">
+    <div class="page-header">
+        <h1>👤 个人中心</h1>
+    </div>
+
+    <div class="profile-grid">
+        <!-- User Info -->
+        <div class="card">
+            <div class="card-header">
+                <h2>基本信息</h2>
+            </div>
+            <div class="card-body">
+                <div class="profile-info">
+                    <div class="profile-avatar">{{ current_user.name[0] }}</div>
+                    <div class="profile-details">
+                        <h3>{{ current_user.name }}</h3>
+                        <p>学号: {{ current_user.student_id }}</p>
+                        <p>邮箱: {{ current_user.email }}</p>
+                        <p>注册时间: {{ current_user.registered_at.strftime('%Y-%m-%d') }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="card">
+            <div class="card-header">
+                <h2>学习统计</h2>
+            </div>
+            <div class="card-body">
+                <div class="stats-vertical">
+                    <div class="stat-row">
+                        <span class="stat-label">累计打卡</span>
+                        <span class="stat-value">{{ total_checkins }} 天</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">总积分</span>
+                        <span class="stat-value">{{ total_score }} 分</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">连续打卡</span>
+                        <span class="stat-value">{{ streak }} 天</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">文献订阅</span>
+                        <span class="stat-value">{{ subs_count }} 个主题</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Links -->
+    <div class="card">
+        <div class="card-header">
+            <h2>快捷入口</h2>
+        </div>
+        <div class="card-body">
+            <div class="quick-links">
+                <a href="{{ url_for('study') }}" class="quick-link">
+                    <span>📖</span> 今日学习
+                </a>
+                <a href="{{ url_for('literature') }}" class="quick-link">
+                    <span>📰</span> 文献中心
+                </a>
+                <a href="{{ url_for('my_subscriptions') }}" class="quick-link">
+                    <span>📡</span> 我的订阅
+                </a>
+                <a href="{{ url_for('nebula') }}" class="quick-link">
+                    <span>🌌</span> 文献星云
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}文献引用星云 — 电子显微学前沿课程{% endblock %}
+{% block content %}
+<div class="nebula-page">
+    <div class="page-header">
+        <h1>🌌 文献引用关系星云图</h1>
+        <p class="text-muted">可视化展示文献之间的引用关系网络</p>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div id="nebula-container">
+                <div class="nebula-loading">
+                    <div class="spinner"></div>
+                    <p>加载文献数据...</p>
+                </div>
+            </div>
+            <div class="nebula-legend">
+                <div class="legend-item">
+                    <span class="legend-dot" style="background:#3b82f6;"></span>
+                    <span>文献节点（圆点大小表示引用量）</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-line"></span>
+                    <span>引用关系</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>数据统计</h2>
+        </div>
+        <div class="card-body">
+            <div class="nebula-stats" id="nebula-stats">
+                <div class="stat-mini">
+                    <span class="stat-value" id="node-count">-</span>
+                    <span class="stat-label">文献总数</span>
+                </div>
+                <div class="stat-mini">
+                    <span class="stat-value" id="edge-count">-</span>
+                    <span class="stat-label">引用关系数</span>
+                </div>
+                <div class="stat-mini">
+                    <span class="stat-value" id="topic-count">-</span>
+                    <span class="stat-label">研究主题数</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js"></script>
+<script src="{{ url_for('static', filename='js/nebula.js') }}"></script>
+{% endblock %}

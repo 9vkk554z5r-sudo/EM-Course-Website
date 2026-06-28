@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}我的小森林{% endblock %}
+{% block content %}
+<div class="rewards-page">
+<div class="page-header"><h1>我的小森林</h1><p class="text-muted">全勤打卡，种下属于你的小树！</p></div>
+<div class="reward-stats-grid">
+<div class="stat-card"><div class="stat-icon">🌳</div><div class="stat-info"><span class="stat-value">{{ total_trees }}</span><span class="stat-label">累计种树</span></div></div>
+<div class="stat-card"><div class="stat-icon">🌱</div><div class="stat-info"><span class="stat-value">{{ weekly_trees }}</span><span class="stat-label">周奖励</span></div></div>
+<div class="stat-card"><div class="stat-icon">🌲</div><div class="stat-info"><span class="stat-value">{{ monthly_trees }}</span><span class="stat-label">月奖励</span></div></div>
+<div class="stat-card"><div class="stat-icon">🔥</div><div class="stat-info"><span class="stat-value">{{ current_streak }}</span><span class="stat-label">当前连续</span></div></div>
+<div class="stat-card"><div class="stat-icon">🏆</div><div class="stat-info"><span class="stat-value">{{ max_streak }}</span><span class="stat-label">最长连续</span></div></div>
+</div>
+<div class="card"><div class="card-header"><h2>我的小森林</h2></div><div class="card-body">
+{% if trees %}
+<div class="forest">{% for t in trees %}
+<div class="tree-item">
+<div class="tree-icon">{% if t.reward_type == "tree" %}{% if t.period == "weekly" %}🌱{% else %}🌳{% endif %}{% else %}🎁{% endif %}</div>
+<div class="tree-info">
+<strong>{% if t.period == "weekly" %}周全勤{% else %}月全勤{% endif %}</strong>
+<p class="text-muted">{{ t.period_key }} · 打卡{{ t.checkin_days }}/{{ t.total_days }}天</p>
+<span class="tree-date">{{ t.earned_at.strftime("%Y-%m-%d") }}</span>
+</div></div>{% endfor %}
+</div>
+{% else %}
+<div class="empty-state"><p style="font-size:2rem;">🌱</p><p>还没有种下小树</p>
+<p class="text-muted">连续打卡7天获得周奖励，全勤一个月获得月奖励</p>
+<a href="{{ url_for('study') }}" class="btn btn-primary">开始学习打卡</a></div>
+{% endif %}
+</div></div></div>
+{% endblock %}

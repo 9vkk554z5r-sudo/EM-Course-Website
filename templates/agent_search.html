@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}AI 文献搜索{% endblock %}
+{% block content %}
+<div class="page-header"><h1>🤖 AI 文献搜索</h1><p class="text-muted">输入问题，由 LLM 驱动的 Agent 自动回答</p></div>
+<div class="card"><div class="card-header"><h2>搜索</h2></div><div class="card-body">
+<form method="POST" class="form">
+<div class="form-group"><textarea name="query" rows="3" placeholder="例如：列举2024年电子显微学领域最重要的5篇论文及其核心发现" style="width:100%">{{ query }}</textarea></div>
+<div class="form-row"><div class="form-group"><select name="provider"><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option></select></div>
+<button type="submit" class="btn btn-primary">🚀 发送</button></div>
+</form></div></div>
+{% if result %}<div class="card"><div class="card-header"><h2>回答</h2></div><div class="card-body"><div class="knowledge-content" style="white-space:pre-wrap">{{ result }}</div></div></div>{% endif %}
+{% endblock %}

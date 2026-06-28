@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}文献中心 — 电子显微学前沿课程{% endblock %}
+{% block content %}
+<div class="literature-page">
+    <div class="page-header">
+        <h1>📰 文献中心</h1>
+        <div class="header-actions">
+            <a href="{{ url_for('my_subscriptions') }}" class="btn btn-outline">我的订阅</a>
+            <a href="{{ url_for('refresh_literature') }}" class="btn">刷新文献</a>
+        </div>
+    </div>
+
+    <!-- Subscribe Form -->
+    <div class="card">
+        <div class="card-header">
+            <h2>订阅新主题</h2>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('subscribe') }}" class="subscribe-form">
+                <div class="form-row">
+                    <div class="form-group flex-grow">
+                        <input type="text" name="topic" placeholder="输入订阅主题，如 cryo-EM, STEM, EELS" required>
+                    </div>
+                    <div class="form-group flex-grow">
+                        <input type="text" name="keywords" placeholder="可选关键词，逗号分隔">
+                    </div>
+                    <button type="submit" class="btn btn-primary">订阅</button>
+                </div>
+            </form>
+            <div class="topic-suggestions">
+                <span>热门主题：</span>
+                <a href="#" onclick="fillTopic('electron microscopy')">electron microscopy</a>
+                <a href="#" onclick="fillTopic('cryo-EM')">cryo-EM</a>
+                <a href="#" onclick="fillTopic('STEM')">STEM</a>
+                <a href="#" onclick="fillTopic('EELS')">EELS</a>
+                <a href="#" onclick="fillTopic('semiconductor')">semiconductor</a>
+                <a href="#" onclick="fillTopic('in situ TEM')">in situ TEM</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paper List -->
+    <div class="card">
+        <div class="card-header">
+            <h2>文献列表</h2>
+            <span class="badge">{{ pagination.total }} 篇</span>
+        </div>
+        <div class="card-body">
+            {% if pagination.items %}
+            <div class="paper-list">
+                {% for paper in pagination.items %}
+                <div class="paper-item">
+                    <a href="{{ paper.url }}" class="paper-title" target="_blank">{{ paper.title }}</a>
+                    <div class="paper-meta">
+                        <span>{{ paper.authors }}</span>
+                        <span>· {{ paper.journal }} ({{ paper.year }})</span>
+                        <span class="paper-topic">#{{ paper.topic }}</span>
+                        <span class="paper-citations">引用: {{ paper.citation_count }}</span>
+                    </div>
+                    {% if paper.abstract %}
+                    <p class="paper-abstract">{{ paper.abstract[:200] }}{% if paper.abstract|length > 200 %}...{% endif %}</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination">
+                {% if pagination.has_prev %}
+                <a href="{{ url_for('literature', page=pagination.prev_num) }}" class="btn btn-sm">← 上一页</a>
+                {% endif %}
+                <span class="page-info">第 {{ pagination.page }} / {{ pagination.pages }} 页</span>
+                {% if pagination.has_next %}
+                <a href="{{ url_for('literature', page=pagination.next_num) }}" class="btn btn-sm">下一页 →</a>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <p>暂无文献数据</p>
+                <p>请先订阅主题，然后点击"刷新文献"获取最新论文</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function fillTopic(topic) {
+    document.querySelector('input[name="topic"]').value = topic;
+}
+</script>
+{% endblock %}

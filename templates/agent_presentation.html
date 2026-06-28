@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}AI Pre Assistant{% endblock %}
+{% block content %}
+<div class="page-header"><h1>{{ _("📊 AI Pre 助手", "📊 AI Pre Assistant") }}</h1>
+<p class="text-muted">{{ _("两大功能：自动生成PPT建议 & 上传分析你的PPT (支持PDF/PPT文件)", "Two features: Auto-generate & Upload analysis (PDF/PPT)") }}</p></div>
+
+<div class="stats-grid" style="margin-bottom:16px">
+<div class="stat-card"><div class="stat-icon">🎯</div><div class="stat-info"><span class="stat-value">{{ _("功能一", "Feature 1") }}</span><span class="stat-label">{{ _("输入DOI/标题 → 生成Pre建议", "Input DOI/Title → Generate") }}</span></div></div>
+<div class="stat-card"><div class="stat-icon">📝</div><div class="stat-info"><span class="stat-value">{{ _("功能二", "Feature 2") }}</span><span class="stat-label">{{ _("上传PDF/PPT+文献 → 分析评分", "Upload PDF/PPT+Paper → Analyze") }}</span></div></div>
+</div>
+
+<!-- Feature 1: Generate -->
+<div class="card"><div class="card-header"><h2>{{ _("1. 自动生成Pre建议", "1. Generate Pre Suggestions") }}</h2></div><div class="card-body">
+<form method="POST" class="form" enctype="multipart/form-data">
+<input type="hidden" name="action" value="generate">
+<div class="form-group"><input type="text" name="paper_title" placeholder="{{ _("论文标题 (可选)", "Paper Title (optional)") }}" style="width:100%"></div>
+<div class="form-row"><div class="form-group flex-grow"><input type="text" name="paper_doi" placeholder="DOI (e.g. 10.1038/s41586-024-07123-5)" style="width:100%"></div>
+<div class="form-group"><select name="template_id"><option value="">{{ _("不使用模板", "No template") }}</option>
+{% for t in templates %}<option value="{{ t.id }}">{{ t.title }}</option>{% endfor %}</select></div></div>
+<button type="submit" class="btn btn-primary">🚀 {{ _("生成PPT设计建议", "Generate") }}</button>
+</form></div></div>
+
+<!-- Feature 2: Upload -->
+<div class="card"><div class="card-header"><h2>{{ _("2. 上传PPT/PDF分析", "2. Upload PPT/PDF Analysis") }}</h2></div><div class="card-body">
+<p class="text-muted" style="margin-bottom:12px">{{ _("上传PDF或PPT文件，Agent自动解析内容并分析", "Upload PDF or PPT files - Agent will extract and analyze content") }}</p>
+<form method="POST" class="form" enctype="multipart/form-data">
+<input type="hidden" name="action" value="analyze">
+<div class="form-row"><div class="form-group flex-grow"><input type="text" name="student_paper_title" placeholder="{{ _("文献标题 (必填)", "Paper Title (required)") }}" required style="width:100%"></div>
+<div class="form-group"><input type="text" name="student_paper_doi" placeholder="DOI" style="width:100%"></div></div>
+<div class="form-group"><input type="file" name="file_upload" accept=".pdf,.ppt,.pptx" style="width:100%;padding:8px;border:1px dashed rgba(59,130,246,0.3);border-radius:8px;background:rgba(59,130,246,0.03)">
+<div class="text-muted" style="font-size:0.75rem;margin-top:4px">{{ _("支持的格式: PDF, PPT, PPTX", "Supported: PDF, PPT, PPTX") }}</div></div>
+<div class="form-group"><textarea name="ppt_content" rows="4" placeholder="{{ _("或直接粘贴PPT内容/大纲...", "Or paste PPT content/outline...") }}" style="width:100%"></textarea></div>
+<div class="form-group"><select name="template_id"><option value="">{{ _("不使用评分模板", "No scoring template") }}</option>
+{% for t in templates %}<option value="{{ t.id }}">{{ t.title }}</option>{% endfor %}</select></div>
+<button type="submit" class="btn btn-primary">📊 {{ _("分析我的PPT", "Analyze") }}</button>
+</form></div></div>
+
+{% if result %}{% if result.found %}
+<div class="card"><div class="card-header"><h2>{{ _("📄 文献信息", "📄 Paper Info") }}</h2></div><div class="card-body">
+<div class="knowledge-content">{{ result.info.title }}</div>
+<p class="text-muted">{{ result.info.first_author }} &middot; {{ result.info.journal }} ({{ result.info.publication_date[:4] if result.info.publication_date else "N/A" }}) &middot; DOI: {{ result.info.doi }}</p>
+{% if result.key_points %}<div style="margin-top:8px"><strong>{{ _("核心要点:", "Key Points:") }}</strong><ul>{% for kp in result.key_points %}<li>{{ kp }}</li>{% endfor %}</ul></div>{% endif %}
+</div></div>
+{% if result.analysis %}
+<div class="card"><div class="card-header"><h2>{{ _("📝 分析报告", "📝 Analysis Report") }}</h2></div><div class="card-body">
+<h3 style="margin-bottom:8px">{{ _("改进建议:", "Improvement Suggestions:") }}</h3>
+<ul>{% for s in result.analysis.improvement_suggestions %}<li>{{ s }}</li>{% endfor %}</ul>
+</div></div>{% endif %}
+<div class="card"><div class="card-header"><h2>{{ _("📊 PPT设计建议", "📊 PPT Design Suggestion") }}</h2></div><div class="card-body"><ol>{% for s in result.suggestions %}<li style="margin-bottom:6px">{{ s }}</li>{% endfor %}</ol></div></div>
+<div class="card"><div class="card-header"><h2>{{ _("❓ 可能提问", "❓ Q&A Predictions") }}</h2></div><div class="card-body">{% for qa in result.qa_predictions %}<div style="margin-bottom:12px;padding:10px;background:rgba(59,130,246,0.05);border-radius:8px"><strong>Q: {{ qa.question }}</strong><br><span class="text-muted">A: {{ qa.answer }}</span></div>{% endfor %}</div></div>
+<div class="card"><div class="card-header"><h2>{{ _("📋 评分维度", "📋 Scoring") }}</h2>{% if result.template %}<span class="badge">{{ result.template.title }}</span>{% endif %}</div><div class="card-body"><table class="admin-table"><thead><tr><th>{{ _("维度", "Dimension") }}</th><th>{{ _("权重", "Weight") }}</th><th>{{ _("标准", "Standard") }}</th></tr></thead><tbody>{% for s in result.scoring %}<tr><td>{{ s.dimension if s.dimension is string else s.get("dimension","") }}</td><td>{{ s.weight if s.weight is string else s.get("weight","") }}</td><td>{{ s.standard if s.standard is string else s.get("standard","") }}</td></tr>{% endfor %}</tbody></table></div></div>
+{% endif %}{% endif %}
+{% endblock %}

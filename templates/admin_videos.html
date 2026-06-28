@@ -1,0 +1,29 @@
+{% extends "admin_base.html" %}
+{% block title %}实验视频管理{% endblock %}
+{% block admin_content %}
+<div class="page-header"><h1>实验视频管理</h1></div>
+<div class="card"><div class="card-header"><h2>上传新视频</h2></div><div class="card-body">
+<form method="POST" action="{{ url_for('admin_upload_video') }}" enctype="multipart/form-data" class="form">
+<div class="form-row"><div class="form-group flex-grow"><input type="text" name="title" placeholder="视频标题" required></div>
+<div class="form-group"><input type="text" name="category" placeholder="分类" value="sample-prep"></div></div>
+<div class="form-row"><div class="form-group flex-grow"><input type="text" name="video_url" placeholder="视频链接URL（可选）"></div>
+<div class="form-group"><input type="number" name="duration" placeholder="时长(分钟)"></div>
+<div class="form-group"><select name="difficulty"><option value="beginner">初级</option><option value="intermediate">中级</option><option value="advanced">高级</option></select></div></div>
+<div class="form-group"><input type="file" name="video_file" accept="video/*" class="file-input"></div>
+<div class="form-group"><textarea name="description" rows="3" placeholder="视频描述"></textarea></div>
+<button type="submit" class="btn btn-primary">上传</button>
+</form></div></div>
+<div class="card"><div class="card-header"><h2>视频列表 ({{ videos|length }})</h2></div><div class="card-body">
+<div class="video-list">{% for v in videos %}
+<div class="video-item">
+<h4>{{ v.title }}</h4>
+<p class="text-muted">{{ v.description[:80] }}{% if v.description|length>80 %}...{% endif %} · {{ v.duration_minutes }}min</p>
+<div class="video-meta">
+<span class="badge">{{ v.category }}</span>
+<span class="badge">{% if v.difficulty=='beginner' %}初级{% elif v.difficulty=='intermediate' %}中级{% else %}高级{% endif %}</span>
+<span class="text-muted">{{ v.uploaded_at.strftime('%m-%d') }}</span>
+</div>
+<a href="{{ url_for('admin_delete_video', vid=v.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('删除此视频？')">删除</a>
+</div>{% endfor %}
+</div></div></div>
+{% endblock %}

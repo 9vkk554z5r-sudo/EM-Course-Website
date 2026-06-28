@@ -1,0 +1,22 @@
+{% extends "admin_base.html" %}
+{% block title %}用户管理{% endblock %}
+{% block admin_content %}
+<div class="page-header"><h1>用户管理</h1></div>
+<div class="card"><div class="card-body">
+<table class="admin-table">
+<thead><tr><th>学号</th><th>姓名</th><th>邮箱</th><th>管理员</th><th>注册时间</th><th>操作</th></tr></thead>
+<tbody>
+{% for u in users %}
+<tr>
+<td>{{ u.student_id }}</td><td>{{ u.name }}</td><td>{{ u.email }}</td>
+<td>{% if u.is_admin %}✅{% else %}-{% endif %}</td>
+<td>{{ u.registered_at.strftime('%m-%d') }}</td>
+<td>
+<a href="{{ url_for('admin_set_admin', uid=u.id) }}" class="btn btn-sm btn-outline">{% if u.is_admin %}取消管理{% else %}设为管理{% endif %}</a>
+</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div></div>
+{% endblock %}

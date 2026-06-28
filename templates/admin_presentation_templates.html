@@ -1,0 +1,41 @@
+{% extends "admin_base.html" %}
+{% block title %}Presentation Templates{% endblock %}
+{% block content %}
+<div class="page-header"><h1>📊 Presentation Scoring Templates</h1>
+<a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline">&larr; Back</a></div>
+
+<div class="card"><div class="card-header"><h2>Create Template</h2></div><div class="card-body">
+<form method="POST" class="form" id="templateForm">
+<div class="form-group"><label>Template Title</label><input type="text" name="title" required style="width:100%"></div>
+<div class="form-group"><label>Description</label><textarea name="description" rows="2" style="width:100%"></textarea></div>
+<div class="form-group"><label>Scoring Criteria</label>
+<table class="admin-table" id="criteriaTable"><thead><tr><th>Dimension</th><th>Weight</th><th>Standard</th><th></th></tr></thead>
+<tbody>
+<tr><td><input type="text" name="dimension[]" placeholder="e.g. Content" style="width:100%"></td>
+<td><input type="text" name="weight[]" placeholder="e.g. 30%" style="width:80px"></td>
+<td><input type="text" name="standard[]" placeholder="Description" style="width:100%"></td>
+<td><button type="button" class="btn btn-sm btn-danger" onclick="this.parentElement.parentElement.remove()">X</button></td></tr>
+</tbody></table>
+<button type="button" class="btn btn-sm" onclick="addRow()">+ Add Criteria</button></div>
+<div class="form-group"><button type="submit" class="btn btn-primary">Create Template</button></div>
+</form></div></div>
+
+<div class="card"><div class="card-header"><h2>Existing Templates</h2></div><div class="card-body">
+{% if templates %}
+<div class="paper-list">{% for t in templates %}
+<div class="paper-item"><div class="paper-title">{{ t.title }}</div>
+<div class="paper-meta">{{ t.description[:100] }} &middot; Created {{ t.created_at.strftime("%Y-%m-%d") }}
+<a href="{{ url_for('admin_delete_presentation_template', tid=t.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')">Delete</a></div></div>
+{% endfor %}</div>
+{% else %}<div class="empty-state"><p>No templates yet.</p></div>{% endif %}
+</div></div>
+
+<script>
+function addRow() {
+    var tbody = document.querySelector("#criteriaTable tbody");
+    var tr = document.createElement("tr");
+    tr.innerHTML = '<td><input type="text" name="dimension[]" placeholder="Dimension" style="width:100%"></td><td><input type="text" name="weight[]" placeholder="%" style="width:80px"></td><td><input type="text" name="standard[]" placeholder="Standard" style="width:100%"></td><td><button type="button" class="btn btn-sm btn-danger" onclick="this.parentElement.parentElement.remove()">X</button></td>';
+    tbody.appendChild(tr);
+}
+</script>
+{% endblock %}
