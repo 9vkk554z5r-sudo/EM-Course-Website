@@ -764,6 +764,27 @@ a:hover { color: #67e8f9; text-decoration: none; }
     color: var(--text-muted);
 }
 
+.nebula-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.nebula-search-card .form-row {
+    margin-bottom: 6px;
+    align-items: flex-end;
+}
+
+#nebula-status {
+    margin-top: 8px;
+    font-size: 0.82rem;
+}
+
 .spinner {
     width: 40px;
     height: 40px;

@@ -1,17 +1,90 @@
 {% extends "admin_base.html" %}
-{% block title %}API Key 管理{% endblock %}
+{% block title %}LLM API 配置{% endblock %}
 {% block admin_content %}
-<div class="page-header"><h1>🔑 API Key 管理</h1><p class="text-muted">添加 LLM API Key 来驱动 Agent 功能</p></div>
-<div class="card"><div class="card-header"><h2>添加 API Key</h2></div><div class="card-body">
-<form method="POST" class="form">
-<div class="form-row"><div class="form-group"><select name="provider"><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="custom">自定义</option></select></div>
-<div class="form-group"><input type="text" name="key_name" placeholder="名称" value="default"></div></div>
-<div class="form-group"><input type="password" name="api_key" placeholder="sk-..." style="width:100%" required></div>
-<button type="submit" class="btn btn-primary">保存</button>
-</form></div></div>
-<div class="card"><div class="card-header"><h2>已保存的 Keys ({{ keys|length }})</h2></div><div class="card-body">
-{% for k in keys %}<div class="paper-item"><span class="paper-title">{{ k.provider }} - {{ k.key_name }}</span>
-<div class="paper-meta">{{ k.created_at.strftime('%Y-%m-%d') }} | {{ k.encrypted_key[:12] }}...</div>
-<a href="{{ url_for('admin_delete_api_key', k_id=k.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('删除？')">删除</a>
-</div>{% else %}<p class="text-muted">暂无 API Key</p>{% endfor %}</div></div>
+<div class="page-header">
+    <h1>🔑 LLM API 配置</h1>
+    <p class="text-muted">配置后网站可直接调用模型，无需依赖 Codex。</p>
+</div>
+
+{% if env_config %}
+<div class="card">
+    <div class="card-body">
+        <strong>环境变量配置已启用</strong>
+        <p class="text-muted">{{ env_config.provider }} · {{ env_config.model }} · {{ env_config.endpoint }}</p>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header"><h2>添加 API 配置</h2></div>
+    <div class="card-body">
+        <form method="POST" class="form">
+            <div class="form-row">
+                <div class="form-group flex-grow">
+                    <label>服务商</label>
+                    <select name="provider">
+                        <option value="shanghaitech">上海科技大学 GenAI</option>
+                        <option value="custom">其他兼容接口</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="deepseek">DeepSeek</option>
+                    </select>
+                </div>
+                <div class="form-group flex-grow">
+                    <label>配置名称</label>
+                    <input type="text" name="key_name" value="GPT-5.5" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>端点地址</label>
+                <input type="url" name="endpoint" value="https://genaiapi.shanghaitech.edu.cn/api/v1/start" placeholder="https://.../v1/chat/completions" required>
+            </div>
+            <div class="form-row">
+                <div class="form-group flex-grow">
+                    <label>模型编码</label>
+                    <input type="text" name="model_name" value="GPT-5.5" placeholder="GPT-5.5" required>
+                </div>
+                <div class="form-group flex-grow">
+                    <label>部署节点（可选）</label>
+                    <input type="text" name="deployment" value="east-US-2-gpt-5.5" placeholder="deployment name">
+                </div>
+                <div class="form-group">
+                    <label>接口格式</label>
+                    <select name="api_style">
+                        <option value="auto">自动识别</option>
+                        <option value="chat_completions">Chat Completions</option>
+                        <option value="responses">Responses</option>
+                        <option value="start">Start 网关</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>API Key</label>
+                <input type="password" name="api_key" placeholder="仅保存在本机数据库中" autocomplete="new-password" required>
+            </div>
+            <button type="submit" class="btn btn-primary">保存配置</button>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h2>已保存配置（{{ keys|length }}）</h2></div>
+    <div class="card-body">
+        {% for k in keys %}
+        <div class="paper-item">
+            <span class="paper-title">{{ k.key_name }} · {{ k.model_name or k.provider }}</span>
+            <div class="paper-meta">
+                {{ k.provider }} · {{ k.endpoint or '默认端点' }} · Key 尾号 {{ k.encrypted_key[-4:] }}
+            </div>
+            <div class="knowledge-actions">
+                <form method="POST" action="{{ url_for('admin_test_api_key', k_id=k.id) }}">
+                    <button type="submit" class="btn btn-sm btn-outline">测试连接</button>
+                </form>
+                <a href="{{ url_for('admin_delete_api_key', k_id=k.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('确认删除该配置？')">删除</a>
+            </div>
+        </div>
+        {% else %}
+        <p class="text-muted">暂无数据库配置。也可以使用 .env 环境变量配置。</p>
+        {% endfor %}
+    </div>
+</div>
 {% endblock %}

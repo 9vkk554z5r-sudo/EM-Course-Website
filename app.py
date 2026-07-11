@@ -21,32 +21,30 @@ import re
 import datetime as dt_module
 from functools import wraps
 from werkzeug.utils import secure_filename
+from llm_client import (
+    call_llm as execute_llm_request,
+    config_from_environment,
+    config_from_key_record,
+)
 
 
 
-def call_llm(api_key, provider, prompt, system="You are an EM expert."):
-    import requests as req, os as _os
-    # Auto-detect proxy from environment variables
-    _proxies = {}
-    _hp = _os.environ.get("HTTP_PROXY", "") or _os.environ.get("http_proxy", "")
-    _hs = _os.environ.get("HTTPS_PROXY", "") or _os.environ.get("https_proxy", "")
-    if _hp: _proxies["http"] = _hp
-    if _hs: _proxies["https"] = _hs
-    if provider == "deepseek":
-        url = "https://api.deepseek.com/v1/chat/completions"
-        model = "deepseek-chat"
-    else:
-        url = "https://api.openai.com/v1/chat/completions"
-        model = "gpt-3.5-turbo"
-    try:
-        resp = req.post(url, headers={"Authorization": "Bearer " + api_key, "Content-Type": "application/json"},
-            json={"model": model, "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}], "max_tokens": 600}, timeout=60, proxies=_proxies if _proxies else None)
-        if resp.status_code == 200:
-            return resp.json()["choices"][0]["message"]["content"]
-        else:
-            return "API Error (" + str(resp.status_code) + "): " + resp.text[:300]
-    except Exception as e:
-        return "Request Error: " + str(e)
+def get_llm_config(provider=None):
+    """Prefer environment configuration, then fall back to an active DB key."""
+    environment_config = config_from_environment()
+    if environment_config and (not provider or environment_config.provider == provider):
+        return environment_config
+    query = ApiKey.query.filter_by(is_active=True)
+    if provider:
+        query = query.filter_by(provider=provider)
+    return config_from_key_record(query.order_by(ApiKey.created_at.desc()).first())
+
+
+def call_configured_llm(prompt, system="You are an electron microscopy expert.", provider=None):
+    config = get_llm_config(provider=provider)
+    if not config:
+        return None, None
+    return execute_llm_request(config, prompt, system=system), config
 
 
 def admin_required(f):
@@ -182,14 +180,18 @@ def dashboard():
     total_trees = AttendanceReward.query.filter_by(user_id=current_user.id).count()
     weekly_trees = AttendanceReward.query.filter_by(user_id=current_user.id, period="weekly").count()
 
-    # Sample literature for nebula
-    from literature_agent import SAMPLE_LITERATURE
-    sample_literature = []
-    for topic, papers in SAMPLE_LITERATURE.items():
-        for p in papers:
-            p_copy = dict(p)
-            p_copy["topic"] = topic
-            sample_literature.append(p_copy)
+    # Real OpenAlex-backed literature for the dashboard nebula.
+    nebula_items = LiteratureItem.query.order_by(
+        LiteratureItem.citation_count.desc(), LiteratureItem.fetched_at.desc()
+    ).limit(60).all()
+    sample_literature = [{
+        "id": item.id,
+        "title": item.title,
+        "label": item.title[:18],
+        "topic": item.topic or "Uncategorized",
+        "citation_count": item.citation_count or 0,
+        "url": item.url or ("https://doi.org/" + item.doi if item.doi else ""),
+    } for item in nebula_items]
 
     # Knowledge points for forest
     all_kps = KnowledgePoint.query.all()
@@ -281,33 +283,18 @@ def unsubscribe(sub_id):
 @app.route("/literature/refresh")
 @login_required
 def refresh_literature():
-    from literature_agent import fetch_literature_for_topic
+    from literature_agent import sync_citation_network
     subs = LiteratureSubscription.query.filter_by(
         user_id=current_user.id, active=True
     ).all()
-    count = 0
+    nodes_added = 0
+    edges_added = 0
     for sub in subs:
-        results = fetch_literature_for_topic(sub.topic, sub.keywords)
-        for paper in results:
-            existing = LiteratureItem.query.filter_by(
-                doi=paper.get("doi")
-            ).first()
-            if not existing and paper.get("doi"):
-                item = LiteratureItem(
-                    title=paper.get("title", ""),
-                    authors=paper.get("authors", ""),
-                    journal=paper.get("journal", ""),
-                    year=paper.get("year"),
-                    doi=paper.get("doi", ""),
-                    abstract=paper.get("abstract", ""),
-                    url=paper.get("url", ""),
-                    topic=sub.topic,
-                    citation_count=paper.get("citation_count", 0),
-                )
-                db.session.add(item)
-                count += 1
-        db.session.commit()
-    flash(f"??????? {count} ???", "success")
+        query = " ".join(filter(None, [sub.topic, sub.keywords]))
+        _, stats = sync_citation_network(query, topic=sub.topic, max_nodes=35)
+        nodes_added += stats["created_nodes"]
+        edges_added += stats["created_edges"]
+    flash(f"已同步 {nodes_added} 篇新文献和 {edges_added} 条真实引用关系", "success")
     return redirect(url_for("literature"))
 
 
@@ -329,9 +316,21 @@ def nebula():
 @app.route("/api/nebula-data")
 @login_required
 def nebula_data():
+    query = request.args.get("q", "").strip()
+    query_type = request.args.get("type", "keyword")
+    if query:
+        from literature_agent import sync_citation_network
+        try:
+            graph, stats = sync_citation_network(query, query_type=query_type, topic=query, max_nodes=45)
+            graph["sync"] = stats
+            graph["query"] = query
+            return jsonify(graph)
+        except Exception as exc:
+            return jsonify({"nodes": [], "edges": [], "error": str(exc), "source": "OpenAlex"}), 502
+
     items = LiteratureItem.query.all()
     if not items:
-        return jsonify({"nodes": [], "edges": []})
+        return jsonify({"nodes": [], "edges": [], "source": "OpenAlex"})
 
     from literature_agent import generate_citation_graph
     data = generate_citation_graph(items)
@@ -639,14 +638,21 @@ def literature_upload_submit():
             upload.abstract = info.get("abstract", "")
             upload.citation_count = info.get("citation_count", 0)
             upload.status = "completed"
-            existing = LiteratureItem.query.filter_by(doi=info.get("doi", doi)).first()
-            if not existing and info.get("doi"):
+            resolved_doi = info.get("doi") or doi or None
+            resolved_openalex_id = info.get("openalex_id", "")
+            existing = None
+            if resolved_openalex_id:
+                existing = LiteratureItem.query.filter_by(openalex_id=resolved_openalex_id).first()
+            if not existing and resolved_doi:
+                existing = LiteratureItem.query.filter_by(doi=resolved_doi).first()
+            if not existing:
                 item = LiteratureItem(
                     title=info.get("title", title),
                     authors=info.get("authors", ""),
                     journal=info.get("journal", ""),
                     year=info.get("year"),
-                    doi=info.get("doi", doi),
+                    doi=resolved_doi,
+                    openalex_id=resolved_openalex_id or None,
                     abstract=info.get("abstract", ""),
                     url=info.get("url", url),
                     topic="user-uploaded",
@@ -998,11 +1004,10 @@ def agent_chat():
     question = data.get("question", "")
     if not question:
         return jsonify({"answer": "Please ask a question"})
-    key_obj = ApiKey.query.filter_by(is_active=True).first()
-    if not key_obj:
-        return jsonify({"answer": "No LLM key configured. Add in API Keys."})
-    provider = key_obj.provider or "openai"
-    answer = call_llm(key_obj.encrypted_key, provider, question)
+    answer, config = call_configured_llm(question)
+    if not config:
+        return jsonify({"answer": "未配置 LLM。请设置环境变量或在后台添加 API 配置。"}), 503
+    provider = config.provider
     # Save chat history
     try:
         ch_user = ChatHistory(user_id=current_user.id, role="user", message=question)
@@ -1012,7 +1017,7 @@ def agent_chat():
         db.session.commit()
     except:
         pass
-    return jsonify({"answer": "[" + provider + "] " + answer if answer else answer, "provider": provider})
+    return jsonify({"answer": answer, "provider": provider, "model": config.model})
 
 
 @app.route("/api/chat/history", methods=["GET"])
@@ -1282,30 +1287,61 @@ def api_planet_data():
 
 
 @app.route("/admin/api-keys", methods=["GET", "POST"])
-@login_required
+@admin_required
 def admin_api_keys():
     if request.method == "POST":
-        provider = request.form.get("provider", "openai")
+        provider = request.form.get("provider", "custom").strip().lower()
         key_name = request.form.get("key_name", "default")
         api_key = request.form.get("api_key", "").strip()
-        if api_key:
-            key = ApiKey(user_id=current_user.id, provider=provider, key_name=key_name, encrypted_key=api_key)
+        endpoint = request.form.get("endpoint", "").strip()
+        model_name = request.form.get("model_name", "").strip()
+        deployment = request.form.get("deployment", "").strip()
+        api_style = request.form.get("api_style", "auto").strip()
+        if api_key and endpoint and model_name:
+            key = ApiKey(
+                user_id=current_user.id,
+                provider=provider,
+                key_name=key_name,
+                encrypted_key=api_key,
+                endpoint=endpoint,
+                model_name=model_name,
+                deployment=deployment,
+                api_style=api_style,
+            )
             db.session.add(key)
             db.session.commit()
-            flash("API Key 已保存", "success")
+            flash("LLM API 配置已保存", "success")
+        else:
+            flash("API Key、端点地址和模型编码均为必填项", "error")
         return redirect(url_for("admin_api_keys"))
     keys = ApiKey.query.order_by(ApiKey.created_at.desc()).all()
-    return render_template("admin_api_keys.html", keys=keys)
+    return render_template("admin_api_keys.html", keys=keys, env_config=config_from_environment())
 
 
 @app.route("/admin/api-keys/delete/<int:k_id>")
-@login_required
+@admin_required
 def admin_delete_api_key(k_id):
     key = db.session.get(ApiKey, k_id)
     if key:
         db.session.delete(key)
         db.session.commit()
         flash("API Key 已删除", "info")
+    return redirect(url_for("admin_api_keys"))
+
+
+@app.route("/admin/api-keys/test/<int:k_id>", methods=["POST"])
+@admin_required
+def admin_test_api_key(k_id):
+    key = db.session.get(ApiKey, k_id)
+    config = config_from_key_record(key)
+    if not config:
+        flash("该 API 配置不完整", "error")
+    else:
+        result = execute_llm_request(config, "Reply with exactly: API connected")
+        if result.startswith(("API Error", "Request Error")):
+            flash(result, "error")
+        else:
+            flash(f"连接成功：{result[:120]}", "success")
     return redirect(url_for("admin_api_keys"))
 
 
@@ -1317,39 +1353,11 @@ def agent_search():
     query = ""
     if request.method == "POST":
         query = request.form.get("query", "")
-        provider = request.form.get("provider", "openai")
-        key_entry = ApiKey.query.filter_by(is_active=True, provider=provider).first()
-        if key_entry and key_entry.encrypted_key:
-            result_text = call_llm(key_entry.encrypted_key, provider, query)
-        else:
+        provider = request.form.get("provider", "").strip() or None
+        result_text, config = call_configured_llm(query, provider=provider)
+        if not config:
             result_text = "未配置 API Key，请管理员在后台添加。"
     return render_template("agent_search.html", result=result_text, query=query)
-
-
-def call_llm(api_key, provider, prompt, system="You are an EM expert."):
-    """Call LLM API to process the prompt."""
-    import requests as req, os as _os
-    _proxies = {}
-    _hp = _os.environ.get("HTTP_PROXY", "") or _os.environ.get("http_proxy", "")
-    _hs = _os.environ.get("HTTPS_PROXY", "") or _os.environ.get("https_proxy", "")
-    if _hp: _proxies["http"] = _hp
-    if _hs: _proxies["https"] = _hs
-    try:
-        if provider == "deepseek":
-            url = "https://api.deepseek.com/v1/chat/completions"
-            model = "deepseek-chat"
-        else:
-            url = "https://api.openai.com/v1/chat/completions"
-            model = "gpt-3.5-turbo"
-        resp = req.post(url, headers={"Authorization": "Bearer " + api_key, "Content-Type": "application/json"},
-            json={"model": model, "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
-                  "max_tokens": 600}, timeout=60, proxies=_proxies if _proxies else None)
-        if resp.status_code == 200:
-            return resp.json()["choices"][0]["message"]["content"]
-        else:
-            return "API Error (" + str(resp.status_code) + "): " + resp.text[:300]
-    except Exception as e:
-        return "Request Error: " + str(e)
 
 
 
@@ -1414,19 +1422,18 @@ def literature_collection():
 
 
 @app.route("/admin/knowledge/llm-generate", methods=["POST"])
-@login_required
+@admin_required
 def admin_llm_generate():
     topic = request.form.get("topic", "").strip()
     if not topic:
         flash("请输入主题", "error")
         return redirect(url_for("admin_knowledge"))
-    key_obj = ApiKey.query.filter_by(is_active=True).first()
-    if not key_obj:
+    config = get_llm_config()
+    if not config:
         flash("请先在 API Keys 配置 LLM Key", "error")
         return redirect(url_for("admin_api_keys"))
-    provider = key_obj.provider or "openai"
     prompt = 'Generate 3 EM knowledge points about ' + topic + ' in JSON: [{"title":"...","content":"...","difficulty":"beginner/intermediate/advanced"}]'
-    text = call_llm(key_obj.encrypted_key, provider, prompt)
+    text = execute_llm_request(config, prompt)
     if not text:
         flash("API Error: No response", "error")
         return redirect(url_for("admin_knowledge"))
@@ -1554,9 +1561,40 @@ def fromjson_filter(value):
     except: return []
 
 
+def _ensure_schema_updates():
+    """Apply small SQLite-compatible upgrades for installations without Alembic."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(db.engine)
+    upgrades = {
+        "literature_items": {
+            "openalex_id": "VARCHAR(50)",
+        },
+        "api_keys": {
+            "endpoint": "VARCHAR(500) DEFAULT ''",
+            "model_name": "VARCHAR(100) DEFAULT ''",
+            "deployment": "VARCHAR(200) DEFAULT ''",
+            "api_style": "VARCHAR(30) DEFAULT 'auto'",
+        },
+    }
+    with db.engine.begin() as connection:
+        for table_name, columns in upgrades.items():
+            existing = {column["name"] for column in inspector.get_columns(table_name)}
+            for column_name, definition in columns.items():
+                if column_name not in existing:
+                    connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}"))
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_literature_items_openalex_id ON literature_items (openalex_id)"))
+        connection.execute(text(
+            "DELETE FROM citation_links WHERE id NOT IN "
+            "(SELECT MIN(id) FROM citation_links GROUP BY source_id, target_id)"
+        ))
+        connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_citation_source_target ON citation_links (source_id, target_id)"))
+
+
 def init_db():
     with app.app_context():
         db.create_all()
+        _ensure_schema_updates()
         # Seed knowledge points if empty
         if KnowledgePoint.query.count() == 0:
             from knowledge_points import KNOWLEDGE_POINTS

@@ -1,51 +1,54 @@
 {% extends "base.html" %}
-{% block title %}文献引用星云 — 电子显微学前沿课程{% endblock %}
+{% block title %}文献引用星云 · 电子显微学前沿课程{% endblock %}
 {% block content %}
 <div class="nebula-page">
     <div class="page-header">
-        <h1>🌌 文献引用关系星云图</h1>
-        <p class="text-muted">可视化展示文献之间的引用关系网络</p>
+        <div>
+            <h1>🌌 文献引用关系星云图</h1>
+            <p class="text-muted">从 OpenAlex 检索真实文献，并按论文明确列出的参考文献生成有向引用关系。</p>
+        </div>
+    </div>
+
+    <div class="card nebula-search-card">
+        <div class="card-body">
+            <form id="nebula-search-form" class="form">
+                <div class="form-row">
+                    <div class="form-group flex-grow">
+                        <input id="nebula-query" type="text" placeholder="输入关键词，例如：cryo electron microscopy；或输入 DOI" required>
+                    </div>
+                    <div class="form-group">
+                        <select id="nebula-query-type">
+                            <option value="keyword">关键词</option>
+                            <option value="doi">DOI</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">检索并生成图谱</button>
+                </div>
+            </form>
+            <p id="nebula-status" class="text-muted">未输入查询时展示已同步到本地数据库的图谱。</p>
+        </div>
     </div>
 
     <div class="card">
         <div class="card-body">
             <div id="nebula-container">
-                <div class="nebula-loading">
-                    <div class="spinner"></div>
-                    <p>加载文献数据...</p>
-                </div>
+                <div class="nebula-loading"><div class="spinner"></div><p>加载文献数据...</p></div>
             </div>
             <div class="nebula-legend">
-                <div class="legend-item">
-                    <span class="legend-dot" style="background:#3b82f6;"></span>
-                    <span>文献节点（圆点大小表示引用量）</span>
-                </div>
-                <div class="legend-item">
-                    <span class="legend-line"></span>
-                    <span>引用关系</span>
-                </div>
+                <div class="legend-item"><span class="legend-dot" style="background:#3b82f6;"></span><span>节点大小表示被引次数</span></div>
+                <div class="legend-item"><span class="legend-line"></span><span>箭头从引用论文指向被引用论文</span></div>
+                <div class="legend-item"><span>数据来源：<strong id="nebula-source">OpenAlex</strong></span></div>
             </div>
         </div>
     </div>
 
     <div class="card">
-        <div class="card-header">
-            <h2>数据统计</h2>
-        </div>
+        <div class="card-header"><h2>数据统计</h2></div>
         <div class="card-body">
             <div class="nebula-stats" id="nebula-stats">
-                <div class="stat-mini">
-                    <span class="stat-value" id="node-count">-</span>
-                    <span class="stat-label">文献总数</span>
-                </div>
-                <div class="stat-mini">
-                    <span class="stat-value" id="edge-count">-</span>
-                    <span class="stat-label">引用关系数</span>
-                </div>
-                <div class="stat-mini">
-                    <span class="stat-value" id="topic-count">-</span>
-                    <span class="stat-label">研究主题数</span>
-                </div>
+                <div class="stat-mini"><span class="stat-value" id="node-count">-</span><span class="stat-label">文献总数</span></div>
+                <div class="stat-mini"><span class="stat-value" id="edge-count">-</span><span class="stat-label">真实引用关系</span></div>
+                <div class="stat-mini"><span class="stat-value" id="topic-count">-</span><span class="stat-label">研究主题</span></div>
             </div>
         </div>
     </div>

@@ -75,6 +75,7 @@ class LiteratureItem(db.Model):
     journal = db.Column(db.String(300), default="")
     year = db.Column(db.Integer)
     doi = db.Column(db.String(200), unique=True)
+    openalex_id = db.Column(db.String(50), unique=True, index=True, nullable=True)
     abstract = db.Column(db.Text, default="")
     url = db.Column(db.String(500), default="")
     topic = db.Column(db.String(200), default="")
@@ -93,6 +94,10 @@ class CitationLink(db.Model):
 
     source = db.relationship("LiteratureItem", foreign_keys=[source_id], backref="cited_by")
     target = db.relationship("LiteratureItem", foreign_keys=[target_id], backref="cites")
+
+    __table_args__ = (
+        db.UniqueConstraint("source_id", "target_id", name="unique_citation_edge"),
+    )
 
 
 class LiteratureSubscription(db.Model):
@@ -205,6 +210,10 @@ class ApiKey(db.Model):
     provider = db.Column(db.String(50), default="openai")
     key_name = db.Column(db.String(100), default="default")
     encrypted_key = db.Column(db.Text, nullable=False)
+    endpoint = db.Column(db.String(500), default="")
+    model_name = db.Column(db.String(100), default="")
+    deployment = db.Column(db.String(200), default="")
+    api_style = db.Column(db.String(30), default="auto")
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     user = db.relationship("User", backref="api_keys")
