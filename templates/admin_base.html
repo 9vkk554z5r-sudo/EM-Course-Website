@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block scripts %}{% endblock %}
+{% block content %}
+<div class="admin-layout">
+    <aside class="admin-sidebar">
+        <h3>管理后台</h3>
+        <a href="{{ url_for('admin_dashboard') }}" class="admin-nav-link {% if request.endpoint == 'admin_dashboard' %}active{% endif %}">概览</a>
+        <a href="{{ url_for('admin_knowledge') }}" class="admin-nav-link {% if request.endpoint == 'admin_knowledge' %}active{% endif %}">知识库</a>
+        <a href="{{ url_for('admin_videos') }}" class="admin-nav-link {% if request.endpoint == 'admin_videos' %}active{% endif %}">实验视频</a>
+        <a href="{{ url_for('admin_users') }}" class="admin-nav-link {% if request.endpoint == 'admin_users' %}active{% endif %}">用户管理</a>
+       <a href="{{ url_for('admin_api_keys') }}" class="admin-nav-link {% if request.endpoint == 'admin_api_keys' %}active{% endif %}">API Keys</a>
+        <a href="{{ url_for('admin_presentation_templates') }}" class="admin-nav-link {% if request.endpoint == 'admin_presentation_templates' %}active{% endif %}">PPT模板</a>
+       <a href="{{ url_for('dashboard') }}" class="admin-nav-link">返回前台</a>
+    </aside>
+    <main class="admin-main">
+        {% block admin_content %}{% endblock %}
+    </main>
+</div>
+{% endblock %}

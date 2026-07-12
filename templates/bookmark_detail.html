@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ _("文献详情", "Paper Detail") }}{% endblock %}
+{% block content %}
+<div class="page-header">
+<h1>{{ bm.title }}</h1>
+<p class="text-muted">{{ bm.authors }} · {{ bm.journal }} ({{ bm.year }})</p>
+<a href="{{ url_for('literature_collection_view') }}" class="btn btn-sm btn-outline">← {{ _("返回收藏夹", "Back to Collection") }}</a>
+</div>
+<div class="card"><div class="card-header"><h2>📄 {{ _("文献信息", "Paper Info") }}</h2></div><div class="card-body">
+<div class="knowledge-content">
+<p><strong>{{ _("标题:", "Title:") }}</strong> {{ bm.title }}</p>
+<p><strong>{{ _("作者:", "Authors:") }}</strong> {{ bm.authors }}</p>
+<p><strong>{{ _("期刊:", "Journal:") }}</strong> {{ bm.journal }}</p>
+<p><strong>{{ _("年份:", "Year:") }}</strong> {{ bm.year }}</p>
+{% if bm.doi %}<p><strong>DOI：</strong><a href="https://doi.org/{{ bm.doi }}" target="_blank">{{ bm.doi }}</a></p>{% endif %}
+{% if bm.url %}<p><a href="{{ bm.url }}" target="_blank" class="btn btn-outline">🔗 {{ _("查看原文", "View Original") }}</a></p>{% endif %}
+{% if bm.abstract %}<p><strong>{{ _("摘要:", "Abstract:") }}</strong><br>{{ bm.abstract[:500] }}{% if bm.abstract|length > 500 %}...{% endif %}</p>{% endif %}
+<p><strong>{{ _("被引数:", "Citations:") }}</strong> {{ bm.citation_count }}</p>
+<p><strong>{{ _("来源:", "Source:") }}</strong> {{ bm.source }}</p>
+{% if bm.notes %}<p><strong>{{ _("备注:", "Notes:") }}</strong> {{ bm.notes }}</p>{% endif %}
+{% if category %}<p><strong>{{ _("分类:", "Category:") }}</strong> 📁 {{ category.name }}</p>{% endif %}
+<p><strong>{{ _("收藏时间:", "Added:") }}</strong> {{ bm.added_at.strftime("%Y-%m-%d %H:%M") if bm.added_at else "" }}</p>
+</div>
+</div></div>
+{% endblock %}

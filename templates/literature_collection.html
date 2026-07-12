@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}{{ _("文献收藏夹", "Collection") }}{% endblock %}
+{% block content %}
+<div class="page-header"><h1>{{ _("📚 我的文献收藏", "📚 My Collection") }}</h1>
+<p class="text-muted">{{ _("像Zotero一样管理你的文献 - 创建分类，收藏文献", "Zotero-style management - create categories, bookmark papers") }}</p></div>
+
+<div class="stats-grid" style="margin-bottom:16px">
+<div class="stat-card"><div class="stat-icon">📚</div><div class="stat-info"><span class="stat-value" id="totalBookmarks">0</span><span class="stat-label">{{ _("已收藏", "Bookmarked") }}</span></div></div>
+<div class="stat-card"><div class="stat-icon">📁</div><div class="stat-info"><span class="stat-value" id="totalCategories">0</span><span class="stat-label">{{ _("分类", "Categories") }}</span></div></div>
+</div>
+
+<div class="card"><div class="card-header"><h2>{{ _("📁 管理分类", "📁 Manage Categories") }}</h2></div><div class="card-body">
+<div class="form-row"><div class="form-group flex-grow"><input type="text" id="catName" placeholder="{{ _("新分类名称", "New category name") }}" style="width:100%"></div>
+<button class="btn btn-primary btn-sm" onclick="addCategory()">{{ _("创建", "Create") }}</button></div>
+<div id="categoryList" class="paper-list" style="margin-top:10px"></div>
+</div></div>
+
+<div class="card"><div class="card-header"><h2>{{ _("📚 我的收藏", "📚 My Bookmarks") }}</h2>
+<select id="filterCat" onchange="loadBookmarks()" style="margin-left:auto;padding:4px 8px;border-radius:6px;background:rgba(10,15,36,0.6);color:var(--text-primary);border:1px solid rgba(59,130,246,0.2)">
+<option value="">{{ _("全部", "All") }}</option></select></div>
+<div class="card-body">
+<div id="bookmarkList" class="paper-list"></div>
+<div id="emptyState" class="empty-state" style="display:none"><p>{{ _("还没有收藏文献", "No bookmarks yet") }}</p></div>
+</div></div>
+
+<script>
+function addCategory() {
+    var n = document.getElementById("catName").value.trim();
+    if (!n) return;
+    fetch("/api/literature/categories", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:n})})
+    .then(function(r){return r.json()}).then(function(d){if(d.ok){document.getElementById("catName").value="";loadCategories();loadBookmarks();}});
+}
+function deleteCategory(id) {
+    if(!confirm("Delete category and move papers to uncategorized?"))return;
+    fetch("/api/literature/category/delete/"+id).then(function(){loadCategories();loadBookmarks();});
+}
+function deleteBookmark(id) {
+    if(!confirm("Remove bookmark?"))return;
+    fetch("/api/literature/bookmark/delete/"+id).then(function(){loadBookmarks();});
+}
+var activeCategory = "";
+function filterByCategory(catId) {
+    activeCategory = catId;
+    document.getElementById("filterCat").value = catId;
+    loadBookmarks();
+    loadCategories();
+}
+function loadCategories() {
+    fetch("/api/literature/categories").then(function(r){return r.json()}).then(function(cats){
+        var html = "";
+        var sel = '<option value="">{{ _("全部", "All") }}</option>';
+        document.getElementById("totalCategories").textContent = cats.length;
+        cats.forEach(function(c){
+            var active = (activeCategory == c.id) ? " style=\"border-color:var(--accent-cyan);background:rgba(6,182,212,0.08)\"" : "";
+            html += "<div class=\\"paper-item\\""+active+"><span class=\\"paper-title\\" style=\\"cursor:pointer\\" onclick=\\"filterByCategory("+c.id+")\\">📁 "+c.name+"</span><div class=\\"paper-meta\\">"+c.count+" papers <a href=\\"#\\" onclick=\\"filterByCategory('')\\">View all</a> &middot; <a href=\\"#\\" onclick=\\"deleteCategory("+c.id+");return false\\" class=\\"btn btn-sm btn-danger\\">Delete</a></div></div>";
+            sel += "<option value=\""+c.id+"\">"+c.name+"</option>";
+        });
+        if(!html) html = "<p class=\"text-muted\">{{ _("还没有分类", "No categories yet") }}</p>";
+        document.getElementById("categoryList").innerHTML = html;
+        document.getElementById("filterCat").innerHTML = sel;
+    });
+}
+function loadBookmarks() {
+    var cat = document.getElementById("filterCat").value;
+    var url = "/api/literature/bookmarks";
+    if(cat) url += "?category_id="+cat;
+    fetch(url).then(function(r){return r.json()}).then(function(items){
+        var html = "";
+        document.getElementById("totalBookmarks").textContent = items.length;
+        var empty = document.getElementById("emptyState");
+        if(items.length === 0) { empty.style.display = "block"; document.getElementById("bookmarkList").innerHTML = ""; return; }
+        empty.style.display = "none";
+        items.forEach(function(b){
+            html += "<div class=\"paper-item\"><div class=\"paper-title\"><a href=\"/bookmark/"+b.id+"\" style=\"color:inherit;text-decoration:none\">"+b.title+"</a></div><div class=\"paper-meta\">"+b.authors+" · "+b.journal+" ("+b.year+") · Source: "+b.source+"<a href=\"/bookmark/"+b.id+"\" class=\"btn btn-sm btn-primary\" style=\"margin-left:8px\">🔍 {{ _("查看", "View") }}</a><a href=\"#\" onclick=\"deleteBookmark("+b.id+");return false\" class=\"btn btn-sm btn-danger\" style=\"margin-left:4px\">{{ _("删除", "Delete") }}</a></div></div>";
+        });
+        document.getElementById("bookmarkList").innerHTML = html;
+    });
+}
+document.addEventListener("DOMContentLoaded", function(){loadCategories();loadBookmarks();});
+</script>
+{% endblock %}

@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}关键词文献星球{% endblock %}
+{% block content %}
+<div class="page-header"><h1>🪐 关键词文献星球</h1><p class="text-muted">每个关键词是一个星系，文献是环绕的小行星。点击小行星可以跳转对应文献信息</p>
+<button class="btn btn-sm btn-primary" onclick="document.getElementById('createForm').style.display='block'">+ 创建星球</button></div>
+<div class="card" style="margin-bottom:16px;"><div class="card-header"><h2>📤 上传DOI生成星云</h2></div><div class="card-body"><form method="POST" action="{{ url_for("upload_dois") }}" class="form"><div class="form-row"><div class="form-group flex-grow"><input type="text" name="keyword" placeholder="关键词名称" required style="width:100%"></div><button type="submit" class="btn btn-primary">🚀 生成星云</button></div><div class="form-group"><textarea name="dois" rows="4" placeholder="输入DOI（每行一个）" style="width:100%" required></textarea></div></form></div></div>
+<div id="planet-solar" style="height:600px;background:radial-gradient(ellipse at center,#0a0f24 0%,#000 100%);border-radius:12px;cursor:grab;margin-bottom:20px;"></div>
+<div class="card" id="createForm" style="display:none"><div class="card-header"><h2>创建新星球</h2></div><div class="card-body">
+<form method="POST" action="{{ url_for('planet_create') }}" class="form">
+<div class="form-row"><div class="form-group flex-grow"><input type="text" name="name" placeholder="星球名称" required></div>
+<div class="form-group"><input type="text" name="topic" placeholder="主题词"></div>
+<div class="form-group"><input type="color" name="color" value="#3b82f6"></div></div>
+<div class="form-group"><textarea name="description" rows="2" placeholder="描述"></textarea></div>
+<button type="submit" class="btn btn-primary">创建</button></form></div></div>
+{% if planets %}
+<div class="card"><div class="card-header"><h2>我的星球列表</h2></div><div class="card-body">
+{% for p in planets %}{% set pc = p.papers.count() %}
+<div class="paper-item"><span class="paper-title">{{ p.name }}</span>
+<div class="paper-meta">{{ p.topic }} · {{ pc }} 篇文献 · <a href="{{ url_for('planet_detail', pid=p.id) }}">查看详情</a></div></div>
+{% endfor %}</div></div>{% endif %}
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/three.min.js') }}"></script>
+<script>
+var planetColor = {{ planet_color|tojson }};
+var planetName = {{ planet_name|tojson }};
+var solarPapers = {{ (papers if papers else samples)|tojson }};
+document.addEventListener('DOMContentLoaded', function() {
+    var c = document.getElementById('planet-solar'); if (!c || typeof THREE === 'undefined' || solarPapers.length === 0) return;
+    var W = c.clientWidth, H = 500;
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(50, W/H, 0.1, 1000); camera.position.z = 14;
+    var renderer = new THREE.WebGLRenderer({alpha:true,antialias:true});
+    renderer.setSize(W,H); renderer.setPixelRatio(Math.min(window.devicePixelRatio,2)); c.appendChild(renderer.domElement);
+    // Galaxy disk stars (2000)
+    var sg=new THREE.BufferGeometry();var sp=[];
+    for(var i=0;i<2000;i++){var r=Math.pow(Math.random(),1.5)*40;var a=Math.random()*Math.PI*2+r*0.3;var h=(Math.random()-0.5)*r*0.15;
+    sp.push(Math.cos(a)*r,h,Math.sin(a)*r);}
+    sg.setAttribute('position',new THREE.Float32BufferAttribute(sp,3));
+    scene.add(new THREE.Points(sg,new THREE.PointsMaterial({color:0xffffff,size:0.05,transparent:true,opacity:0.3})));
+    // Filler disk particles
+    var gp=new THREE.BufferGeometry();var gpp=[];
+    for(var i=0;i<500;i++){var r=Math.pow(Math.random(),1.5)*7;var a=Math.random()*Math.PI*2+r*0.4;var h=(Math.random()-0.5)*r*0.2;
+    gpp.push(Math.cos(a)*r,h,Math.sin(a)*r);}
+    gp.setAttribute('position',new THREE.Float32BufferAttribute(gpp,3));
+    scene.add(new THREE.Points(gp,new THREE.PointsMaterial({color:0x88bbff,size:0.03,transparent:true,opacity:0.25})));
+    // Disk glow
+    var dcv=document.createElement('canvas');dcv.width=256;dcv.height=256;var dcx=dcv.getContext('2d');
+    var dgr=dcx.createRadialGradient(128,128,0,128,128,128);dgr.addColorStop(0,'rgba(245,215,110,0.05)');dgr.addColorStop(0.5,'rgba(245,215,110,0.02)');dgr.addColorStop(1,'rgba(245,215,110,0)');
+    dcx.fillStyle=dgr;dcx.fillRect(0,0,256,256);
+    var dt=new THREE.CanvasTexture(dcv);dt.needsUpdate=true;
+    var ds=new THREE.Sprite(new THREE.SpriteMaterial({map:dt,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));
+    ds.scale.set(25,25,1);scene.add(ds);
+
+    // Central text label
+    var lcv=document.createElement('canvas');lcv.width=512;lcv.height=128;
+    var lcx=lcv.getContext('2d');lcx.fillStyle='rgba(0,0,0,0)';lcx.fillRect(0,0,512,128);
+    lcx.fillStyle='rgba(255,255,255,0.9)';lcx.font='bold 28px Inter,sans-serif';lcx.textAlign='center';lcx.textBaseline='middle';
+    lcx.fillText(planetName||'',256,64);
+    var lt=new THREE.CanvasTexture(lcv);lt.needsUpdate=true;
+    var ls=new THREE.Sprite(new THREE.SpriteMaterial({map:lt,transparent:true,depthTest:false,blending:THREE.AdditiveBlending}));
+    ls.position.set(0,2.2,0);ls.scale.set(5,1.25,1);scene.add(ls);;
+    var cc=new THREE.Color(planetColor||'#F5D76E'); var cg=new THREE.SphereGeometry(1.2,32,32);
+    var cm=new THREE.MeshPhongMaterial({color:cc,emissive:cc,emissiveIntensity:0.8});
+    var center=new THREE.Mesh(cg,cm); scene.add(center);
+    // Gradient glow sprite (brighter at center, fading outward)
+    var gcv=document.createElement('canvas');gcv.width=256;gcv.height=256;
+    var gctx=gcv.getContext('2d');var grad=gctx.createRadialGradient(128,128,0,128,128,128);
+    grad.addColorStop(0,'rgba(245,215,110,0.6)');grad.addColorStop(0.3,'rgba(245,215,110,0.25)');
+    grad.addColorStop(0.6,'rgba(245,215,110,0.1)');grad.addColorStop(1,'rgba(245,215,110,0)');
+    gctx.fillStyle=grad;gctx.fillRect(0,0,256,256);
+    var gtex=new THREE.CanvasTexture(gcv);gtex.needsUpdate=true;
+    var gsm=new THREE.SpriteMaterial({map:gtex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false});
+    var gsprite=new THREE.Sprite(gsm);gsprite.scale.set(20,20,1);scene.add(gsprite);
+    var l1=new THREE.DirectionalLight(0xffffff,1.2); l1.position.set(10,20,10); scene.add(l1); scene.add(new THREE.AmbientLight(0x404060));
+    var meshes=[];
+    // Orbit ring paths
+    for(var ri=0;ri<5;ri++){var rr=1.5+ri*1.2;var rgeo=new THREE.BufferGeometry();var rpts=[];for(var a=0;a<=64;a++){var ang=(a/64)*Math.PI*2;rpts.push(Math.cos(ang)*rr,0,Math.sin(ang)*rr);}rgeo.setAttribute('position',new THREE.Float32BufferAttribute(rpts,3));scene.add(new THREE.Line(rgeo,new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0.04})));}
+    solarPapers.forEach(function(p,i){
+        var sz=0.2+Math.random()*0.1+(1-i/solarPapers.length)*0.06; var col=new THREE.Color(planetColor||'#F5D76E');col.multiplyScalar(0.5+Math.random()*0.5);
+        var g=new THREE.SphereGeometry(sz,12,12); var m=new THREE.MeshPhongMaterial({color:col,emissive:col,emissiveIntensity:0.2});
+        var mesh=new THREE.Mesh(g,m); var angle=(i/solarPapers.length)*Math.PI*2;
+        var t=i/solarPapers.length; var r=1.5+t*6+t*Math.sin(t*10)*0.5; var h=(Math.random()-0.5)*r*0.4;
+        mesh.position.set(Math.cos(angle)*r,h,Math.sin(angle)*r); mesh.userData={url:p.url};
+        scene.add(mesh); meshes.push({mesh:mesh,angle:angle,radius:r,height:h,speed:0.15+Math.random()*0.2});
+        var cv=document.createElement('canvas'); cv.width=200; cv.height=48;
+        var cx=cv.getContext('2d'); cx.fillStyle='rgba(0,0,0,0.5)'; cx.fillRect(4,4,192,40);
+        cx.fillStyle='#fff'; cx.font='12px Inter,sans-serif'; cx.textAlign='center';
+        cx.fillText(p.label||(p.title||'').slice(0,15),100,30);
+        var tex=new THREE.CanvasTexture(cv); tex.needsUpdate=true;
+        var sm=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false});
+        var sprite=new THREE.Sprite(sm); sprite.position.set(Math.cos(angle)*r,h+1,Math.sin(angle)*r);
+        sprite.scale.set(2,0.5,1); scene.add(sprite); mesh.userData.sprite=sprite;
+    });
+    var lines=[];
+    for(var li=0;li<meshes.length-1;li++){var lblg=new THREE.BufferGeometry();lblg.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(72),3));var lblc=new THREE.Color(planetColor||'#F5D76E');var lblm=new THREE.LineBasicMaterial({color:lblc,transparent:true,opacity:0.35});scene.add(new THREE.Line(lblg,lblm));lines.push({g:lblg,i1:li,i2:li+1,off:0.5+Math.random()*0.8});if(li%3===0&&li+1<meshes.length-1){var lblg2=new THREE.BufferGeometry();lblg2.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(72),3));var lblc2=new THREE.Color(planetColor||'#F5D76E');var lblm2=new THREE.LineBasicMaterial({color:lblc2,transparent:true,opacity:0.25});scene.add(new THREE.Line(lblg2,lblm2));lines.push({g:lblg2,i1:li+1,i2:li,off:0.5+Math.random()*0.8});}}
+
+    var raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2(),hovered=null,isDragging=false,px,py,rx=0,ry=0,wasDragged=false;
+    c.addEventListener('mousemove',function(e){var r=c.getBoundingClientRect();mouse.x=((e.clientX-r.left)/r.width)*2-1;mouse.y=-((e.clientY-r.top)/r.height)*2+1;raycaster.setFromCamera(mouse,camera);var hits=raycaster.intersectObjects(meshes.map(function(m){return m.mesh;}));if(hits.length>0){c.style.cursor='pointer';hovered=hits[0].object;}else{c.style.cursor='grab';hovered=null;}});
+    c.addEventListener('click',function(){if(wasDragged)return;if(hovered&&hovered.userData.url)window.open(hovered.userData.url,'_blank');});
+    c.addEventListener('mousedown',function(e){isDragging=true;wasDragged=false;px=e.clientX;py=e.clientY;});
+    window.addEventListener('mouseup',function(){isDragging=false;});
+    c.addEventListener('mousemove',function(e){if(isDragging){wasDragged=true;ry+=(e.clientX-px)*0.008;rx+=(e.clientY-py)*0.008;px=e.clientX;py=e.clientY;}});
+    var autoRotate=true; c.addEventListener('mousedown',function(){autoRotate=false;}); window.addEventListener('mouseup',function(){setTimeout(function(){autoRotate=true;},3000);});
+    c.addEventListener('wheel',function(e){e.preventDefault();var z=camera.position.z+e.deltaY*0.02;if(z>7&&z<35)camera.position.z=z;},{passive:false});
+    function animate(){requestAnimationFrame(animate);if(autoRotate&&!isDragging)ry+=0.003;meshes.forEach(function(m){m.angle+=0.01*m.speed;m.mesh.position.x=Math.cos(m.angle)*m.radius;m.mesh.position.z=Math.sin(m.angle)*m.radius;m.mesh.rotation.y+=0.02;if(m.mesh.userData.sprite){m.mesh.userData.sprite.position.x=Math.cos(m.angle)*m.radius;m.mesh.userData.sprite.position.z=Math.sin(m.angle)*m.radius;}});if(typeof lines!=='undefined'){lines.forEach(function(l){var m1=meshes[l.i1].mesh,m2=meshes[l.i2].mesh;var sx=m1.position.x,sy=m1.position.y,sz=m1.position.z,ex=m2.position.x,ey=m2.position.y,ez=m2.position.z;var dx=ex-sx,dz=ez-sz,len=Math.sqrt(dx*dx+dz*dz);if(len<0.01)return;var mx=(sx+ex)/2+(-dz/len)*l.off,my=(sy+ey)/2,mz=(sz+ez)/2+(dx/len)*l.off;var crv=new THREE.QuadraticBezierCurve3(new THREE.Vector3(sx,sy,sz),new THREE.Vector3(mx,my,mz),new THREE.Vector3(ex,ey,ez));var pts=crv.getPoints(19);var pos=l.g.attributes.position;for(var pi=0;pi<20;pi++){pos.setXYZ(pi,pts[pi].x,pts[pi].y,pts[pi].z);}var lx=pts[18].x,ly=pts[18].y,lz=pts[18].z,ex2=pts[19].x,ey2=pts[19].y,ez2=pts[19].z;var ax=ex2-lx,ay=ey2-ly,az=ez2-lz,al=Math.sqrt(ax*ax+ay*ay+az*az);if(al>0.01){ax/=al;ay/=al;az/=al;var px=-az,py=0,pz=ax,pl=Math.sqrt(px*px+pz*pz);if(pl>0.01){px/=pl;pz/=pl;}else{px=1;pz=0;}var as=0.35;pos.setXYZ(20,ex2+px*as,ey2,ez2+pz*as);pos.setXYZ(21,ex2,ey2,ez2);pos.setXYZ(22,ex2-px*as,ey2,ez2-pz*as);}else{pos.setXYZ(20,ex2,ey2,ez2);pos.setXYZ(21,ex2,ey2,ez2);pos.setXYZ(22,ex2,ey2,ez2);}pos.needsUpdate=true;});}camera.position.x=Math.sin(ry)*Math.cos(rx)*14;camera.position.y=Math.sin(rx)*6+2;camera.position.z=Math.cos(ry)*Math.cos(rx)*14;camera.lookAt(0,0,0);renderer.render(scene,camera);}
+    animate();
+    window.addEventListener('resize',function(){W=c.clientWidth;H=500;camera.aspect=W/H;camera.updateProjectionMatrix();renderer.setSize(W,H);});
+});
+</script>
+{% endblock %}

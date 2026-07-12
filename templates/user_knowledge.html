@@ -1,0 +1,61 @@
+﻿{% extends "base.html" %}
+{% block title %}{{ _("\u77e5\u8bc6\u7ba1\u7406", "Knowledge Management") }}{% endblock %}
+{% block content %}
+<div class="page-header"><h1>\ud83e\udde0 {{ _("\u77e5\u8bc6\u7ba1\u7406", "Knowledge Management") }}</h1>
+<p class="text-muted">{{ _("\u7528AI\u751f\u6210\u3001\u81ea\u5df1\u4e0a\u4f20\u3001\u7f16\u8f91\u7ef4\u62a4\u6240\u6709\u77e5\u8bc6\u70b9", "AI generate, upload, edit all knowledge points") }}</p></div>
+<div style="text-align:right;margin-bottom:10px"><a href="{{ url_for('knowledge_upload') }}" class="btn btn-outline" style="font-size:0.85rem">\U0001f4c1 {{ _("\u4e0a\u4f20\u77e5\u8bc6\u5e93\u6587\u4ef6", "Upload Knowledge File") }}</a></div>
+
+<!-- AI Generate -->
+<div class="card"><div class="card-header"><h2>?? {{ _("AI \u751f\u6210\u77e5\u8bc6\u70b9", "AI Generate") }}</h2></div><div class="card-body">
+<form method="POST" action="{{ url_for('user_llm_generate') }}" class="form">
+<div class="form-row"><div class="form-group flex-grow"><input type="text" name="topic" placeholder="\u8f93\u5165\u4e3b\u9898\uff0c\u5982: cryo-EM" required style="width:100%"></div>
+<button type="submit" class="btn btn-primary">?? {{ _("AI \u751f\u6210", "Generate") }}</button></div>
+<p class="text-muted">{{ _("\u4f1a\u81ea\u52a8\u68c0\u7d22\u5df2\u6709\u77e5\u8bc6\u70b9\uff0c\u907f\u514d\u91cd\u590d\u751f\u6210", "RAG: checks existing KPs to avoid duplicates") }}</p>
+</form></div></div>
+
+<!-- Manual Add -->
+<div class="card"><div class="card-header"><h2>?? {{ _("\u624b\u52a8\u6dfb\u52a0", "Manual Add") }}</h2></div><div class="card-body">
+<form method="POST" action="{{ url_for('user_add_knowledge') }}" class="form">
+<div class="form-row"><div class="form-group flex-grow"><input type="text" name="title" placeholder="{{ _("\u77e5\u8bc6\u70b9\u6807\u9898", "Title") }}" required></div>
+<div class="form-group"><select name="difficulty">
+<option value="beginner">\u521d\u7ea7</option><option value="intermediate">\u4e2d\u7ea7</option><option value="advanced">\u9ad8\u7ea7</option></select></div>
+<div class="form-group"><input type="text" name="category" placeholder="{{ _("\u5206\u7c7b", "Category") }}" value="general"></div></div>
+<div class="form-group"><textarea name="content" rows="4" placeholder="{{ _("\u77e5\u8bc6\u70b9\u5185\u5bb9", "Content") }}" required></textarea></div>
+<button type="submit" class="btn btn-primary">{{ _("\u6dfb\u52a0", "Add") }}</button>
+</form></div></div>
+
+<!-- All Knowledge Points -->
+<div class="card"><div class="card-header"><h2>\ud83d\udcda {{ _("\u6240\u6709\u77e5\u8bc6\u70b9", "All Knowledge Points") }}</h2></div><div class="card-body">
+<div class="knowledge-list">{% for p in points %}
+<div class="knowledge-item">
+<div class="knowledge-top"><h4>{{ p.title }}</h4>
+<span class="badge" style="background:{% if p.difficulty=='beginner' %}#10b981{% elif p.difficulty=='intermediate' %}#f59e0b{% else %}#ef4444{% endif %};">{{ difficulties.get(p.difficulty, p.difficulty) }}</span>
+<span class="badge" style="background:{% if p.source=='user' %}#3b82f6{% elif p.source=='llm' %}#8b5cf6{% else %}#64748b{% endif %};">{{ p.source }}</span></div>
+<p class="text-muted">{{ p.category }} &middot; {{ p.content[:100] }}{% if p.content|length>100 %}...{% endif %} &middot; {{ p.created_at.strftime("%Y-%m-%d") if p.created_at else "" }}</p>
+<div class="knowledge-actions">
+<a href="/knowledge/edit-form/{{ p.id }}" class="btn btn-sm">✏️ {{ _("\u7f16\u8f91", "Edit") }}</a>
+</div></div>{% endfor %}</div></div></div>
+
+<script>
+function editKp(btn) {
+    var m = document.getElementById('editModal');
+    m.style.display='flex';
+    document.getElementById('editTitle').value=btn.getAttribute('editTitle''data-title'
+    document.getElementById('editContent').value=btn.getAttribute('editContent''data-content'
+    document.getElementById('editDifficulty').value=btn.getAttribute('editDifficulty''data-difficulty'
+    document.getElementById('editCategory').value=btn.getAttribute('editCategory''data-category'
+    document.getElementById('editForm').action='/knowledge/edit/'+btn.getAttribute('data-id');
+}
+</script>
+<div id="editModal" class="modal" style="display:none">
+<div class="modal-content"><h3>{{ _("\u7f16\u8f91\u77e5\u8bc6\u70b9", "Edit Knowledge Point") }}</h3>
+<form method="POST" id="editForm">
+<div class="form-group"><input type="text" name="title" id="editTitle" required></div>
+<div class="form-group"><select name="difficulty" id="editDifficulty">
+<option value="beginner">\u521d\u7ea7</option><option value="intermediate">\u4e2d\u7ea7</option><option value="advanced">\u9ad8\u7ea7</option></select></div>
+<div class="form-group"><input type="text" name="category" id="editCategory"></div>
+<div class="form-group"><textarea name="content" id="editContent" rows="5" required></textarea></div>
+<button type="submit" class="btn btn-primary">{{ _("\u4fdd\u5b58", "Save") }}</button>
+<button type="button" class="btn btn-outline" onclick="document.getElementById('editModal').style.display='none'">{{ _("\u53d6\u6d88", "Cancel") }}</button>
+</form></div></div>
+{% endblock %}

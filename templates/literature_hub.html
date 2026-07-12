@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}{{ _("文献星云", "Literature Nebula") }}{% endblock %}
+{% block content %}
+<div class="page-header"><h1>{{ _("文献星云", "Literature Nebula") }}</h1><p class="text-muted">{{ _("三大模块，助你全面管理文献", "Three modules to manage literature") }}</p></div>
+<div class="action-grid">
+<a href="{{ url_for('planets') }}" class="action-card">
+<div class="action-icon">🪐</div><h3>{{ _("关键词星球", "Keyword Planets") }}</h3><p>{{ _("按主题分类创建文献星球，文献越多星球越大越亮", "Create lit planets by topic") }}</p><span class="action-arrow">{{ _("探索星群", "Explore") }} &rarr;</span></a>
+<a href="{{ url_for('literature_weekly') }}" class="action-card">
+<div class="action-icon">📬</div><h3>{{ _("每周文献更新", "Weekly Updates") }}</h3><p>{{ _("输入关键词，通过OpenAlex获取近一周最新文献列表", "Get latest papers via OpenAlex") }}</p><span class="action-arrow">{{ _("查看更新", "View") }} &rarr;</span></a>
+<a href="{{ url_for('literature_collection') }}" class="action-card">
+<div class="action-icon">📚</div><h3>{{ _("文献收藏夹", "Collection") }}</h3><p>{{ _("按星球分类查看所有收藏的文献，Zotero式管理", "Browse all collected literature") }}</p><span class="action-arrow">{{ _("查看收藏", "View") }} &rarr;</span></a>
+</div>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}{{ _("学习打卡", "Study") }}{% endblock %}
+{% block content %}
+<div class="page-header"><h1>🎯 {{ _("每日学习打卡", "Daily Study Check-in") }}</h1>
+<p class="text-muted">{{ _("选择主题，设定每日学习数，完成测验才能打卡", "Choose topic, set daily count, pass quiz to check in") }}</p></div>
+
+<!-- Settings -->
+<div class="card"><div class="card-header"><h2>⚙️ {{ _("学习设置", "Study Settings") }}</h2></div><div class="card-body">
+<div class="form-row">
+<div class="form-group flex-grow">
+<label class="text-muted" style="font-size:0.8rem">{{ _("学习主题", "Topic") }}</label>
+<input type="text" id="studyTopic" placeholder="{{ _("cryo-EM, 结构生物学...", "cryo-EM, structural biology...") }}" style="width:100%"></div>
+<div class="form-group">
+<label class="text-muted" style="font-size:0.8rem">{{ _("每日数量", "Daily Count") }}</label>
+<select id="dailyCount" style="padding:8px;border-radius:6px;background:rgba(10,15,36,0.6);color:var(--text-primary);border:1px solid rgba(59,130,246,0.2)">
+<option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option><option value="10">10</option></select></div>
+<div class="form-group">
+<label class="text-muted" style="font-size:0.8rem">{{ _("难度", "Difficulty") }}</label>
+<select id="studyDifficulty" style="padding:8px;border-radius:6px;background:rgba(10,15,36,0.6);color:var(--text-primary);border:1px solid rgba(59,130,246,0.2)">
+<option value="beginner">{{ _("入门", "Beginner") }}</option>
+<option value="intermediate">{{ _("中级", "Intermediate") }}</option>
+<option value="advanced">{{ _("高级", "Advanced") }}</option></select></div>
+<button class="btn btn-primary btn-sm" onclick="saveSettings()" style="margin-top:18px">{{ _("保存设置", "Save") }}</button>
+</div></div></div>
+
+<div class="card"><div class="card-header"><h2>📖 {{ _("今日知识点", "Today\"s Knowledge") }}</h2></div><div class="card-body">
+<div id="studyContent">
+{% if point %}
+<div class="knowledge-content">{{ point.content }}</div>
+{% for q in quizzes %}
+<div class="quiz-item" style="margin-top:12px;padding:12px;background:rgba(59,130,246,0.05);border-radius:8px">
+<p><strong>{{ _("问题", "Question") }}:</strong> {{ q.question }}</p>
+<div class="quiz-options" style="margin-top:8px">{% set opts = q.options|fromjson %}
+{% for o in opts %}
+<label style="display:block;margin:4px 0;cursor:pointer">
+<input type="radio" name="q{{ q.id }}" value="{{ o.label }}" onchange="checkAnswer({{ q.id }}, '{{ o.label }}', '{{ q.correct_answer }}')">
+{{ o.label }}. {{ o.text }}</label>
+{% endfor %}</div>
+<div id="quizResult{{ q.id }}" style="margin-top:6px;font-size:0.85rem"></div>
+</div>
+{% endfor %}
+{% else %}
+<p class="text-muted">{{ _("请先设置学习主题", "Please set a study topic first") }}</p>
+{% endif %}
+</div>
+</div></div>
+
+<div class="card"><div class="card-header"><h2>📊 {{ _("进度", "Progress") }}</h2></div><div class="card-body">
+<div id="streakDisplay" class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr))">
+<div class="stat-card"><div class="stat-info"><span class="stat-value">{{ streak }}</span><span class="stat-label">{{ _("连续打卡", "Streak") }}</span></div></div>
+<div class="stat-card"><div class="stat-info"><span class="stat-value">{{ total_checkins }}</span><span class="stat-label">{{ _("总天数", "Total") }}</span></div></div>
+</div>
+</div></div>
+
+<script>
+function loadSettings() {
+    fetch("/api/study/plan").then(function(r){return r.json()}).then(function(p){
+        document.getElementById("studyTopic").value = p.topic;
+        document.getElementById("dailyCount").value = p.daily_count;
+        document.getElementById("studyDifficulty").value = p.difficulty;
+    });
+}
+function saveSettings() {
+    fetch("/api/study/plan", {method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+            topic: document.getElementById("studyTopic").value,
+            daily_count: parseInt(document.getElementById("dailyCount").value),
+            difficulty: document.getElementById("studyDifficulty").value
+        })}).then(function(r){return r.json()}).then(function(d){
+            if(d.ok) alert("Settings saved!");
+        });
+}
+function checkAnswer(qid, selected, correct) {
+    var div = document.getElementById("quizResult"+qid);
+    if(selected === correct) { div.innerHTML = "✅ Correct!"; div.style.color = "#6ee7b7"; }
+    else { div.innerHTML = "❌ Incorrect. Correct: "+correct; div.style.color = "#fca5a5"; }
+}
+document.addEventListener("DOMContentLoaded", loadSettings);
+</script>
+{% endblock %}

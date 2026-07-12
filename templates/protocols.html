@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}实验Protocol视频{% endblock %}
+{% block content %}
+<div class="page-header"><h1>实验Protocol视频</h1></div>
+<div class="filter-tabs">
+<a href="{{ url_for('protocols') }}" class="filter-tab {% if not current_cat %}active{% endif %}">全部</a>
+{% for c in categories %}
+<a href="{{ url_for('protocols', category=c) }}" class="filter-tab {% if current_cat==c %}active{% endif %}">{{ c }}</a>
+{% endfor %}
+</div>
+{% if videos %}
+<div class="video-grid">{% for v in videos %}
+<div class="video-card">
+<div class="video-thumb">
+{% if v.video_url %}<iframe src="{{ v.video_url }}" frameborder="0" allowfullscreen></iframe>
+{% elif v.video_path %}<video controls><source src="{{ url_for('static', filename=v.video_path.replace('static/','')) }}"></video>
+{% else %}<div class="video-placeholder">🎬</div>{% endif %}
+</div>
+<div class="video-info"><h3>{{ v.title }}</h3>
+<p class="text-muted">{{ v.description[:100] }}</p>
+<div class="video-meta">
+<span class="badge">{{ v.category }}</span>
+<span class="badge">{% if v.difficulty=='beginner' %}初级{% elif v.difficulty=='intermediate' %}中级{% else %}高级{% endif %}</span>
+<span class="text-muted">{{ v.duration_minutes }}分钟</span>
+</div></div>
+</div>{% endfor %}
+</div>
+{% else %}<div class="empty-state"><p>暂无实验视频</p></div>{% endif %}
+{% endblock %}

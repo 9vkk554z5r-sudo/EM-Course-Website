@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}我的订阅 — 电子显微学前沿课程{% endblock %}
+{% block content %}
+<div class="subscriptions-page">
+    <div class="page-header">
+        <h1>📡 我的订阅</h1>
+        <a href="{{ url_for('literature') }}" class="btn btn-outline">添加订阅</a>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            {% if subs %}
+            <div class="sub-list">
+                {% for sub in subs %}
+                <div class="sub-item {% if not sub.active %}inactive{% endif %}">
+                    <div class="sub-info">
+                        <h3>{{ sub.topic }}</h3>
+                        {% if sub.keywords %}
+                        <p class="sub-keywords">关键词: {{ sub.keywords }}</p>
+                        {% endif %}
+                        <span class="sub-date">订阅于 {{ sub.created_at.strftime('%Y-%m-%d') }}</span>
+                        <span class="sub-status {% if sub.active %}active{% else %}inactive{% endif %}">
+                            {% if sub.active %}已激活{% else %}已取消{% endif %}
+                        </span>
+                    </div>
+                    {% if sub.active %}
+                    <a href="{{ url_for('unsubscribe', sub_id=sub.id) }}" class="btn btn-sm btn-danger"
+                       onclick="return confirm('确定取消该订阅？')">取消订阅</a>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <p>还没有订阅任何主题</p>
+                <a href="{{ url_for('literature') }}" class="btn btn-primary">去订阅</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

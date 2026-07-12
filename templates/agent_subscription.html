@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ _('文献订阅', 'Subscribe') }}{% endblock %}
+{% block content %}
+<div class="page-header"><h1>📬 {{ _('文献订阅', 'Literature Subscription') }}</h1></div>
+<div class="card"><div class="card-header"><h2>{{ _('搜索近一周文献', 'Search Recent Papers') }}</h2></div><div class="card-body">
+<form method="POST" class="form"><div class="form-row">
+<div class="form-group flex-grow"><input type="text" name="keyword" placeholder="{{ _('输入研究关键词', 'Enter keyword') }}" value="{{ keyword }}" required></div>
+<div class="form-group"><input type="number" name="days" value="7" min="1" max="30"></div>
+<button type="submit" class="btn btn-primary">🔍 {{ _('搜索', 'Search') }}</button>
+</div></form></div></div>
+{% if result %}<div class="card"><div class="card-header"><h2>{{ _('结果', 'Results') }} ({{ result.results|length }})</h2></div><div class="card-body">
+{% for r in result.results %}<div class="paper-item"><span class="paper-title"><a href="https://doi.org/{{ r.doi }}" target="_blank" style="color:inherit;text-decoration:none">{{ r.title }}</a></span>
+<div class="paper-meta"><span>{{ r.authors }}</span>·<span>{{ r.journal }}</span>·<span>{{ r.date }}</span></div></div>
+{% else %}<p>{{ _('未找到', 'No results') }}</p>{% endfor %}</div></div>{% endif %}
+{% endblock %}

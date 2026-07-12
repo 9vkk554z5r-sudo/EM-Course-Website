@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}文献上传{% endblock %}
+{% block content %}
+<div class="page-header"><h1>上传文献</h1><p class="text-muted">上传文献标题或DOI，Agent自动获取详细信息</p></div>
+<div class="card"><div class="card-header"><h2>新增文献</h2></div><div class="card-body">
+<form method="POST" action="{{ url_for('literature_upload_submit') }}" class="form">
+<div class="form-group"><input type="text" name="title" placeholder="文献标题" required></div>
+<div class="form-row"><div class="form-group flex-grow"><input type="text" name="doi" placeholder="DOI（可选）"></div>
+<div class="form-group flex-grow"><input type="text" name="url" placeholder="URL（可选）"></div></div>
+<div class="form-group"><input type="text" name="keywords" placeholder="关键词（逗号分隔，可选）"></div>
+<button type="submit" class="btn btn-primary">提交并调用Agent获取信息</button>
+</form></div></div>
+<div class="card"><div class="card-header"><h2>我的上传 ({{ uploads|length }})</h2></div><div class="card-body">
+{% if uploads %}
+<div class="paper-list">{% for u in uploads %}
+<div class="paper-item">
+<span class="paper-title">{{ u.title or u.doi or u.url }}</span>
+<div class="paper-meta"><span>{{ u.authors }}</span>·<span>{{ u.journal }}</span>
+<span class="upload-status {{ u.status }}">{{ u.status }}</span></div>
+</div>{% endfor %}
+</div>
+{% else %}<div class="empty-state"><p>暂无上传记录</p></div>{% endif %}
+</div></div>
+{% endblock %}

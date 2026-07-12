@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}{{ _("实验方法总结", "Methods") }}{% endblock %}
+{% block content %}
+<div class="page-header"><h1>🔬 {{ _("实验方法总结", "Experimental Methods") }}</h1><p class="text-muted">{{ _("提取文献实验方法，生成Protocol流程图", "Extract methods, generate protocol flowcharts") }}</p></div>
+
+<div class="card"><div class="card-header"><h2>{{ _("提取方法", "Extract Methods") }}</h2></div><div class="card-body">
+<form method="POST" class="form">
+<div class="form-row"><div class="form-group flex-grow"><input type="text" name="query" placeholder="DOI / 文献标题" value="{{ query }}" required></div>
+<div class="form-group"><select name="query_type"><option value="doi">DOI</option><option value="title">{{ _("标题", "Title") }}</option></select></div>
+<button type="submit" class="btn btn-primary">🔍 {{ _("提取", "Extract") }}</button></div>
+<div class="form-group"><input type="text" name="save_name" placeholder="{{ _("收藏名称 (可选)", "Save name (optional)") }}" style="width:100%"></div>
+</form></div></div>
+
+{% if result %}
+{% if result.found %}
+<div class="card"><div class="card-header"><h2>{{ _("📄 方法结果", "📄 Methods") }}: {{ result.title[:60] }}</h2></div><div class="card-body">
+<h3>{{ _("实验方法", "Methods") }}:</h3>
+<ul>{% for m in result.methods %}<li>{{ m }}</li>{% endfor %}</ul>
+{% if result.protocol_links %}
+<div style="margin-top:12px"><strong>{{ _("Protocol链接:", "Protocol Links:") }}</strong>
+{% set links = result.protocol_links %}
+{% if links is string %}{% set links = links|fromjson %}{% endif %}
+<ul>{% for l in links %}<li><a href="{{ l }}" target="_blank">{{ l[:50] }}...</a></li>{% endfor %}</ul>
+</div>{% endif %}
+{% if result.saved %}<p class="text-muted">✅ {{ _("已保存到收藏夹", "Saved to collection") }}</p>{% endif %}
+
+<!-- Flowchart -->
+<div style="margin-top:16px;padding:16px;background:rgba(10,15,36,0.5);border-radius:8px">
+<h3>📊 {{ _("Protocol流程图", "Protocol Flowchart") }}</h3>
+<div id="flowchart" style="margin-top:12px;overflow-x:auto;min-height:100px;padding:20px"></div>
+</div>
+</div></div>
+{% else %}
+<div class="card"><div class="card-header"><h2>{{ _("提示", "Notice") }}</h2></div><div class="card-body"><p class="text-muted">{{ _("未找到文献", "Paper not found") }}</p></div></div>
+{% endif %}
+{% endif %}
+
+<div class="card"><div class="card-header"><h2>{{ _("📚 我的Protocol收藏", "📚 My Protocol Collection") }}</h2></div><div class="card-body">
+{% if protocols %}
+<div class="paper-list">{% for p in protocols %}
+<div class="paper-item"><span class="paper-title">{{ p.name }}</span>
+<div class="paper-meta">{{ p.paper_title[:50] }} &middot; <a href="{{ url_for('agent_methods') }}?method_id={{ p.id }}">{{ _("查看", "View") }}</a></div></div>
+{% endfor %}</div>
+{% else %}<p class="text-muted">{{ _("还没有收藏", "No protocols yet") }}</p>{% endif %}
+</div></div>
+
+<script>
+function renderFlowchart(steps) {
+    var div = document.getElementById("flowchart");
+    if(!steps || steps.length === 0) { div.innerHTML = "<p class=\"text-muted\">{{ _("暂无流程步骤", "No steps") }}</p>"; return; }
+    var html = "<div style=\"display:flex;flex-direction:column;align-items:center;gap:6px\">";
+    steps.forEach(function(s, i) {
+        html += "<div style=\"padding:10px 18px;background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(139,92,246,0.1));border:1px solid rgba(59,130,246,0.2);border-radius:8px;text-align:center;font-size:0.85rem;min-width:180px;max-width:400px\">"+s+"</div>";
+        if(i < steps.length - 1) {
+            html += "<div style=\"color:var(--accent-cyan);font-size:1rem\">&#8595;</div>";
+        }
+    });
+    html += "</div>";
+    div.innerHTML = html;
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    var stepsDiv = document.getElementById("flowchart");
+    if(stepsDiv && !stepsDiv.innerHTML.trim()) {
+        renderFlowchart(["Sample Step 1", "Sample Step 2", "Sample Step 3"]);
+    }
+});
+</script>
+{% endblock %}

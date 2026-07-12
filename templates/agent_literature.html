@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}{{ _("文献信息整理", "Lit Info") }}{% endblock %}
+{% block content %}
+<div class="page-header"><h1>📄 {{ _("文献信息整理", "Literature Info") }}</h1><p class="text-muted">{{ _("通过OpenAlex获取文献信息，支持收藏到文献收藏夹", "Powered by OpenAlex - bookmark papers to your collection") }}</p></div>
+<div class="card"><div class="card-header"><h2>{{ _("搜索文献", "Search") }}</h2></div><div class="card-body">
+<form method="POST" class="form">
+<div class="form-row"><div class="form-group flex-grow"><input type="text" name="query" placeholder="{{ _("输入DOI/标题/关键词", "Enter DOI/Title/Keyword") }}" value="{{ query }}" required></div>
+<div class="form-group"><select name="query_type"><option value="title">{{ _("标题", "Title") }}</option><option value="doi">DOI</option></select></div>
+<button type="submit" class="btn btn-primary">🔍 {{ _("查询", "Search") }}</button></div></form></div></div>
+{% if result %}{% if result.found %}
+<div class="card"><div class="card-header"><h2>{{ _("查询结果", "Results") }}</h2></div><div class="card-body">
+{% for r in result.results %}
+<div class="knowledge-item" style="margin-bottom:12px">
+<h4>{{ r.info.title }}</h4>
+<p class="text-muted">{{ r.info.first_author }} &middot; {{ r.info.journal }} ({{ r.info.publication_date[:4] if r.info.publication_date else "N/A" }})</p>
+<p><strong>{{ _("通讯作者", "Corresponding") }}:</strong> {{ r.info.corresponding_author }}</p>
+<ul>{% for p in r.key_points %}<li>{{ p }}</li>{% endfor %}</ul>
+<div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap">
+<select class="bm-cat" style="font-size:0.72rem;padding:3px 6px;border-radius:4px;background:rgba(10,15,36,0.6);color:var(--text-primary);border:1px solid rgba(59,130,246,0.2)">
+<option value="">{{ _("\u9009\u62e9\u5206\u7c7b", "Category") }}</option></select>
+<button class="btn btn-sm btn-primary" onclick='bookmarkPaper(this,"{{ r.info.title|e }}","{{ r.info.first_author|e }}","{{ r.info.journal|e }}",{{ r.info.publication_date[:4] if r.info.publication_date else "null" }},"{{ r.info.doi|e }}","","search")'>📌 {{ _("\u6536\u85cf", "Bookmark") }}</button></div>
+</div>{% endfor %}
+</div></div>{% else %}
+<div class="card"><div class="card-header"><h2>{{ _("提示", "Notice") }}</h2></div><div class="card-body"><p class="text-muted">{{ _("未找到相关文献", "No results found") }}</p></div></div>
+{% endif %}{% endif %}
+<script>
+function bookmarkPaper(btn,title,authors,journal,year,doi,url,source) {
+    var sel=btn.parentElement.querySelector(".bm-cat");
+    var catId=sel?sel.value:"";
+    fetch("/api/literature/bookmark",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({title:title,authors:authors,journal:journal,year:year,doi:doi,url:url,source:source,category_id:catId||null})})
+    .then(function(r){return r.json()}).then(function(d){if(d.ok)alert("{{ _("已收藏!", "Bookmarked!") }}");else alert(d.error);});
+}
+function loadCatOptions(){fetch("/api/literature/categories").then(function(r){return r.json()}).then(function(cats){document.querySelectorAll(".bm-cat").forEach(function(sel){cats.forEach(function(c){var opt=document.createElement("option");opt.value=c.id;opt.textContent=c.name;sel.appendChild(opt);});});});}
+document.addEventListener("DOMContentLoaded",loadCatOptions);
+</script>
+{% endblock %}
