@@ -197,7 +197,7 @@ Agent 引用网络页 `/agent/citation` 也补充了同样的文献详情展示�
 2. 填入 `LLM_API_ENDPOINT`、`LLM_API_KEY`、`LLM_MODEL`、`LLM_DEPLOYMENT`
 3. 启动 Flask
 4. 登录管理员账号，进入 `/admin/api-keys`
-5. 使用“测试连接”验证模型接口
+5. 使用“测试当前配置”验证未保存的表单配置，或保存后在配置列表中使用“测试连接”
 
 也可以完全不使用后台配置，只依赖 `.env`。这更适合部署环境。
 
@@ -242,4 +242,3 @@ Agent 引用网络页 `/agent/citation` 也补充了同样的文献详情展示�
 | `static/js/nebula.js` | 星云图谱渲染、颜色、节点大小、双击打开来源 |
 | `templates/agent_citation.html` | Agent 引用网络详情展示 |
 | `.env.example` | 独立部署环境变量模板 |
-

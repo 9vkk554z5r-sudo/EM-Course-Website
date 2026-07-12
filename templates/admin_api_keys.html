@@ -61,7 +61,10 @@
                 <label>API Key</label>
                 <input type="password" name="api_key" placeholder="仅保存在本机数据库中" autocomplete="new-password" required>
             </div>
-            <button type="submit" class="btn btn-primary">保存配置</button>
+            <div class="form-row">
+                <button type="submit" class="btn btn-primary">保存配置</button>
+                <button type="submit" class="btn btn-outline" formaction="{{ url_for('admin_test_api_config') }}" formmethod="post">测试当前配置</button>
+            </div>
         </form>
     </div>
 </div>

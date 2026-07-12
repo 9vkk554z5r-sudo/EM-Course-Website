@@ -22,6 +22,7 @@ import datetime as dt_module
 from functools import wraps
 from werkzeug.utils import secure_filename
 from llm_client import (
+    LLMConfig,
     call_llm as execute_llm_request,
     config_from_environment,
     config_from_key_record,
@@ -1326,6 +1327,34 @@ def admin_delete_api_key(k_id):
         db.session.delete(key)
         db.session.commit()
         flash("API Key 已删除", "info")
+    return redirect(url_for("admin_api_keys"))
+
+
+@app.route("/admin/api-keys/test-config", methods=["POST"])
+@admin_required
+def admin_test_api_config():
+    provider = request.form.get("provider", "custom").strip().lower()
+    api_key = request.form.get("api_key", "").strip()
+    endpoint = request.form.get("endpoint", "").strip()
+    model_name = request.form.get("model_name", "").strip()
+    deployment = request.form.get("deployment", "").strip()
+    api_style = request.form.get("api_style", "auto").strip().lower() or "auto"
+    if not api_key or not endpoint or not model_name:
+        flash("请先填写 API Key、端点地址和模型编码后再测试", "error")
+        return redirect(url_for("admin_api_keys"))
+    config = LLMConfig(
+        api_key=api_key,
+        endpoint=endpoint,
+        model=model_name,
+        provider=provider,
+        deployment=deployment,
+        api_style=api_style,
+    )
+    result = execute_llm_request(config, "Reply with exactly: API connected")
+    if result.startswith(("API Error", "Request Error")):
+        flash(result, "error")
+    else:
+        flash(f"测试成功：{result[:120]}", "success")
     return redirect(url_for("admin_api_keys"))
 
 
