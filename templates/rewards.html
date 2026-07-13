@@ -1,30 +1,129 @@
 {% extends "base.html" %}
-{% block title %}我的小森林{% endblock %}
+{% block title %}{{ _('我的小森林', 'My Forest') }}{% endblock %}
+{% block body_class %}life-product-theme knowledge-forest-route reward-forest-route cosmic-task-route{% endblock %}
 {% block content %}
-<div class="rewards-page">
-<div class="page-header"><h1>我的小森林</h1><p class="text-muted">全勤打卡，种下属于你的小树！</p></div>
-<div class="reward-stats-grid">
-<div class="stat-card"><div class="stat-icon">🌳</div><div class="stat-info"><span class="stat-value">{{ total_trees }}</span><span class="stat-label">累计种树</span></div></div>
-<div class="stat-card"><div class="stat-icon">🌱</div><div class="stat-info"><span class="stat-value">{{ weekly_trees }}</span><span class="stat-label">周奖励</span></div></div>
-<div class="stat-card"><div class="stat-icon">🌲</div><div class="stat-info"><span class="stat-value">{{ monthly_trees }}</span><span class="stat-label">月奖励</span></div></div>
-<div class="stat-card"><div class="stat-icon">🔥</div><div class="stat-info"><span class="stat-value">{{ current_streak }}</span><span class="stat-label">当前连续</span></div></div>
-<div class="stat-card"><div class="stat-icon">🏆</div><div class="stat-info"><span class="stat-value">{{ max_streak }}</span><span class="stat-label">最长连续</span></div></div>
+<div class="reward-forest-page">
+    <section class="reward-forest-hero">
+        <div class="reward-forest-copy">
+            <p class="section-kicker">{{ _('知识森林', 'Knowledge Forest') }}</p>
+            <h1>{{ _('我的小森林', 'My Forest') }}</h1>
+            <p>{{ _('连续学习会点亮森林节点。周全勤生成幼芽，月全勤成长为主树。', 'Consistent study lights up forest nodes. Weekly attendance grows sprouts; monthly attendance grows main trees.') }}</p>
+            <div class="forest-hero-actions">
+                <a href="{{ url_for('study') }}" class="btn btn-primary">{{ _('开始学习打卡', 'Start Check-in') }}</a>
+                <a href="{{ url_for('knowledge_forest') }}" class="btn btn-outline">{{ _('返回知识森林', 'Back to Forest') }}</a>
+            </div>
+        </div>
+        <div class="reward-forest-stage" aria-hidden="true">
+            <span class="reward-forest-moon"></span>
+            <span class="reward-forest-grid"></span>
+            <span class="reward-forest-scan"></span>
+            <span class="reward-tree-shape shape-a"></span>
+            <span class="reward-tree-shape shape-b"></span>
+            <span class="reward-tree-shape shape-c"></span>
+            <span class="reward-tree-shape shape-d"></span>
+            <span class="reward-tree-node node-a"></span>
+            <span class="reward-tree-node node-b"></span>
+            <span class="reward-tree-node node-c"></span>
+        </div>
+    </section>
+
+    <section class="reward-metric-grid" aria-label="{{ _('森林统计', 'Forest Stats') }}">
+        <div class="reward-metric-card"><span>{{ _('累计种树', 'Trees') }}</span><strong>{{ total_trees }}</strong><em>{{ _('全部奖励节点', 'All reward nodes') }}</em></div>
+        <div class="reward-metric-card"><span>{{ _('周奖励', 'Weekly') }}</span><strong>{{ weekly_trees }}</strong><em>{{ _('连续 7 天', '7-day streak') }}</em></div>
+        <div class="reward-metric-card"><span>{{ _('月奖励', 'Monthly') }}</span><strong>{{ monthly_trees }}</strong><em>{{ _('月度全勤', 'Monthly attendance') }}</em></div>
+        <div class="reward-metric-card"><span>{{ _('当前连续', 'Current') }}</span><strong>{{ current_streak }}</strong><em>{{ _('正在生长', 'Growing now') }}</em></div>
+        <div class="reward-metric-card"><span>{{ _('最长连续', 'Best') }}</span><strong>{{ max_streak }}</strong><em>{{ _('历史峰值', 'Best streak') }}</em></div>
+    </section>
+
+    <section class="reward-forest-panel">
+        <div class="section-head">
+            <div>
+                <p class="section-kicker">{{ _('成长记录', 'Growth Log') }}</p>
+                <h2>{{ _('森林节点', 'Forest Nodes') }}</h2>
+            </div>
+            <div class="reward-panel-links">
+                <a href="#my-farm">{{ _('我的林场', 'My Farm') }}</a>
+                <a href="{{ url_for('study') }}">{{ _('继续学习', 'Keep Studying') }}</a>
+            </div>
+        </div>
+        <div class="reward-milestone-grid" aria-label="{{ _('打卡成长节点', 'Check-in Growth Nodes') }}">
+            {% for node in reward_milestones %}
+            <article class="reward-milestone-card {% if node.unlocked %}is-unlocked{% else %}is-locked{% endif %}">
+                <span class="reward-milestone-token stage-{{ node.stage }}" aria-hidden="true">
+                    {% if node.stage == 'young-tree' %}<i class="bonus-seed"></i>{% endif %}
+                </span>
+                <div>
+                    <strong>{{ node.title }}</strong>
+                    <p>{{ node.subtitle }}</p>
+                    <em>{% if node.unlocked %}{{ _('已点亮', 'Unlocked') }}{% else %}{{ current_streak }}/{{ node.day }} {{ _('天', 'days') }}{% endif %}</em>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+
+        <div class="reward-growth-note">
+            <strong>{{ _('成长规则', 'Growth Rule') }}</strong>
+            <span>{{ _('7 天获得种子，14 天成长为小树苗，21 天成长为小树并获得另一颗种子，28 天成长为大树。', '7 days unlocks a seed, 14 days a sprout, 21 days a young tree plus another seed, and 28 days a full tree.') }}</span>
+        </div>
+
+        {% if trees %}
+        <div class="reward-tree-list reward-history-list">
+            {% for t in trees %}
+            <article class="reward-tree-item">
+                <span class="reward-tree-token {% if t.period == 'monthly' %}is-monthly{% else %}is-weekly{% endif %}"></span>
+                <div>
+                    <strong>{% if t.period == "weekly" %}{{ _('周全勤记录', 'Weekly Attendance Log') }}{% else %}{{ _('月全勤记录', 'Monthly Attendance Log') }}{% endif %}</strong>
+                    <p>{{ t.period_key }} · {{ _('打卡', 'Check-ins') }} {{ t.checkin_days }}/{{ t.total_days }} {{ _('天', 'days') }}</p>
+                </div>
+                <time>{{ t.earned_at.strftime("%Y-%m-%d") }}</time>
+            </article>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </section>
+
+    <section class="cyber-farm-panel" id="my-farm">
+        <div class="section-head">
+            <div>
+                <p class="section-kicker">{{ _('我的林场', 'My Farm') }}</p>
+                <h2>{{ _('大树林场', 'Cyber Tree Farm') }}</h2>
+            </div>
+            {% if farm_preview %}
+            <div class="farm-preview-controls" aria-label="{{ _('管理员林场预览控制', 'Admin farm preview controls') }}">
+                <button type="button" data-farm-decrease aria-label="{{ _('减少一棵大树', 'Remove one tree') }}">−</button>
+                <span>{{ _('管理员预览', 'Admin Preview') }} · <b data-farm-count-display>{{ farm_display_tree_count }}</b>/12</span>
+                <button type="button" data-farm-increase aria-label="{{ _('增加一棵大树', 'Add one tree') }}">+</button>
+            </div>
+            {% else %}
+            <span>{{ farm_display_tree_count }} {{ _('棵大树', 'full trees') }}</span>
+            {% endif %}
+        </div>
+        <div class="cyber-farm-stage {% if farm_display_tree_count == 0 %}is-empty{% endif %}{% if farm_preview %} is-preview{% endif %}"{% if farm_preview %} data-farm-preview data-farm-max="12" data-farm-count="{{ farm_display_tree_count }}"{% endif %}>
+            <span class="farm-grid" aria-hidden="true"></span>
+            <span class="farm-scan" aria-hidden="true"></span>
+            {% if farm_preview %}
+            <div class="farm-token-usage">
+                <span>TREE TOKEN · {{ _('林场容量', 'Farm Capacity') }}</span>
+                <strong><b data-token-count>{{ farm_display_tree_count }}</b><small>/12</small></strong>
+                <i><em data-token-meter style="width: {{ ((farm_display_tree_count / 12) * 100)|round|int }}%"></em></i>
+            </div>
+            {% endif %}
+            <div class="farm-tree-layer" data-farm-tree-layer>
+                {% if farm_display_tree_count > 0 %}
+                {% for i in range(farm_display_tree_count) %}
+                <span class="farm-big-tree tree-slot-{{ loop.index0 % 6 }} tree-row-{{ loop.index0 // 6 }}" aria-hidden="true"><i></i></span>
+                {% endfor %}
+                {% elif not farm_preview %}
+                <div class="farm-empty-copy">
+                    <strong>{{ _('林场等待第一棵大树', 'Your farm is waiting for its first full tree') }}</strong>
+                    <span>{{ _('完成 28 天连续学习后，这里会自动种下一棵动态赛博大树。', 'Complete a 28-day streak and a dynamic cyber tree will be planted here.') }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </section>
 </div>
-<div class="card"><div class="card-header"><h2>我的小森林</h2></div><div class="card-body">
-{% if trees %}
-<div class="forest">{% for t in trees %}
-<div class="tree-item">
-<div class="tree-icon">{% if t.reward_type == "tree" %}{% if t.period == "weekly" %}🌱{% else %}🌳{% endif %}{% else %}🎁{% endif %}</div>
-<div class="tree-info">
-<strong>{% if t.period == "weekly" %}周全勤{% else %}月全勤{% endif %}</strong>
-<p class="text-muted">{{ t.period_key }} · 打卡{{ t.checkin_days }}/{{ t.total_days }}天</p>
-<span class="tree-date">{{ t.earned_at.strftime("%Y-%m-%d") }}</span>
-</div></div>{% endfor %}
-</div>
-{% else %}
-<div class="empty-state"><p style="font-size:2rem;">🌱</p><p>还没有种下小树</p>
-<p class="text-muted">连续打卡7天获得周奖励，全勤一个月获得月奖励</p>
-<a href="{{ url_for('study') }}" class="btn btn-primary">开始学习打卡</a></div>
-{% endif %}
-</div></div></div>
+{% endblock %}
+{% block scripts %}
+{% if farm_preview %}<script src="{{ url_for('static', filename='js/farm_preview.js') }}?v=2"></script>{% endif %}
 {% endblock %}

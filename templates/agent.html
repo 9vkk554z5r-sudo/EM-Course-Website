@@ -1,24 +1,66 @@
 {% extends "base.html" %}
 {% block title %}Agent Skills{% endblock %}
 {% block content %}
-<div class="page-header"><h1>🧠 Agent Skills 智能助手</h1><p class="text-muted">6 项 AI 技能助力科研学习</p></div>
-<div class="action-grid">
-<a href="{{ url_for('agent_literature_info') }}" class="action-card">
-<div class="action-icon">📄</div><h3>{{ _('文献信息整理', 'Lit Info') }}</h3><p>{{ _('输入DOI/标题，获取核心要点、通讯作者', 'Get paper details via OpenAlex') }}</p><span class="action-arrow">{{ _('使用', 'Use') }} →</span></a>
-<a href="{{ url_for('agent_subscription') }}" class="action-card">
-<div class="action-icon">📬</div><h3>{{ _('文献订阅', 'Subscribe') }}</h3><p>{{ _('输入关键词，获取近一周文献', 'Get weekly papers by keyword') }}</p><span class="action-arrow">{{ _('使用', 'Use') }} →</span></a>
-<a href="{{ url_for('agent_citation') }}" class="action-card">
-<div class="action-icon">🌐</div><h3>{{ _('引用关系网络', 'Citation Net') }}</h3><p>{{ _('生成文献引用网络图', 'Build citation relationship graph') }}</p><span class="action-arrow">{{ _('使用', 'Use') }} →</span></a>
-<a href="{{ url_for('agent_presentation') }}" class="action-card">
-<div class="action-icon">📊</div><h3>{{ _('AI辅助Pre', 'AI Pre') }}</h3><p>{{ _('获取PPT设计建议与评分', 'Get presentation tips & scoring') }}</p><span class="action-arrow">{{ _('使用', 'Use') }} →</span></a>
-<a href="{{ url_for('agent_methods') }}" class="action-card">
-<div class="action-icon">🔬</div><h3>{{ _('实验方法总结', 'Methods') }}</h3><p>{{ _('自动提取实验方法', 'Extract experimental methods') }}</p><span class="action-arrow">{{ _('使用', 'Use') }} →</span></a>
-<a href="{{ url_for('study') }}" class="action-card">
-<div class="action-icon">🎯</div><h3>{{ _('每日测验打卡', 'Daily Quiz') }}</h3><p>{{ _('答题通过才能种树', 'Pass quiz to plant trees') }}</p><span class="action-arrow">{{ _('开始', 'Start') }} →</span></a>
+<div class="page-header">
+    <div>
+        <p class="eyebrow">EM Agent Skills</p>
+        <h1>🧠 科研助手技能</h1>
+        <p class="text-muted">围绕文献、实验方法、汇报和学习训练组织的 6 项 AI 辅助能力。</p>
+    </div>
 </div>
+
+<div class="module-section">
+    <div class="card">
+        <div class="card-header"><h2>文献工作流</h2></div>
+        <div class="card-body">
+            <div class="skill-grid">
+                <a href="{{ url_for('agent_literature_info') }}" class="skill-card">
+                    <span class="skill-icon">📄</span>
+                    <span><strong>{{ _('文献信息整理', 'Lit Info') }}</strong><span>{{ _('输入 DOI/标题，获取核心要点、通讯作者', 'Get paper details via OpenAlex') }}</span></span>
+                </a>
+                <a href="{{ url_for('agent_subscription') }}" class="skill-card">
+                    <span class="skill-icon">📬</span>
+                    <span><strong>{{ _('文献订阅', 'Subscribe') }}</strong><span>{{ _('按关键词获取近一周文献', 'Get weekly papers by keyword') }}</span></span>
+                </a>
+                <a href="{{ url_for('agent_citation') }}" class="skill-card">
+                    <span class="skill-icon">🌐</span>
+                    <span><strong>{{ _('引用关系网络', 'Citation Net') }}</strong><span>{{ _('生成文献引用网络图', 'Build citation relationship graph') }}</span></span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h2>表达与训练</h2></div>
+        <div class="card-body">
+            <div class="compact-list">
+                <a href="{{ url_for('agent_presentation') }}" class="compact-item">
+                    <span class="compact-item-icon">📊</span>
+                    <span><strong>{{ _('AI 辅助 Pre', 'AI Pre') }}</strong><span>{{ _('获取 PPT 设计建议与评分', 'Get presentation tips and scoring') }}</span></span>
+                </a>
+                <a href="{{ url_for('agent_methods') }}" class="compact-item">
+                    <span class="compact-item-icon">🔬</span>
+                    <span><strong>{{ _('实验方法总结', 'Methods') }}</strong><span>{{ _('自动提取实验方法并收藏 Protocol', 'Extract experimental methods') }}</span></span>
+                </a>
+                <a href="{{ url_for('study') }}" class="compact-item">
+                    <span class="compact-item-icon">🎯</span>
+                    <span><strong>{{ _('每日测验打卡', 'Daily Quiz') }}</strong><span>{{ _('学习知识点并完成测验', 'Study and complete quizzes') }}</span></span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% if logs %}
-<div class="card"><div class="card-header"><h2>{{ _('最近操作', 'Recent') }}</h2></div><div class="card-body">
-<div class="paper-list">{% for log in logs %}
-<div class="paper-item"><span class="paper-title">{{ log.skill }}: {{ log.action }}</span></div>
-{% endfor %}</div></div></div>{% endif %}
+<div class="card">
+    <div class="card-header"><h2>{{ _('最近操作', 'Recent') }}</h2></div>
+    <div class="card-body">
+        <div class="paper-list">
+            {% for log in logs %}
+            <div class="paper-item"><span class="paper-title">{{ log.skill }}: {{ log.action }}</span></div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

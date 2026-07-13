@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}{{ _('选择你的学科星系', 'Choose Your Discipline Galaxy') }} - {{ _('生命科学课程助手', 'Life Science Course Assistant') }}{% endblock %}
+{% block body_class %}course-select-page galaxy-course-page life-product-theme{% endblock %}
+{% block content %}
+<section class="course-select-hero galaxy-select-hero">
+    <div class="galaxy-hero-copy">
+        <p class="section-kicker">{{ _('学科星系选择器', 'Discipline Galaxy Selector') }}</p>
+        <h1>{{ _('选择你的学科星系', 'Choose Your Discipline Galaxy') }}</h1>
+        <p class="phrase-lines course-select-copy"><span>{{ _('从一个研究星系出发', 'Start from a research galaxy') }}</span><span>{{ _('建立你的课程学习、文献网络与实验方法路径', 'Build your course learning, literature network and experimental methods path') }}</span></p>
+        <div class="galaxy-legend" aria-label="{{ _('星系功能链路', 'Galaxy capability chain') }}">
+            <span>{{ _('课程学习', 'Course Study') }}</span>
+            <i></i>
+            <span>{{ _('文献星云', 'Literature Nebula') }}</span>
+            <i></i>
+            <span>{{ _('实验方法', 'Methods') }}</span>
+            <i></i>
+            <span>{{ _('AI助手', 'AI Assistant') }}</span>
+        </div>
+    </div>
+    <a href="{{ url_for('index') }}" class="btn btn-outline">{{ _('返回平台首页', 'Back to Home') }}</a>
+</section>
+
+<section class="discipline-grid galaxy-selector" aria-label="{{ _('学科星系', 'Discipline Galaxies') }}">
+    {% for slug, course in courses.items() %}
+    {% set display_name = course.name_en if lang == 'en' and course.name_en is defined else course.name %}
+    {% set summary = course.description_en if lang == 'en' and course.description_en is defined else course.description %}
+    {% set keywords = course.galaxy_keywords_en if lang == 'en' and course.galaxy_keywords_en is defined else course.galaxy_keywords %}
+    <article class="discipline-card galaxy-card galaxy-{{ slug }} {% if course.status == 'open' %}is-open{% else %}is-soon{% endif %}" data-course-status="{{ course.status }}" data-course-name="{{ display_name }}">
+        <a class="galaxy-link" href="{{ url_for('course_entry', slug=slug) if course.status == 'open' else '#' }}" {% if course.status != 'open' %}aria-disabled="true" data-soon-message="{{ display_name }}{{ _('星系即将开放', ' galaxy is coming soon') }}"{% else %}data-enter-galaxy="true"{% endif %}>
+            <div class="galaxy-visual" aria-hidden="true">
+                <span class="galaxy-core"></span>
+                <svg class="galaxy-glyph" viewBox="0 0 120 120">
+                    {% if slug == 'electron-microscopy' %}
+                    <g class="glyph-orbit glyph-orbit-a"><ellipse cx="60" cy="60" rx="44" ry="16"/></g>
+                    <g class="glyph-orbit glyph-orbit-b"><ellipse cx="60" cy="60" rx="44" ry="16" transform="rotate(58 60 60)"/></g>
+                    <g class="glyph-orbit glyph-orbit-c"><ellipse cx="60" cy="60" rx="44" ry="16" transform="rotate(118 60 60)"/></g>
+                    <circle class="glyph-core-dot" cx="60" cy="60" r="8"/>
+                    <path class="glyph-density" d="M32 83 C45 70 76 70 90 83"/>
+                    {% elif slug == 'structural-biology' %}
+                    <path class="protein-backbone" d="M29 74 C37 43 48 31 61 39 C72 46 67 65 79 70 C88 74 90 58 82 47"/>
+                    <path class="protein-backbone secondary" d="M36 84 C49 93 74 91 86 78"/>
+                    <circle cx="40" cy="55" r="4"/><circle cx="60" cy="39" r="4"/><circle cx="78" cy="70" r="4"/>
+                    {% elif slug == 'cell-biology' %}
+                    <path class="cell-outline" d="M26 62 C26 34 54 22 78 31 C101 40 101 74 78 88 C53 103 26 90 26 62Z"/>
+                    <circle class="glyph-core-dot" cx="61" cy="62" r="15"/><circle cx="83" cy="55" r="5"/><circle cx="43" cy="72" r="4"/>
+                    {% elif slug == 'bioinformatics' %}
+                    <path class="data-grid" d="M26 34h68M26 52h68M26 70h68M26 88h68"/>
+                    <path class="data-grid" d="M38 26v70M60 26v70M82 26v70"/>
+                    <circle cx="38" cy="52" r="4"/><circle cx="60" cy="70" r="4"/><circle cx="82" cy="34" r="4"/>
+                    {% else %}
+                    <path class="synapse-line" d="M30 62 C43 39 62 37 72 58"/>
+                    <path class="synapse-line" d="M73 58 C83 48 94 51 99 66"/>
+                    <circle class="synapse-terminal" cx="30" cy="62" r="6"/><circle class="synapse-terminal" cx="72" cy="58" r="6"/><circle class="synapse-terminal" cx="99" cy="66" r="5"/>
+                    <path class="pulse-line" d="M38 79 H84"/>
+                    {% endif %}
+                </svg>
+            </div>
+            <div class="discipline-top">
+                {% if slug == 'electron-microscopy' %}
+                <span class="galaxy-label is-electron"><span>Electron</span><span>microscopy</span></span>
+                {% else %}
+                <span class="galaxy-label">{{ course.label }}</span>
+                {% endif %}
+                <em>{{ _('可进入', 'Open') if course.status == 'open' else _('即将开放', 'Coming Soon') }}</em>
+            </div>
+            <h2>{{ display_name }}</h2>
+            <div class="galaxy-summary">{{ summary }}</div>
+            <div class="discipline-accent tag-row keyword-list" aria-label="{{ display_name }}{{ _('关键词', ' keywords') }}">
+                {% for keyword in keywords %}<span>{{ keyword }}</span>{% endfor %}
+            </div>
+        </a>
+    </article>
+    {% endfor %}
+</section>
+<div class="galaxy-toast" role="status" aria-live="polite"></div>
+{% endblock %}

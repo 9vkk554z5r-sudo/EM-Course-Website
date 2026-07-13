@@ -1,8 +1,14 @@
 {% extends "base.html" %}
 {% block title %}{{ _("文献收藏夹", "Collection") }}{% endblock %}
 {% block content %}
-<div class="page-header"><h1>{{ _("📚 我的文献收藏", "📚 My Collection") }}</h1>
-<p class="text-muted">{{ _("像Zotero一样管理你的文献 - 创建分类，收藏文献", "Zotero-style management - create categories, bookmark papers") }}</p></div>
+<div class="page-header">
+<div>
+<p class="eyebrow">{{ _("文献管理", "Paper Library") }}</p>
+<h1>{{ _("📚 我的文献收藏", "📚 My Collection") }}</h1>
+<p class="text-muted">{{ _("像 Zotero 一样管理你的文献：创建分类，整理搜索、订阅和星球中的关键论文", "Zotero-style management for papers from search, updates, and planets.") }}</p>
+</div>
+<a href="{{ url_for('literature_hub') }}" class="btn btn-sm">{{ _("返回文献知识宇宙", "Back to universe") }}</a>
+</div>
 
 <div class="stats-grid" style="margin-bottom:16px">
 <div class="stat-card"><div class="stat-icon">📚</div><div class="stat-info"><span class="stat-value" id="totalBookmarks">0</span><span class="stat-label">{{ _("已收藏", "Bookmarked") }}</span></div></div>

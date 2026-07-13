@@ -1,23 +1,80 @@
 {% extends "base.html" %}
 {% block title %}关键词文献星球{% endblock %}
 {% block content %}
-<div class="page-header"><h1>🪐 关键词文献星球</h1><p class="text-muted">每个关键词是一个星系，文献是环绕的小行星。点击小行星可以跳转对应文献信息</p>
-<button class="btn btn-sm btn-primary" onclick="document.getElementById('createForm').style.display='block'">+ 创建星球</button></div>
-<div class="card" style="margin-bottom:16px;"><div class="card-header"><h2>📤 上传DOI生成星云</h2></div><div class="card-body"><form method="POST" action="{{ url_for("upload_dois") }}" class="form"><div class="form-row"><div class="form-group flex-grow"><input type="text" name="keyword" placeholder="关键词名称" required style="width:100%"></div><button type="submit" class="btn btn-primary">🚀 生成星云</button></div><div class="form-group"><textarea name="dois" rows="4" placeholder="输入DOI（每行一个）" style="width:100%" required></textarea></div></form></div></div>
-<div id="planet-solar" style="height:600px;background:radial-gradient(ellipse at center,#0a0f24 0%,#000 100%);border-radius:12px;cursor:grab;margin-bottom:20px;"></div>
-<div class="card" id="createForm" style="display:none"><div class="card-header"><h2>创建新星球</h2></div><div class="card-body">
-<form method="POST" action="{{ url_for('planet_create') }}" class="form">
-<div class="form-row"><div class="form-group flex-grow"><input type="text" name="name" placeholder="星球名称" required></div>
-<div class="form-group"><input type="text" name="topic" placeholder="主题词"></div>
-<div class="form-group"><input type="color" name="color" value="#3b82f6"></div></div>
-<div class="form-group"><textarea name="description" rows="2" placeholder="描述"></textarea></div>
-<button type="submit" class="btn btn-primary">创建</button></form></div></div>
+<div class="page-header">
+    <div>
+        <p class="eyebrow">Keyword Planets</p>
+        <h1>🪐 关键词文献星球</h1>
+        <p class="text-muted">每个关键词是一组文献星系。上传 DOI 或手动创建星球后，可继续维护主题文献集合。</p>
+    </div>
+    <button class="btn btn-sm btn-primary" onclick="document.getElementById('createForm').style.display='block'">创建星球</button>
+</div>
+
+<div class="module-section">
+    <div class="card">
+        <div class="card-header">
+            <h2>📤 上传 DOI 生成星球</h2>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for("upload_dois") }}" class="form">
+                <div class="form-row">
+                    <div class="form-group flex-grow">
+                        <input type="text" name="keyword" placeholder="关键词名称，例如 cryo-EM sample prep" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">生成星球</button>
+                </div>
+                <div class="form-group">
+                    <textarea name="dois" rows="4" placeholder="输入 DOI，每行一个" required></textarea>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card" id="createForm" style="display:none">
+        <div class="card-header">
+            <h2>手动创建星球</h2>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('planet_create') }}" class="form">
+                <div class="form-grid two">
+                    <div class="form-group"><input type="text" name="name" placeholder="星球名称" required></div>
+                    <div class="form-group"><input type="text" name="topic" placeholder="主题词"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group flex-grow"><textarea name="description" rows="2" placeholder="描述"></textarea></div>
+                    <div class="form-group"><input type="color" name="color" value="#3b82f6" title="星球颜色"></div>
+                </div>
+                <button type="submit" class="btn btn-primary">创建</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2>主题星系预览</h2>
+        <a href="{{ url_for('literature_hub') }}" class="btn btn-sm">返回文献知识宇宙</a>
+    </div>
+    <div class="card-body" style="padding:0;">
+        <div id="planet-solar" style="height:600px;cursor:grab;"></div>
+    </div>
+</div>
+
 {% if planets %}
-<div class="card"><div class="card-header"><h2>我的星球列表</h2></div><div class="card-body">
-{% for p in planets %}{% set pc = p.papers.count() %}
-<div class="paper-item"><span class="paper-title">{{ p.name }}</span>
-<div class="paper-meta">{{ p.topic }} · {{ pc }} 篇文献 · <a href="{{ url_for('planet_detail', pid=p.id) }}">查看详情</a></div></div>
-{% endfor %}</div></div>{% endif %}
+<div class="card">
+    <div class="card-header"><h2>我的星球列表</h2></div>
+    <div class="card-body">
+        <div class="paper-list">
+            {% for p in planets %}{% set pc = p.papers.count() %}
+            <div class="paper-item">
+                <span class="paper-title">{{ p.name }}</span>
+                <div class="paper-meta">{{ p.topic }} · {{ pc }} 篇文献 · <a href="{{ url_for('planet_detail', pid=p.id) }}">查看详情</a></div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/three.min.js') }}"></script>

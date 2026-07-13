@@ -1,13 +1,168 @@
 {% extends "base.html" %}
-{% block title %}{{ _("文献星云", "Literature Nebula") }}{% endblock %}
+{% block title %}文献星云 - {{ platform_name }}{% endblock %}
+{% block body_class %}literature-workspace-route life-product-theme{% endblock %}
 {% block content %}
-<div class="page-header"><h1>{{ _("文献星云", "Literature Nebula") }}</h1><p class="text-muted">{{ _("三大模块，助你全面管理文献", "Three modules to manage literature") }}</p></div>
-<div class="action-grid">
-<a href="{{ url_for('planets') }}" class="action-card">
-<div class="action-icon">🪐</div><h3>{{ _("关键词星球", "Keyword Planets") }}</h3><p>{{ _("按主题分类创建文献星球，文献越多星球越大越亮", "Create lit planets by topic") }}</p><span class="action-arrow">{{ _("探索星群", "Explore") }} &rarr;</span></a>
-<a href="{{ url_for('literature_weekly') }}" class="action-card">
-<div class="action-icon">📬</div><h3>{{ _("每周文献更新", "Weekly Updates") }}</h3><p>{{ _("输入关键词，通过OpenAlex获取近一周最新文献列表", "Get latest papers via OpenAlex") }}</p><span class="action-arrow">{{ _("查看更新", "View") }} &rarr;</span></a>
-<a href="{{ url_for('literature_collection') }}" class="action-card">
-<div class="action-icon">📚</div><h3>{{ _("文献收藏夹", "Collection") }}</h3><p>{{ _("按星球分类查看所有收藏的文献，Zotero式管理", "Browse all collected literature") }}</p><span class="action-arrow">{{ _("查看收藏", "View") }} &rarr;</span></a>
+<div class="literature-workspace graph-workbench" data-initial-view="overview">
+    <header class="literature-head">
+        <div>
+            <p class="section-kicker">文献智能分析</p>
+            <h1>文献星云</h1>
+            <p>导入真实文献后，系统会从论文、关键词、作者、方法和主题之间生成可解释的关系网络，并给出下一步阅读建议。</p>
+        </div>
+        <form class="graph-seed-form" data-graph-search>
+            <input type="search" name="q" value="cryo-EM" placeholder="输入 DOI、标题或关键词">
+            <button type="submit" class="btn btn-primary" data-loading-text="生成中">生成星云</button>
+        </form>
+    </header>
+
+    <section class="import-console" data-import-console>
+        <div class="import-tabs" role="tablist">
+            <button type="button" class="active" data-import-tab="doi">DOI 批量</button>
+            <button type="button" data-import-tab="bibtex">BibTeX</button>
+            <button type="button" data-import-tab="ris">RIS</button>
+            <button type="button" data-import-tab="csv">CSV</button>
+            <button type="button" data-import-tab="manual">手动添加</button>
+        </div>
+
+        <div class="import-panels">
+            <form class="import-panel active" data-import-panel="doi">
+                <label>每行一个 DOI</label>
+                <textarea name="doiText" rows="5" placeholder="10.1038/s41586-020-2008-3&#10;10.1126/science.abe6674"></textarea>
+                <button type="submit" class="btn btn-primary">导入 DOI</button>
+            </form>
+
+            <form class="import-panel" data-import-panel="bibtex">
+                <label>BibTeX 文件或文本</label>
+                <input type="file" name="bibFile" accept=".bib,.txt">
+                <textarea name="bibText" rows="5" placeholder="@article{key, title={...}, author={...}, year={2024}, doi={...}}"></textarea>
+                <button type="submit" class="btn btn-primary">解析 BibTeX</button>
+            </form>
+
+            <form class="import-panel" data-import-panel="ris">
+                <label>RIS 文件或文本</label>
+                <input type="file" name="risFile" accept=".ris,.txt">
+                <textarea name="risText" rows="5" placeholder="TY  - JOUR&#10;TI  - Paper title&#10;AU  - Author, A&#10;PY  - 2024&#10;ER  -"></textarea>
+                <button type="submit" class="btn btn-primary">解析 RIS</button>
+            </form>
+
+            <form class="import-panel" data-import-panel="csv">
+                <label>CSV 文件或文本，字段：title, authors, year, doi, journal, abstract, keywords</label>
+                <input type="file" name="csvFile" accept=".csv,.txt">
+                <textarea name="csvText" rows="5" placeholder="title,authors,year,doi,journal,abstract,keywords"></textarea>
+                <button type="submit" class="btn btn-primary">解析 CSV</button>
+            </form>
+
+            <form class="import-panel manual-form" data-import-panel="manual">
+                <div class="form-grid two">
+                    <div class="form-group"><label>标题</label><input name="title" required placeholder="论文标题"></div>
+                    <div class="form-group"><label>作者</label><input name="authors" placeholder="作者，用分号或逗号分隔"></div>
+                </div>
+                <div class="form-grid three">
+                    <div class="form-group"><label>年份</label><input name="year" type="number" min="1900" max="2100" placeholder="2024"></div>
+                    <div class="form-group"><label>DOI</label><input name="doi" placeholder="10.xxxx/..."></div>
+                    <div class="form-group"><label>期刊</label><input name="journal" placeholder="Nature Methods"></div>
+                </div>
+                <div class="form-group"><label>关键词</label><input name="keywords" placeholder="cryo-EM; single particle analysis; RELION"></div>
+                <div class="form-group"><label>摘要</label><textarea name="abstract" rows="4" placeholder="摘要或简述"></textarea></div>
+                <button type="submit" class="btn btn-primary">添加文献</button>
+            </form>
+        </div>
+
+        <div class="import-status" data-import-status>
+            <strong>本地文献库</strong>
+            <span data-paper-count>0 篇文献</span>
+            <button type="button" class="btn btn-sm btn-outline" data-load-sample>载入示例数据</button>
+            <button type="button" class="btn btn-sm btn-outline" data-clear-library>清空本地导入</button>
+            <a href="{{ url_for('nebula') }}" class="btn btn-sm btn-primary">进入动态星云 · 引用网络</a>
+        </div>
+    </section>
+
+    <section class="graph-toolbar">
+        <div class="view-switch" data-graph-views>
+            <button type="button" class="active" data-view="overview">总览</button>
+            <button type="button" data-view="citation">引用网络</button>
+            <button type="button" data-view="keywords">关键词聚类</button>
+            <button type="button" data-view="timeline">时间线</button>
+        </div>
+        <div class="graph-status" data-graph-status>等待文献数据</div>
+    </section>
+
+    <section class="graph-layout">
+        <aside class="graph-sidebar">
+            <div class="filter-block">
+                <h2>筛选</h2>
+                <label>年份
+                    <select data-filter-year>
+                        <option value="all">全部年份</option>
+                        <option value="2020">2020+</option>
+                        <option value="2015">2015+</option>
+                        <option value="2010">2010+</option>
+                    </select>
+                </label>
+                <label>相关度
+                    <select data-filter-relevance>
+                        <option value="0">全部</option>
+                        <option value="0.45">0.45+</option>
+                        <option value="0.65">0.65+</option>
+                        <option value="0.8">0.80+</option>
+                    </select>
+                </label>
+                <label class="check-row"><input type="checkbox" data-filter-bookmarked><span>仅看收藏</span></label>
+            </div>
+            <div class="filter-block">
+                <h2>节点类型</h2>
+                <div class="type-filter" data-filter-types>
+                    <label><input type="checkbox" value="Paper" checked> 论文</label>
+                    <label><input type="checkbox" value="Keyword" checked> 关键词</label>
+                    <label><input type="checkbox" value="Author" checked> 作者</label>
+                    <label><input type="checkbox" value="Method" checked> 方法</label>
+                    <label><input type="checkbox" value="Topic" checked> 主题</label>
+                </div>
+            </div>
+            <div class="legend-block">
+                <h2>图例</h2>
+                <div class="legend-grid">
+                    <span><i class="legend-dot paper"></i>论文</span>
+                    <span><i class="legend-dot keyword"></i>关键词</span>
+                    <span><i class="legend-dot author"></i>作者</span>
+                    <span><i class="legend-dot method"></i>方法</span>
+                    <span><i class="legend-line cites"></i>引用/参考</span>
+                    <span><i class="legend-line similar"></i>相似主题</span>
+                </div>
+            </div>
+        </aside>
+
+        <main class="graph-stage">
+            <div class="graph-canvas-head">
+                <div>
+                    <strong data-graph-title>主题总览</strong>
+                    <span data-graph-meta>导入文献后生成 30-60 个关键节点</span>
+                </div>
+            </div>
+            <div class="graph-canvas" data-graph-canvas>
+                <div class="graph-empty"><strong>还没有导入文献</strong><span>请使用上方 DOI、BibTeX、RIS、CSV 或手动添加文献。也可以先载入示例数据体验星云。</span></div>
+            </div>
+        </main>
+
+        <aside class="graph-insight-column">
+            <div class="node-detail" data-node-detail>
+                <p class="section-kicker">选择节点</p>
+                <h2>选择一个节点</h2>
+                <p>点击论文、作者、关键词或方法节点，查看摘要、关系和下一步操作。</p>
+            </div>
+            <div class="analysis-panel" data-analysis-panel>
+                <p class="section-kicker">分析</p>
+                <h2>分析摘要</h2>
+                <p>导入文献后显示核心主题、关键论文、高频关键词、主要作者和数据质量提示。</p>
+            </div>
+        </aside>
+    </section>
 </div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/literature_store.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/literature_parsers.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/literature_graph_builder.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/literature_import.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/literature_graph.js') }}?v=4"></script>
 {% endblock %}

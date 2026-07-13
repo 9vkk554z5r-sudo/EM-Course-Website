@@ -14,6 +14,7 @@ class User(UserMixin, db.Model):
     student_id = db.Column(db.String(20), unique=True, nullable=False, index=True)
     name = db.Column(db.String(50), nullable=False)
     email = db.Column(db.String(120), nullable=False)
+    phone = db.Column(db.String(30), unique=True, nullable=True, index=True)
     password_hash = db.Column(db.String(256), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     registered_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))

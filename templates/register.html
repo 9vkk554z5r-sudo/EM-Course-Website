@@ -1,39 +1,6 @@
 {% extends "base.html" %}
-{% block title %}注册 — 电子显微学前沿课程{% endblock %}
+{% block title %}{{ _('注册', 'Register') }} - {{ _('生命科学课程助手', 'Life Science Course Assistant') }}{% endblock %}
+{% block body_class %}auth-route galaxy-auth-route life-product-theme{% endblock %}
 {% block content %}
-<div class="auth-page">
-    <div class="auth-card">
-        <div class="auth-header">
-            <div class="auth-icon">🔬</div>
-            <h1>注册新账号</h1>
-            <p>加入电子显微学前沿课程</p>
-        </div>
-        <form method="POST" class="auth-form">
-            <div class="form-group">
-                <label for="student_id">学号</label>
-                <input type="text" id="student_id" name="student_id" placeholder="请输入学号" required>
-            </div>
-            <div class="form-group">
-                <label for="name">姓名</label>
-                <input type="text" id="name" name="name" placeholder="请输入姓名" required>
-            </div>
-            <div class="form-group">
-                <label for="email">邮箱</label>
-                <input type="email" id="email" name="email" placeholder="用于接收文献推送" required>
-            </div>
-            <div class="form-group">
-                <label for="password">密码</label>
-                <input type="password" id="password" name="password" placeholder="至少6位密码" required minlength="6">
-            </div>
-            <div class="form-group">
-                <label for="confirm_password">确认密码</label>
-                <input type="password" id="confirm_password" name="confirm_password" placeholder="再次输入密码" required>
-            </div>
-            <button type="submit" class="btn btn-primary btn-full">注 册</button>
-        </form>
-        <div class="auth-footer">
-            <p>已有账号？<a href="{{ url_for('login') }}">立即登录</a></p>
-        </div>
-    </div>
-</div>
+<div class="auth-page course-auth"><div class="auth-shell auth-shell-register galaxy-auth-shell"><section class="auth-intro em-auth-visual galaxy-auth-panel"><div class="auth-mark">LS</div><p class="eyebrow">{{ _('生命科学课程助手', 'Life Science Course Assistant') }}</p><h1>{{ _('建立你的课程科研档案', 'Create Your Course Research Profile') }}</h1><p class="phrase-lines auth-intro-copy"><span>{{ _('选择学科星系', 'Choose a discipline galaxy') }}</span><span>{{ _('记录学习进度', 'Track learning progress') }}</span><span>{{ _('连接文献、方法与科研训练', 'Connect literature, methods and research training') }}</span></p><div class="em-galaxy-visual compact archive-visual" aria-label="{{ _('课程科研档案结构图', 'Course research profile structure') }}"><div class="archive-map" aria-hidden="true"><svg viewBox="0 0 560 300" class="archive-map-svg"><g class="archive-links"><path class="archive-link archive-link-1" d="M280 150 L140 82"/><path class="archive-link archive-link-2" d="M280 150 L420 82"/><path class="archive-link archive-link-3" d="M280 150 L140 222"/><path class="archive-link archive-link-4" d="M280 150 L420 222"/><path class="archive-loop" d="M140 82 C250 30 352 30 420 82 C488 150 418 258 280 248 C142 258 72 150 140 82"/></g><g class="archive-core archive-node-core" transform="translate(280 150)"><circle r="42"/><path d="M-16 -12h32v28h-32zM-8 -4h16M-8 5h12"/></g><g class="archive-node archive-node-1" transform="translate(140 82)"><circle r="30"/><text y="52" text-anchor="middle">{{ _('研究方向', 'Research Focus') }}</text></g><g class="archive-node archive-node-2" transform="translate(420 82)"><circle r="30"/><text y="52" text-anchor="middle">{{ _('文献星云', 'Literature Nebula') }}</text></g><g class="archive-node archive-node-3" transform="translate(140 222)"><circle r="30"/><text y="52" text-anchor="middle">{{ _('方法记录', 'Method Records') }}</text></g><g class="archive-node archive-node-4" transform="translate(420 222)"><circle r="30"/><text y="52" text-anchor="middle">{{ _('训练进度', 'Training Progress') }}</text></g></svg><div class="archive-core-label">{{ _('课程科研档案', 'Course Research Profile') }}</div></div></div><div class="auth-highlights"><span>{{ _('账号认证', 'Account Identity') }}</span><span>{{ _('方向档案', 'Galaxy Profile') }}</span><span>{{ _('学习记录', 'Learning Record') }}</span></div></section><section class="auth-card stagger-panel galaxy-glass-form"><div class="auth-header"><div class="auth-icon">LS</div><h2>{{ _('注册新账号', 'Create Account') }}</h2><p>{{ _('邮箱或手机号至少填写一项', 'Provide at least an email or phone number') }}</p></div><form method="POST" class="auth-form galaxy-login-form"><div class="form-grid two"><div class="form-group"><label for="student_id">{{ _('学号', 'Student ID') }}</label><input type="text" id="student_id" name="student_id" placeholder="{{ _('请输入学号', 'Enter student ID') }}" required autocomplete="username"></div><div class="form-group"><label for="name">{{ _('姓名', 'Name') }}</label><input type="text" id="name" name="name" placeholder="{{ _('请输入姓名', 'Enter name') }}" required autocomplete="name"></div></div><div class="form-grid two"><div class="form-group"><label for="email">{{ _('邮箱', 'Email') }}</label><input type="email" id="email" name="email" placeholder="{{ _('用于接收文献提醒', 'For literature reminders') }}" autocomplete="email"></div><div class="form-group"><label for="phone">{{ _('手机号', 'Phone') }}</label><input type="tel" id="phone" name="phone" placeholder="{{ _('用于登录和通知', 'For login and notifications') }}" autocomplete="tel"></div></div><div class="form-grid two"><div class="form-group"><label for="password">{{ _('密码', 'Password') }}</label><input type="password" id="password" name="password" placeholder="{{ _('至少 6 位密码', 'At least 6 characters') }}" required minlength="6" autocomplete="new-password"></div><div class="form-group"><label for="confirm_password">{{ _('确认密码', 'Confirm Password') }}</label><input type="password" id="confirm_password" name="confirm_password" placeholder="{{ _('再次输入密码', 'Re-enter password') }}" required autocomplete="new-password"></div></div><button type="submit" class="btn btn-primary btn-full" data-loading-text="{{ _('正在创建', 'Creating') }}">{{ _('注册', 'Register') }}</button></form><div class="auth-footer"><p>{{ _('已有账号？', 'Already have an account?') }}<a href="{{ url_for('login', course=course.slug) }}">{{ _('立即登录', 'Log In') }}</a></p></div></section></div></div>
 {% endblock %}

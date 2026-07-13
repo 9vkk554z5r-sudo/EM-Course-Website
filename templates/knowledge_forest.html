@@ -1,21 +1,55 @@
 {% extends "base.html" %}
 {% block title %}{{ _('知识森林', 'Knowledge Forest') }}{% endblock %}
+{% block body_class %}life-product-theme knowledge-forest-route cosmic-task-route{% endblock %}
 {% block content %}
-<div class="page-header"><h1>🌲 {{ _('知识森林', 'Knowledge Forest') }}</h1><p class="text-muted">{{ _('每日学习 · 答题测验 · 全勤种树', 'Daily study, quizzes, and rewards') }}</p></div>
-<div class="action-grid">
-<a href="{{ url_for('study') }}" class="action-card">
-<div class="action-icon">📖</div><h3>{{ _('每日知识点学习', 'Daily Study') }}</h3>
-<p>{{ _('选择难度，学习电子显微学知识', 'Learn EM knowledge at different levels') }}</p>
-<span class="action-arrow">{{ _('开始学习', 'Start') }} →</span></a>
-<a href="{{ url_for('rewards') }}" class="action-card">
-<div class="action-icon">🌳</div><h3>{{ _('我的小森林', 'My Forest') }}</h3>
-<p>{{ _('查看全勤奖励，连续打卡种树', 'View rewards, plant trees for streaks') }}</p>
-<span class="action-arrow">{{ _('查看森林', 'View') }} →</span></a>
+<div class="knowledge-forest-page">
+    <section class="forest-hero-panel">
+        <div class="forest-hero-copy">
+            <p class="section-kicker">{{ _('知识森林', 'Knowledge Forest') }}</p>
+            <h1>{{ _('知识森林', 'Knowledge Forest') }}</h1>
+            <p class="forest-subtitle">{{ _('把每日知识点、答题测验、连续打卡和森林成长放在一个统一入口中。', 'Daily study, quizzes, streaks and forest growth in one unified entry.') }}</p>
+            <div class="forest-hero-actions">
+                <a href="{{ url_for('study') }}" class="btn btn-primary">{{ _('开始今日学习', 'Start Today') }}</a>
+                <a href="{{ url_for('rewards') }}" class="btn btn-outline">{{ _('查看森林成长', 'View Growth') }}</a>
+            </div>
+        </div>
+        <div class="forest-stage" aria-hidden="true">
+            <span class="forest-moon"></span>
+            <span class="forest-horizon"></span>
+            <span class="forest-grid-lines"></span>
+            <span class="forest-scanline"></span>
+            <span class="forest-tree tree-1"></span>
+            <span class="forest-tree tree-2"></span>
+            <span class="forest-tree tree-3"></span>
+            <span class="forest-tree tree-4"></span>
+            <span class="forest-tree tree-5"></span>
+            <span class="forest-node node-1"></span>
+            <span class="forest-node node-2"></span>
+            <span class="forest-node node-3"></span>
+        </div>
+    </section>
+
+    <section class="forest-action-grid">
+        <a href="{{ url_for('study') }}" class="forest-action-card">
+            <span class="forest-action-index">01</span>
+            <strong>{{ _('每日知识点学习', 'Daily Study') }}</strong>
+            <span>{{ _('选择难度，学习电子显微学知识并完成测验。', 'Pick a level, study EM knowledge and complete quizzes.') }}</span>
+        </a>
+        <a href="{{ url_for('rewards') }}" class="forest-action-card">
+            <span class="forest-action-index">02</span>
+            <strong>{{ _('我的小森林', 'My Forest') }}</strong>
+            <span>{{ _('查看连续打卡、全勤奖励与已获得的森林节点。', 'View streaks, attendance rewards and forest nodes.') }}</span>
+        </a>
+    </section>
+
+    {% if streak_data %}
+    <section class="forest-stats-panel">
+        <div class="section-head"><h2>{{ _('学习统计', 'Stats') }}</h2></div>
+        <div class="forest-stats-grid">
+            <div class="forest-stat-card"><span>{{ _('累计种树', 'Trees') }}</span><strong>{{ streak_data.trees }}</strong></div>
+            <div class="forest-stat-card"><span>{{ _('连续打卡', 'Streak') }}</span><strong>{{ streak_data.streak }}</strong></div>
+        </div>
+    </section>
+    {% endif %}
 </div>
-{% if streak_data %}
-<div class="card"><div class="card-header"><h2>{{ _('学习统计', 'Stats') }}</h2></div><div class="card-body">
-<div class="stats-grid">
-<div class="stat-card"><div class="stat-icon">🌳</div><div class="stat-info"><span class="stat-value">{{ streak_data.trees }}</span><span class="stat-label">{{ _('累计种树', 'Trees') }}</span></div></div>
-<div class="stat-card"><div class="stat-icon">🔥</div><div class="stat-info"><span class="stat-value">{{ streak_data.streak }}</span><span class="stat-label">{{ _('连续打卡', 'Streak') }}</span></div></div>
-</div></div></div>{% endif %}
 {% endblock %}

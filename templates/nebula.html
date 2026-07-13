@@ -1,57 +1,88 @@
 {% extends "base.html" %}
-{% block title %}文献引用星云 — 电子显微学前沿课程{% endblock %}
+{% block title %}文献星云 - {{ platform_name }}{% endblock %}
+{% block body_class %}literature-workspace-route literature-nebula-route life-product-theme{% endblock %}
 {% block content %}
-<div class="nebula-page">
-    <div class="page-header">
-        <h1>🌌 文献引用关系星云图</h1>
-        <p class="text-muted">可视化展示文献之间的引用关系网络</p>
-    </div>
+<div class="literature-workspace graph-workbench graph-workbench-compact nebula-workspace" data-initial-view="citation">
+    <header class="literature-head nebula-head">
+        <div>
+            <p class="section-kicker">文献星云</p>
+            <h1>文献星云 · 引用网络</h1>
+            <p>保留论文、关键词、作者、方法和主题之间的星云式关系网络，同时接入统一文献星云的筛选、引用与分析能力。</p>
+        </div>
+        <form class="graph-seed-form" data-graph-search>
+            <input type="search" name="q" value="cryo-EM" placeholder="输入 DOI、标题或关键词">
+            <button type="submit" class="btn btn-primary">更新图谱</button>
+        </form>
+    </header>
 
-    <div class="card">
-        <div class="card-body">
-            <div id="nebula-container">
-                <div class="nebula-loading">
-                    <div class="spinner"></div>
-                    <p>加载文献数据...</p>
-                </div>
+    <section class="nebula-stage-card" aria-label="文献星云可视化">
+        <div class="nebula-stage-head">
+            <div>
+                <p class="section-kicker">Literature Nebula</p>
+                <h2>论文、关键词、作者与方法节点星云</h2>
             </div>
-            <div class="nebula-legend">
-                <div class="legend-item">
-                    <span class="legend-dot" style="background:#3b82f6;"></span>
-                    <span>文献节点（圆点大小表示引用量）</span>
-                </div>
-                <div class="legend-item">
-                    <span class="legend-line"></span>
-                    <span>引用关系</span>
-                </div>
+            <div class="nebula-stats">
+                <span><strong id="node-count">0</strong>节点</span>
+                <span><strong id="edge-count">0</strong>连接</span>
+                <span><strong id="topic-count">0</strong>主题</span>
             </div>
         </div>
-    </div>
+        <div id="nebula-container" class="literature-nebula-canvas">
+            <div class="nebula-loading">正在生成文献星云</div>
+        </div>
+    </section>
 
-    <div class="card">
-        <div class="card-header">
-            <h2>数据统计</h2>
+    <section class="graph-toolbar">
+        <div class="view-switch" data-graph-views>
+            <button type="button" data-view="overview">总览</button>
+            <button type="button" class="active" data-view="citation">引用网络</button>
+            <button type="button" data-view="keywords">关键词聚类</button>
+            <button type="button" data-view="timeline">时间线</button>
         </div>
-        <div class="card-body">
-            <div class="nebula-stats" id="nebula-stats">
-                <div class="stat-mini">
-                    <span class="stat-value" id="node-count">-</span>
-                    <span class="stat-label">文献总数</span>
-                </div>
-                <div class="stat-mini">
-                    <span class="stat-value" id="edge-count">-</span>
-                    <span class="stat-label">引用关系数</span>
-                </div>
-                <div class="stat-mini">
-                    <span class="stat-value" id="topic-count">-</span>
-                    <span class="stat-label">研究主题数</span>
+        <a href="{{ url_for('literature_hub') }}" class="btn btn-sm btn-outline">返回文献星云</a>
+    </section>
+
+    <section class="graph-layout">
+        <aside class="graph-sidebar">
+            <div class="filter-block">
+                <h2>筛选</h2>
+                <label>年份<select data-filter-year><option value="all">全部</option><option value="2020">2020+</option><option value="2015">2015+</option><option value="2010">2010+</option></select></label>
+                <label>相关度<select data-filter-relevance><option value="0">全部</option><option value="0.45">0.45+</option><option value="0.65">0.65+</option><option value="0.8">0.80+</option></select></label>
+                <label class="check-row"><input type="checkbox" data-filter-bookmarked><span>仅看收藏</span></label>
+            </div>
+            <div class="filter-block">
+                <h2>节点类型</h2>
+                <div class="type-filter" data-filter-types>
+                    <label><input type="checkbox" value="Paper" checked> 论文</label>
+                    <label><input type="checkbox" value="Keyword" checked> 关键词</label>
+                    <label><input type="checkbox" value="Author" checked> 作者</label>
+                    <label><input type="checkbox" value="Method" checked> 方法</label>
+                    <label><input type="checkbox" value="Topic" checked> 主题</label>
                 </div>
             </div>
-        </div>
-    </div>
+        </aside>
+        <main class="graph-stage">
+            <div class="graph-canvas-head"><div><strong data-graph-title>引用网络</strong><span data-graph-meta></span></div></div>
+            <div class="graph-canvas" data-graph-canvas></div>
+        </main>
+        <aside class="graph-insight-column">
+            <div class="node-detail" data-node-detail>
+                <p class="section-kicker">选择节点</p>
+                <h2>选择一个节点</h2>
+                <p>点击节点查看元数据、相关度和后续操作。</p>
+            </div>
+            <div class="analysis-panel" data-analysis-panel></div>
+        </aside>
+    </section>
 </div>
 {% endblock %}
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/three.min.js') }}"></script>
 <script src="https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js"></script>
-<script src="{{ url_for('static', filename='js/nebula.js') }}"></script>
+<script src="{{ url_for('static', filename='js/nebula.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/literature_store.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/literature_parsers.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/literature_graph_builder.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/literature_graph.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/literature_planet_nebula.js') }}?v=1"></script>
 {% endblock %}
