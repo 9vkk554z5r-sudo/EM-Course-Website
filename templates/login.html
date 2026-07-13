@@ -1,27 +1,28 @@
 {% extends "base.html" %}
-{% block title %}登录 — 电子显微学前沿课程{% endblock %}
+{% set course_display = course.name_en if lang == 'en' and course.name_en is defined else course.name %}
+{% block title %}{{ _('登录', 'Login') }} - {{ course_display }} - {{ _('生命科学课程助手', 'Life Science Course Assistant') }}{% endblock %}
+{% block body_class %}auth-route galaxy-auth-route life-product-theme{% endblock %}
 {% block content %}
-<div class="auth-page">
-    <div class="auth-card">
-        <div class="auth-header">
-            <div class="auth-icon">🔬</div>
-            <h1>电子显微学前沿课程</h1>
-            <p>登录您的账号</p>
-        </div>
-        <form method="POST" class="auth-form">
-            <div class="form-group">
-                <label for="student_id">学号</label>
-                <input type="text" id="student_id" name="student_id" placeholder="请输入学号" required autofocus>
+<div class="auth-page course-auth">
+    <div class="auth-shell galaxy-auth-shell">
+        <section class="auth-intro em-auth-visual galaxy-auth-panel">
+            <div class="auth-mark">LS</div>
+            <p class="eyebrow">{{ _('生命科学课程助手', 'Life Science Course Assistant') }}</p>
+            <h1>{{ course_display }}</h1>
+            <p class="phrase-lines auth-intro-copy"><span>{{ _('进入该方向后', 'After entering this direction') }}</span><span>{{ _('围绕Cryo-EM、Cryo-ET与vEM', 'Focus on Cryo-EM, Cryo-ET and vEM') }}</span><span>{{ _('组织课程学习、构建文献星云与总结实验方法', 'Organize course learning, build literature nebulas and summarize experimental methods') }}</span></p>
+            <div class="em-galaxy-visual workflow-visual" aria-label="{{ _('电子显微学训练流程图', 'Electron microscopy training workflow') }}">
+                <div class="em-workflow-track" aria-hidden="true">
+                    <svg viewBox="0 0 640 220" class="em-workflow-svg"><defs><marker id="workflowArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" /></marker></defs><path class="beam-line workflow-track-line" d="M52 110 H588" marker-end="url(#workflowArrow)"/><path class="workflow-energy" d="M52 110 H588"/><g class="workflow-svg-node workflow-step-1" transform="translate(80 110)"><circle r="20"/><path d="M-8 -8h16v16h-16z"/></g><g class="workflow-svg-node workflow-step-2" transform="translate(240 110)"><circle r="20"/><path d="M-11 -4h22M-8 4h16M-4 -12v24"/></g><g class="workflow-svg-node workflow-step-3" transform="translate(400 110)"><circle r="20"/><path d="M-10 -8h20v16h-20zM-4 -14v28M4 -14v28"/></g><g class="workflow-svg-node workflow-step-4" transform="translate(560 110)"><circle r="20"/><path d="M-12 6 C-5 -12 5 -12 12 6 C6 13 -6 13 -12 6Z"/></g></svg>
+                    <div class="workflow-map workflow-flow" aria-hidden="true"><div class="workflow-node active workflow-step-label workflow-step-1-label">{{ _('样品制备', 'Sample Prep') }}</div><div class="workflow-node workflow-step-label workflow-step-2-label">{{ _('数据采集', 'Data Collection') }}</div><div class="workflow-node workflow-step-label workflow-step-3-label">{{ _('图像处理', 'Image Processing') }}</div><div class="workflow-node workflow-step-label workflow-step-4-label">{{ _('三维重构', '3D Reconstruction') }}</div></div>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="password">密码</label>
-                <input type="password" id="password" name="password" placeholder="请输入密码" required>
-            </div>
-            <button type="submit" class="btn btn-primary btn-full">登 录</button>
-        </form>
-        <div class="auth-footer">
-            <p>还没有账号？<a href="{{ url_for('register') }}">立即注册</a></p>
-        </div>
+            <div class="auth-highlights"><span>{{ _('文献追踪', 'Literature Tracking') }}</span><span>{{ _('Protocol 训练', 'Protocol Training') }}</span><span>{{ _('重构实践', 'Reconstruction Practice') }}</span></div>
+        </section>
+        <section class="auth-card stagger-panel galaxy-glass-form">
+            <div class="auth-header"><div class="auth-icon">LS</div><h2>{{ _('登录课程工作台', 'Log In to Course Workspace') }}</h2><p>{{ _('使用学号 / 邮箱 / 手机号 + 密码登录', 'Use student ID, email or phone plus password') }}</p></div>
+            <form method="POST" class="auth-form galaxy-login-form"><input type="hidden" name="course" value="{{ course.slug }}"><input type="hidden" name="next" value="{{ next_url }}"><div class="form-group"><label for="identifier">{{ _('账号', 'Account') }}</label><input type="text" id="identifier" name="identifier" placeholder="{{ _('学号 / 邮箱 / 手机号', 'Student ID / Email / Phone') }}" required autofocus autocomplete="username"></div><div class="form-group"><label for="password">{{ _('密码', 'Password') }}</label><input type="password" id="password" name="password" placeholder="{{ _('请输入密码', 'Enter password') }}" required autocomplete="current-password"></div><button type="submit" class="btn btn-primary btn-full" data-loading-text="{{ _('正在登录', 'Logging in') }}">{{ _('登录', 'Login') }}</button></form>
+            <div class="auth-footer"><p>{{ _('还没有账号？', 'No account yet?') }}<a href="{{ url_for('register', course=course.slug) }}">{{ _('立即注册', 'Register Now') }}</a></p><p><a href="{{ url_for('courses') }}">{{ _('重新选择学科星系', 'Choose Another Galaxy') }}</a></p></div>
+        </section>
     </div>
 </div>
 {% endblock %}

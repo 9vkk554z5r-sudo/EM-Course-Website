@@ -8,3 +8,9 @@ course.db
 .venv/
 venv/
 
+*.log
+*.db
+cloudflared*.exe
+public_runtime/
+public_share/
+static/uploads/

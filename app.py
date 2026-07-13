@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import os
 import sys
 from datetime import datetime, date, timezone
@@ -68,6 +68,88 @@ def create_app():
 app = create_app()
 db.init_app(app)
 
+PLATFORM_NAME = "生命科学课程助手"
+COURSE_REGISTRY = {
+    "electron-microscopy": {
+        "slug": "electron-microscopy",
+        "name": "冷冻电子显微学",
+        "name_en": "Cryo-Electron Microscopy",
+        "label": "Electron Microscopy",
+        "description": "聚焦冷冻电镜、冷冻电镜断层成像与体积电镜，连接结构解析、样品制备和文献追踪",
+        "description_en": "Focuses on cryo-EM, cryo-electron tomography and volume EM, connecting structure determination, sample preparation and literature tracking",
+        "status": "open",
+        "accent": "Cryo-EM / Cryo-ET / vEM",
+        "galaxy_keywords": ["Cryo-EM", "Cryo-ET", "vEM"],
+        "galaxy_keywords_en": ["Cryo-EM", "Cryo-ET", "vEM"],
+    },
+    "structural-biology": {
+        "slug": "structural-biology",
+        "name": "结构生物学",
+        "name_en": "Structural Biology",
+        "label": "Structural Biology",
+        "description": "围绕蛋白质、复合物与分子机器的结构解析，组织方法、文献与科研问题",
+        "description_en": "Organizes methods, literature and research questions around proteins, complexes and molecular machines",
+        "status": "soon",
+        "accent": "Structure / Function / Binding",
+        "galaxy_keywords": ["蛋白质结构解析", "分子机器", "构效关系"],
+        "galaxy_keywords_en": ["Protein Structure", "Molecular Machines", "Structure-Activity"],
+    },
+    "cell-biology": {
+        "slug": "cell-biology",
+        "name": "细胞生物学",
+        "name_en": "Cell Biology",
+        "label": "Cell Biology",
+        "description": "关注细胞结构、信号通路、细胞器与动态过程，辅助课程学习和实验设计",
+        "description_en": "Explores cellular structures, signaling pathways, organelles and dynamic processes for learning and experiment design",
+        "status": "soon",
+        "accent": "Imaging / Signaling / Organelles",
+        "galaxy_keywords": ["细胞器动态", "信号通路", "细胞成像"],
+        "galaxy_keywords_en": ["Organelle Dynamics", "Signaling Pathways", "Cell Imaging"],
+    },
+    "bioinformatics": {
+        "slug": "bioinformatics",
+        "name": "生物信息学",
+        "name_en": "Bioinformatics",
+        "label": "Bioinformatics",
+        "description": "面向序列、组学与结构数据分析，整理工具链、数据集和分析流程",
+        "description_en": "Structures toolchains, datasets and analysis workflows for sequences, omics and structural data",
+        "status": "soon",
+        "accent": "Omics / Sequence / Pipeline",
+        "galaxy_keywords": ["序列分析", "组学数据", "结构预测"],
+        "galaxy_keywords_en": ["Sequence Analysis", "Omics Data", "Structure Prediction"],
+    },
+    "neuroscience": {
+        "slug": "neuroscience",
+        "name": "神经科学",
+        "name_en": "Neuroscience",
+        "label": "Neuroscience",
+        "description": "围绕神经环路、突触机制与疾病模型，连接课程知识和研究文献",
+        "description_en": "Connects course knowledge and research literature around neural circuits, synaptic mechanisms and disease models",
+        "status": "soon",
+        "accent": "Circuit / Imaging / Cognition",
+        "galaxy_keywords": ["神经环路", "突触机制", "疾病模型"],
+        "galaxy_keywords_en": ["Neural Circuits", "Synaptic Mechanisms", "Disease Models"],
+    },
+}
+
+
+def _selected_course():
+    slug = (
+        request.args.get("course")
+        or flask_session.get("selected_course")
+        or "electron-microscopy"
+    )
+    return COURSE_REGISTRY.get(slug, COURSE_REGISTRY["electron-microscopy"])
+
+
+@app.context_processor
+def inject_platform_context():
+    return {
+        "platform_name": PLATFORM_NAME,
+        "course_registry": COURSE_REGISTRY,
+        "selected_course": _selected_course(),
+    }
+
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -81,63 +163,102 @@ def load_user(user_id):
 
 @app.route('/')
 def index():
+    return render_template("platform_home.html")
+
+
+@app.route('/courses')
+def courses():
+    return render_template("course_select.html", courses=COURSE_REGISTRY)
+
+
+@app.route('/course/<slug>')
+def course_entry(slug):
+    course = COURSE_REGISTRY.get(slug)
+    if not course:
+        abort(404)
+    if course["status"] != "open":
+        flash(f"{course['name']} 星系即将开放", "info")
+        return redirect(url_for("courses"))
+    flask_session["selected_course"] = slug
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
-    return redirect(url_for('login'))
+        return redirect(url_for("dashboard"))
+    return redirect(url_for("login", course=slug, next=url_for("dashboard")))
 
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
+        return redirect(request.args.get("next") or url_for('dashboard'))
+    course_slug = request.args.get("course") or flask_session.get("selected_course") or "electron-microscopy"
+    course = COURSE_REGISTRY.get(course_slug, COURSE_REGISTRY["electron-microscopy"])
+    flask_session["selected_course"] = course["slug"]
     if request.method == 'POST':
-        student_id = request.form.get('student_id', '').strip()
+        course_slug = request.form.get("course") or course["slug"]
+        course = COURSE_REGISTRY.get(course_slug, COURSE_REGISTRY["electron-microscopy"])
+        flask_session["selected_course"] = course["slug"]
+        identifier = request.form.get('identifier', '').strip()
         password = request.form.get('password', '')
-        user = User.query.filter_by(student_id=student_id).first()
+        user = User.query.filter(
+            db.or_(
+                User.student_id == identifier,
+                User.email == identifier,
+                User.phone == identifier,
+            )
+        ).first()
         if user and user.check_password(password):
             login_user(user, remember=True)
             flash('登录成功！欢迎回来', 'success')
-            return redirect(url_for('dashboard'))
-        flash('学号或密码错误', 'error')
-    return render_template('login.html')
+            return redirect(request.form.get("next") or request.args.get("next") or url_for('dashboard'))
+        flash('账号或密码错误', 'error')
+    return render_template('login.html', course=course, next_url=request.args.get("next") or url_for("dashboard"))
 
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
+    course = _selected_course()
     if request.method == 'POST':
         student_id = request.form.get('student_id', '').strip()
         name = request.form.get('name', '').strip()
         email = request.form.get('email', '').strip()
+        phone = request.form.get('phone', '').strip()
         password = request.form.get('password', '')
         confirm = request.form.get('confirm_password', '')
 
-        if not all([student_id, name, email, password]):
+        if not all([student_id, name, password]) or not (email or phone):
             flash('请填写所有必填字段', 'error')
-            return render_template('register.html')
+            return render_template('register.html', course=course)
 
         if password != confirm:
             flash('两次输入的密码不一致', 'error')
-            return render_template('register.html')
+            return render_template('register.html', course=course)
 
         if len(password) < 6:
             flash('密码长度至少6位', 'error')
-            return render_template('register.html')
+            return render_template('register.html', course=course)
 
         if User.query.filter_by(student_id=student_id).first():
             flash('该学号已被注册', 'error')
-            return render_template('register.html')
+            return render_template('register.html', course=course)
 
-        user = User(student_id=student_id, name=name, email=email)
+        if email and User.query.filter_by(email=email).first():
+            flash('该邮箱已被注册', 'error')
+            return render_template('register.html', course=course)
+
+        if phone and User.query.filter_by(phone=phone).first():
+            flash('该手机号已被注册', 'error')
+            return render_template('register.html', course=course)
+
+        user = User(student_id=student_id, name=name, email=email, phone=phone or None)
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
 
         flash('注册成功！请登录', 'success')
-        return redirect(url_for('login'))
+        return redirect(url_for('login', course=course["slug"]))
 
-    return render_template('register.html')
+    return render_template('register.html', course=course)
 
 
 @app.route('/logout')
@@ -145,7 +266,7 @@ def register():
 def logout():
     logout_user()
     flash('已退出登录', 'info')
-    return redirect(url_for('login'))
+    return redirect(url_for('index'))
 
 
 @app.route('/dashboard')
@@ -159,6 +280,9 @@ def dashboard():
     subscription_count = LiteratureSubscription.query.filter_by(
         user_id=current_user.id, active=True
     ).count()
+    active_subscriptions = LiteratureSubscription.query.filter_by(
+        user_id=current_user.id, active=True
+    ).order_by(LiteratureSubscription.created_at.desc()).limit(4).all()
     total_checkins = DailyCheckin.query.filter_by(user_id=current_user.id).count()
     streak = _calc_streak(current_user.id)
 
@@ -199,6 +323,9 @@ def dashboard():
 
     # User protocols
     user_protocols_list = ProtocolCollection.query.filter_by(user_id=current_user.id).all()
+    bookmark_count = BookmarkedLiterature.query.filter_by(user_id=current_user.id).count()
+    protocol_count = ProtocolCollection.query.filter_by(user_id=current_user.id).count()
+    primary_topic = active_subscriptions[0].topic if active_subscriptions else "cryo-EM / single particle analysis"
 
     return render_template(
         "dashboard.html",
@@ -214,6 +341,10 @@ def dashboard():
         sample_literature=sample_literature,
         all_kps=all_kps,
         user_protocols=user_protocols_list,
+        active_subscriptions=active_subscriptions,
+        bookmark_count=bookmark_count,
+        protocol_count=protocol_count,
+        primary_topic=primary_topic,
     )
 
 
@@ -251,7 +382,7 @@ def subscribe():
     topic = request.form.get("topic", "").strip()
     keywords = request.form.get("keywords", "").strip()
     if not topic:
-        flash("???????", "error")
+        flash("请输入订阅主题", "error")
         return redirect(url_for("literature"))
 
     existing = LiteratureSubscription.query.filter_by(
@@ -265,7 +396,7 @@ def subscribe():
         )
         db.session.add(sub)
     db.session.commit()
-    flash(f"??????{topic}", "success")
+    flash(f"已订阅：{topic}", "success")
     return redirect(url_for("literature"))
 
 
@@ -277,7 +408,7 @@ def unsubscribe(sub_id):
         abort(403)
     sub.active = False
     db.session.commit()
-    flash("?????", "info")
+    flash("已取消订阅", "info")
     return redirect(url_for("literature"))
 
 
@@ -336,6 +467,302 @@ def nebula_data():
     from literature_agent import generate_citation_graph
     data = generate_citation_graph(items)
     return jsonify(data)
+
+
+@app.route("/api/literature-graph")
+@login_required
+def literature_graph():
+    query = request.args.get("q", "").strip() or "cryo-EM"
+    return jsonify(_build_literature_graph(current_user.id, query))
+
+
+def _build_literature_graph(user_id, query):
+    nodes = {}
+    edges = []
+
+    def add_node(node):
+        nodes[node["id"]] = node
+
+    def add_edge(source, target, relation, weight=0.5):
+        if source in nodes and target in nodes:
+            edges.append({
+                "from": source,
+                "to": target,
+                "relation": relation,
+                "weight": weight,
+            })
+
+    seed_id = "topic:" + re.sub(r"[^a-zA-Z0-9_-]+", "-", query.lower()).strip("-")
+    add_node({
+        "id": seed_id,
+        "type": "Topic",
+        "label": query,
+        "title": query,
+        "year": "",
+        "authors": "",
+        "keywords": [query],
+        "abstract": "当前文献探索的中心研究主题。",
+        "relevance": 1.0,
+        "citation_count": 0,
+        "bookmarked": False,
+        "read": False,
+        "url": "",
+        "source": "seed",
+    })
+
+    bookmarks = BookmarkedLiterature.query.filter_by(user_id=user_id).order_by(BookmarkedLiterature.added_at.desc()).limit(16).all()
+    literature_items = LiteratureItem.query.order_by(LiteratureItem.citation_count.desc()).limit(18).all()
+    planet_papers = PlanetPaper.query.join(LiteraturePlanet).filter(LiteraturePlanet.user_id == user_id).limit(14).all()
+    protocols = ProtocolCollection.query.filter_by(user_id=user_id).order_by(ProtocolCollection.created_at.desc()).limit(6).all()
+
+    paper_sources = []
+    for item in literature_items:
+        paper_sources.append(("lit", item.id, item.title, item.authors, item.journal, item.year, item.abstract, item.topic, item.citation_count, item.url, item.doi, False))
+    for item in planet_papers:
+        topic = item.planet.topic or item.planet.name if item.planet else ""
+        paper_sources.append(("planet", item.id, item.title, item.authors, item.journal, item.year, item.abstract, topic, 0, item.url, item.doi, False))
+    for item in bookmarks:
+        paper_sources.append(("bookmark", item.id, item.title, item.authors, item.journal, item.year, item.abstract, item.source, item.citation_count, item.url, item.doi, True))
+
+    seen_titles = set()
+    author_counts = {}
+    keyword_counts = {}
+    paper_ids = []
+    for source, item_id, title, authors, journal, year, abstract, topic, citations, url, doi, bookmarked in paper_sources:
+        if not title or title.lower() in seen_titles:
+            continue
+        seen_titles.add(title.lower())
+        node_id = f"paper:{source}:{item_id}"
+        keywords = _graph_keywords(topic, title, abstract)
+        add_node({
+            "id": node_id,
+            "type": "Paper",
+            "label": title[:42] + ("..." if len(title) > 42 else ""),
+            "title": title,
+            "year": year or "",
+            "authors": authors or "",
+            "journal": journal or "",
+            "keywords": keywords,
+            "abstract": abstract[:360] if abstract else "暂无摘要。可从 DOI、标题或收藏记录继续补充。",
+            "relevance": _graph_relevance(query, title, topic, citations),
+            "citation_count": citations or 0,
+            "bookmarked": bookmarked,
+            "read": False,
+            "url": url or "",
+            "doi": doi or "",
+            "source": source,
+        })
+        paper_ids.append(node_id)
+        add_edge(seed_id, node_id, "similar_work", 0.55 + min((citations or 0) / 300, 0.35))
+
+        for author in _split_authors(authors)[:2]:
+            author_counts[author] = author_counts.get(author, 0) + 1
+        for kw in keywords[:3]:
+            keyword_counts[kw] = keyword_counts.get(kw, 0) + 1
+
+    for kw, count in sorted(keyword_counts.items(), key=lambda x: x[1], reverse=True)[:10]:
+        kw_id = "keyword:" + re.sub(r"[^a-zA-Z0-9_-]+", "-", kw.lower()).strip("-")
+        add_node({
+            "id": kw_id,
+            "type": "Keyword",
+            "label": kw,
+            "title": kw,
+            "year": "",
+            "authors": "",
+            "keywords": [kw],
+            "abstract": f"在当前图谱中与 {count} 篇文献相关。",
+            "relevance": min(0.95, 0.45 + count * 0.12),
+            "citation_count": count,
+            "bookmarked": False,
+            "read": False,
+            "url": "",
+            "source": "keyword",
+        })
+        add_edge(seed_id, kw_id, "shared_keyword", 0.45 + count * 0.08)
+
+    for author, count in sorted(author_counts.items(), key=lambda x: x[1], reverse=True)[:7]:
+        author_id = "author:" + re.sub(r"[^a-zA-Z0-9_-]+", "-", author.lower()).strip("-")
+        add_node({
+            "id": author_id,
+            "type": "Author",
+            "label": author,
+            "title": author,
+            "year": "",
+            "authors": author,
+            "keywords": ["research team"],
+            "abstract": f"当前图谱中出现 {count} 次的作者或研究团队。",
+            "relevance": min(0.9, 0.4 + count * 0.15),
+            "citation_count": count,
+            "bookmarked": False,
+            "read": False,
+            "url": "",
+            "source": "author",
+        })
+        add_edge(seed_id, author_id, "same_author", 0.4 + count * 0.08)
+
+    for protocol in protocols:
+        protocol_id = f"protocol:{protocol.id}"
+        add_node({
+            "id": protocol_id,
+            "type": "Protocol",
+            "label": protocol.name[:32],
+            "title": protocol.name,
+            "year": protocol.created_at.year if protocol.created_at else "",
+            "authors": "",
+            "keywords": ["protocol", "method"],
+            "abstract": protocol.methods_summary[:360] if protocol.methods_summary else protocol.paper_title or "个人实验流程收藏。",
+            "relevance": 0.72,
+            "citation_count": 0,
+            "bookmarked": True,
+            "read": False,
+            "url": url_for("agent_methods"),
+            "source": "protocol",
+        })
+        add_edge(seed_id, protocol_id, "method_dependency", 0.7)
+
+    if len(nodes) <= 1:
+        return _sample_literature_graph(query)
+
+    keyword_nodes = [n for n in nodes.values() if n["type"] == "Keyword"]
+    author_nodes = [n for n in nodes.values() if n["type"] == "Author"]
+    for paper_id in paper_ids:
+        paper = nodes[paper_id]
+        for kw in paper["keywords"][:3]:
+            kw_id = "keyword:" + re.sub(r"[^a-zA-Z0-9_-]+", "-", kw.lower()).strip("-")
+            add_edge(paper_id, kw_id, "shared_keyword", 0.35)
+        for author in _split_authors(paper.get("authors", ""))[:2]:
+            author_id = "author:" + re.sub(r"[^a-zA-Z0-9_-]+", "-", author.lower()).strip("-")
+            add_edge(paper_id, author_id, "same_author", 0.35)
+
+    if len(paper_ids) >= 2:
+        for i in range(min(len(paper_ids) - 1, 8)):
+            add_edge(paper_ids[i], paper_ids[i + 1], "similar_work", 0.32)
+
+    return {
+        "seed": nodes[seed_id],
+        "nodes": list(nodes.values())[:42],
+        "edges": edges[:90],
+        "meta": {
+            "query": query,
+            "source": "database",
+            "node_count": len(nodes),
+            "edge_count": len(edges),
+        },
+    }
+
+
+def _split_authors(authors):
+    if not authors:
+        return []
+    parts = re.split(r",|;| and |、|，", authors)
+    return [p.strip() for p in parts if p.strip()][:6]
+
+
+def _graph_keywords(topic, title="", abstract=""):
+    seeds = []
+    if topic:
+        seeds.extend(re.split(r",|;|/|、|，", topic))
+    text = f"{title} {abstract}".lower()
+    vocab = [
+        "cryo-EM", "single particle analysis", "electron tomography",
+        "sample preparation", "image processing", "classification",
+        "resolution", "reconstruction", "protein complex", "membrane protein",
+        "focused refinement", "micrograph", "dose weighting", "CLEM",
+        "subtomogram averaging",
+    ]
+    for term in vocab:
+        if term.lower() in text:
+            seeds.append(term)
+    clean = []
+    for item in seeds:
+        item = item.strip()
+        if item and item.lower() not in [x.lower() for x in clean]:
+            clean.append(item)
+    return clean[:6] or ["electron microscopy"]
+
+
+def _graph_relevance(query, title, topic, citations):
+    score = 0.48
+    q = query.lower()
+    if q and q in (title or "").lower():
+        score += 0.24
+    if q and q in (topic or "").lower():
+        score += 0.18
+    score += min((citations or 0) / 500, 0.18)
+    return round(min(score, 0.98), 2)
+
+
+def _sample_literature_graph(query):
+    seed = {
+        "id": "topic:cryo-em",
+        "type": "Topic",
+        "label": query or "cryo-EM",
+        "title": query or "cryo-EM",
+        "year": "",
+        "authors": "",
+        "keywords": ["cryo-EM", "structure determination"],
+        "abstract": "示例图谱：以冷冻电镜单颗粒分析为中心组织论文、作者、关键词和方法。",
+        "relevance": 1,
+        "citation_count": 0,
+        "bookmarked": False,
+        "read": False,
+        "url": "",
+        "source": "sample",
+    }
+    nodes = [seed]
+    samples = [
+        ("paper:1", "Paper", "RELION: implementation of Bayesian single-particle reconstruction", 2012, "Scheres SHW", ["single particle analysis", "reconstruction", "classification"], 1850, 0.96),
+        ("paper:2", "Paper", "CryoSPARC: algorithms for rapid unsupervised cryo-EM structure determination", 2017, "Punjani A, Rubinstein JL", ["ab initio reconstruction", "heterogeneity", "GPU"], 1400, 0.93),
+        ("paper:3", "Paper", "Motion correction and dose weighting for electron cryo-microscopy", 2013, "Li X, Mooney P", ["micrograph", "motion correction", "dose weighting"], 980, 0.86),
+        ("paper:4", "Paper", "Atomic resolution cryo-EM structure determination of protein complexes", 2020, "Nakane T, Kotecha A", ["resolution", "protein complex", "refinement"], 720, 0.84),
+        ("keyword:spa", "Keyword", "single particle analysis", "", "", ["cryo-EM", "classification"], 8, 0.9),
+        ("keyword:heterogeneity", "Keyword", "conformational heterogeneity", "", "", ["3D variability", "classification"], 6, 0.76),
+        ("author:scheres", "Author", "Scheres Lab", "", "Scheres SHW", ["RELION", "Bayesian refinement"], 5, 0.82),
+        ("author:punjani", "Author", "Punjani / Rubinstein", "", "Punjani A", ["CryoSPARC", "algorithms"], 4, 0.78),
+        ("method:refinement", "Method", "Bayesian refinement", "", "", ["refinement", "alignment"], 0, 0.8),
+        ("method:motion", "Method", "Motion correction", "", "", ["micrograph", "beam-induced motion"], 0, 0.74),
+        ("protocol:vitrification", "Protocol", "Vitrification and grid screening", "", "", ["sample preparation", "grid"], 0, 0.66),
+        ("dataset:empiar", "Dataset", "EMPIAR benchmark datasets", "", "", ["dataset", "validation"], 0, 0.58),
+    ]
+    for sid, typ, title, year, authors, keywords, citations, relevance in samples:
+        nodes.append({
+            "id": sid,
+            "type": typ,
+            "label": title[:40] + ("..." if len(title) > 40 else ""),
+            "title": title,
+            "year": year,
+            "authors": authors,
+            "journal": "",
+            "keywords": keywords,
+            "abstract": "示例节点，用于展示真实文献知识图谱的数据结构和交互。接入真实 DOI / OpenAlex 数据后可替换。",
+            "relevance": relevance,
+            "citation_count": citations,
+            "bookmarked": sid in ("paper:2", "protocol:vitrification"),
+            "read": False,
+            "url": "",
+            "doi": "",
+            "source": "sample",
+        })
+    edges = [
+        ("topic:cryo-em", "paper:1", "similar_work", 0.9),
+        ("topic:cryo-em", "paper:2", "similar_work", 0.9),
+        ("topic:cryo-em", "paper:3", "similar_work", 0.75),
+        ("topic:cryo-em", "keyword:spa", "shared_keyword", 0.85),
+        ("paper:1", "author:scheres", "same_author", 0.8),
+        ("paper:2", "author:punjani", "same_author", 0.76),
+        ("paper:1", "method:refinement", "method_dependency", 0.78),
+        ("paper:3", "method:motion", "method_dependency", 0.72),
+        ("paper:1", "keyword:spa", "shared_keyword", 0.7),
+        ("paper:2", "keyword:heterogeneity", "shared_keyword", 0.68),
+        ("paper:4", "paper:1", "cited_by", 0.55),
+        ("protocol:vitrification", "dataset:empiar", "similar_work", 0.38),
+    ]
+    return {
+        "seed": seed,
+        "nodes": nodes,
+        "edges": [{"from": a, "to": b, "relation": r, "weight": w} for a, b, r, w in edges],
+        "meta": {"query": query or "cryo-EM", "source": "sample", "node_count": len(nodes), "edge_count": len(edges)},
+    }
 
 
 @app.route("/study")
@@ -420,7 +847,7 @@ def do_checkin():
         user_id=current_user.id, date=today
     ).first()
     if existing:
-        flash("??????????", "info")
+        flash("今天已经完成打卡", "info")
         return redirect(url_for("study", difficulty=difficulty))
 
     score = {
@@ -439,7 +866,7 @@ def do_checkin():
     db.session.add(checkin)
     db.session.commit()
 
-    flash(f"??????? {score} ?", "success")
+    flash(f"打卡完成 获得 {score} 分", "success")
     return redirect(url_for("study", difficulty=difficulty))
 
 
@@ -481,7 +908,7 @@ def admin_add_knowledge():
     )
     db.session.add(kp)
     db.session.commit()
-    flash("???????", "success")
+    flash("知识点已添加", "success")
     return redirect(url_for("admin_knowledge"))
 
 
@@ -498,7 +925,7 @@ def admin_edit_knowledge(kp_id):
     kp.category = request.form.get("category", kp.category)
     kp.updated_at = dt_module.datetime.now(timezone.utc)
     db.session.commit()
-    flash("???????", "success")
+    flash("知识点已更新", "success")
     return redirect(url_for("admin_knowledge"))
 
 
@@ -510,7 +937,7 @@ def admin_delete_knowledge(kp_id):
     if kp:
         db.session.delete(kp)
         db.session.commit()
-        flash("??????", "info")
+        flash("知识点已删除", "info")
     return redirect(url_for("admin_knowledge"))
 
 
@@ -547,7 +974,7 @@ def admin_upload_video():
             video.video_path = f"static/uploads/videos/{fname}"
     db.session.add(video)
     db.session.commit()
-    flash("????????", "success")
+    flash("视频已保存", "success")
     return redirect(url_for("admin_videos"))
 
 
@@ -559,7 +986,7 @@ def admin_delete_video(vid):
     if video:
         db.session.delete(video)
         db.session.commit()
-        flash("?????", "info")
+        flash("已取消订阅", "info")
     return redirect(url_for("admin_videos"))
 
 
@@ -579,7 +1006,7 @@ def admin_set_admin(uid):
     if user and user.id != current_user.id:
         user.is_admin = not user.is_admin
         db.session.commit()
-        flash(f"?? {user.name} ????????", "info")
+        flash(f"已更新 {user.name} 的管理员权限", "info")
     return redirect(url_for("admin_users"))
 
 
@@ -614,7 +1041,7 @@ def literature_upload_submit():
     keywords = request.form.get("keywords", "").strip()
 
     if not title and not doi and not url:
-        flash("????????DOI?URL??", "error")
+        flash("请至少填写标题、DOI 或 URL", "error")
         return redirect(url_for("literature_upload_page"))
 
     upload = UploadedLiterature(
@@ -660,13 +1087,13 @@ def literature_upload_submit():
                     citation_count=info.get("citation_count", 0),
                 )
                 db.session.add(item)
-            flash("Agent?????????", "success")
+            flash("Agent 已完成文献信息解析", "success")
         else:
             upload.status = "completed"
-            flash("?????", "info")
+            flash("已取消订阅", "info")
     except Exception:
         upload.status = "completed"
-        flash("?????", "info")
+        flash("已取消订阅", "info")
     db.session.commit()
     return redirect(url_for("literature_upload_page"))
 
@@ -682,10 +1109,47 @@ def rewards():
     monthly_trees = AttendanceReward.query.filter_by(user_id=current_user.id, period="monthly").count()
     current_streak = _calc_streak(current_user.id)
     max_streak = _calc_max_streak(current_user.id)
+    farm_tree_count = max(monthly_trees, max_streak // 28)
+    farm_preview = bool(current_user.is_admin)
+    farm_display_tree_count = max(3, min(12, farm_tree_count)) if farm_preview else farm_tree_count
+    reward_milestones = [
+        {
+            "day": 7,
+            "stage": "seed",
+            "title": "周奖励种子",
+            "subtitle": "连续学习 7 天",
+            "unlocked": current_streak >= 7,
+        },
+        {
+            "day": 14,
+            "stage": "sprout",
+            "title": "小树苗",
+            "subtitle": "连续学习 14 天",
+            "unlocked": current_streak >= 14,
+        },
+        {
+            "day": 21,
+            "stage": "young-tree",
+            "title": "小树 + 新种子",
+            "subtitle": "连续学习 21 天",
+            "unlocked": current_streak >= 21,
+        },
+        {
+            "day": 28,
+            "stage": "big-tree",
+            "title": "大树",
+            "subtitle": "连续学习 28 天",
+            "unlocked": current_streak >= 28,
+        },
+    ]
     return render_template("rewards.html",
         trees=trees, total_trees=total_trees,
         weekly_trees=weekly_trees, monthly_trees=monthly_trees,
-        current_streak=current_streak, max_streak=max_streak)
+        current_streak=current_streak, max_streak=max_streak,
+        reward_milestones=reward_milestones,
+        farm_tree_count=farm_tree_count,
+        farm_display_tree_count=farm_display_tree_count,
+        farm_preview=farm_preview)
 
 
 def _calc_max_streak(user_id):
@@ -724,7 +1188,7 @@ def _check_and_award_rewards():
                 reward = AttendanceReward(
                     user_id=user.id, period="weekly", period_key=week_key,
                     checkin_days=week_checkins, total_days=7, reward_type="tree",
-                    reward_data=json.dumps({"emoji": "\U0001F331", "message": "??????????"}),
+                    reward_data=json.dumps({"emoji": "\U0001F331", "message": "连续打卡一周"}),
                 )
                 db.session.add(reward)
 
@@ -745,7 +1209,7 @@ def _check_and_award_rewards():
                     reward = AttendanceReward(
                         user_id=user.id, period="monthly", period_key=month_key,
                         checkin_days=month_checkins, total_days=month_days, reward_type="tree",
-                        reward_data=json.dumps({"emoji": "\U0001F333", "message": "????????????"}),
+                        reward_data=json.dumps({"emoji": "\U0001F333", "message": "完成本月连续学习"}),
                     )
                     db.session.add(reward)
         db.session.commit()
@@ -1650,6 +2114,16 @@ def init_db():
             print("Default admin created: admin / admin123")
 
 
+def _ensure_schema():
+    if db.engine.dialect.name != "sqlite":
+        return
+    with db.engine.begin() as conn:
+        cols = [row[1] for row in conn.exec_driver_sql("PRAGMA table_info(users)").fetchall()]
+        if "phone" not in cols:
+            conn.exec_driver_sql("ALTER TABLE users ADD COLUMN phone VARCHAR(30)")
+            conn.exec_driver_sql("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_phone ON users (phone)")
+
+
 scheduler = BackgroundScheduler()
 
 
@@ -1680,8 +2154,7 @@ if __name__ == "__main__":
     init_db()
     setup_scheduler(app)
     print("=" * 50)
-    print("  EM Course Website")
+    print(f"  {PLATFORM_NAME}")
     print("  http://127.0.0.1:5001")
     print("=" * 50)
     app.run(host="0.0.0.0", port=5001, debug=True)
-

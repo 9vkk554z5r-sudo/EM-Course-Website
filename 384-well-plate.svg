@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="860" viewBox="0 0 1320 860" role="img" aria-labelledby="title desc">
+  <title id="title">384-Well Plate Layout</title>
+  <desc id="desc">A schematic 384-well plate with 16 rows labeled A through P and 24 columns labeled 1 through 24.</desc>
+  <defs>
+    <style>
+      .plate { fill: #f7f8fa; stroke: #374151; stroke-width: 2; }
+      .rim { fill: none; stroke: #cbd5e1; stroke-width: 2; }
+      .well { fill: #ffffff; stroke: #64748b; stroke-width: 1.4; }
+      .well-shade { fill: #e5edf6; opacity: 0.55; }
+      .label { fill: #111827; font: 600 17px Arial, Helvetica, sans-serif; text-anchor: middle; dominant-baseline: middle; }
+      .title { fill: #111827; font: 700 28px Arial, Helvetica, sans-serif; text-anchor: middle; }
+      .subtitle { fill: #475569; font: 15px Arial, Helvetica, sans-serif; text-anchor: middle; }
+    </style>
+    <pattern id="well-grid" x="108" y="132" width="48" height="42" patternUnits="userSpaceOnUse">
+      <circle class="well" cx="24" cy="21" r="12.5"/>
+      <circle class="well-shade" cx="20" cy="17" r="4.2"/>
+    </pattern>
+    <clipPath id="well-area">
+      <rect x="108" y="132" width="1152" height="672" rx="8"/>
+    </clipPath>
+  </defs>
+
+  <rect width="1320" height="860" fill="#ffffff"/>
+  <text class="title" x="660" y="42">384-Well Plate</text>
+  <text class="subtitle" x="660" y="70">16 rows x 24 columns</text>
+
+  <rect class="plate" x="52" y="94" width="1216" height="728" rx="28"/>
+  <rect class="rim" x="78" y="112" width="1172" height="692" rx="18"/>
+
+  <g class="label">
+    <text x="132" y="108">1</text>
+    <text x="180" y="108">2</text>
+    <text x="228" y="108">3</text>
+    <text x="276" y="108">4</text>
+    <text x="324" y="108">5</text>
+    <text x="372" y="108">6</text>
+    <text x="420" y="108">7</text>
+    <text x="468" y="108">8</text>
+    <text x="516" y="108">9</text>
+    <text x="564" y="108">10</text>
+    <text x="612" y="108">11</text>
+    <text x="660" y="108">12</text>
+    <text x="708" y="108">13</text>
+    <text x="756" y="108">14</text>
+    <text x="804" y="108">15</text>
+    <text x="852" y="108">16</text>
+    <text x="900" y="108">17</text>
+    <text x="948" y="108">18</text>
+    <text x="996" y="108">19</text>
+    <text x="1044" y="108">20</text>
+    <text x="1092" y="108">21</text>
+    <text x="1140" y="108">22</text>
+    <text x="1188" y="108">23</text>
+    <text x="1236" y="108">24</text>
+  </g>
+
+  <g class="label">
+    <text x="82" y="153">A</text>
+    <text x="82" y="195">B</text>
+    <text x="82" y="237">C</text>
+    <text x="82" y="279">D</text>
+    <text x="82" y="321">E</text>
+    <text x="82" y="363">F</text>
+    <text x="82" y="405">G</text>
+    <text x="82" y="447">H</text>
+    <text x="82" y="489">I</text>
+    <text x="82" y="531">J</text>
+    <text x="82" y="573">K</text>
+    <text x="82" y="615">L</text>
+    <text x="82" y="657">M</text>
+    <text x="82" y="699">N</text>
+    <text x="82" y="741">O</text>
+    <text x="82" y="783">P</text>
+  </g>
+
+  <rect x="108" y="132" width="1152" height="672" fill="url(#well-grid)" clip-path="url(#well-area)"/>
+  <rect x="108" y="132" width="1152" height="672" rx="8" fill="none" stroke="#94a3b8" stroke-width="1.5"/>
+</svg>

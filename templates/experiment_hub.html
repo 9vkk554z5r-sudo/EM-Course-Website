@@ -1,21 +1,41 @@
 {% extends "base.html" %}
 {% block title %}{{ _('实验收藏', 'Experiments') }}{% endblock %}
+{% block body_class %}life-product-theme experiment-route{% endblock %}
 {% block content %}
-<div class="page-header"><h1>🔬 {{ _('实验收藏', 'Experiment Collection') }}</h1><p class="text-muted">{{ _('实验Protocol视频 · 个人方法收藏', 'Protocol videos and method collections') }}</p></div>
-<div class="action-grid">
-<a href="{{ url_for('protocols') }}" class="action-card">
-<div class="action-icon">🎬</div><h3>{{ _('实验Protocol视频', 'Protocol Videos') }}</h3>
-<p>{{ _('观看管理员上传的实验操作视频', 'Watch experiment protocol videos') }}</p>
-<span class="action-arrow">{{ _('查看视频', 'Watch') }} →</span></a>
-<a href="{{ url_for('agent_methods') }}" class="action-card">
-<div class="action-icon">📋</div><h3>{{ _('实验方法收藏', 'Method Collections') }}</h3>
-<p>{{ _('通过Agent提取文献实验方法，收藏到个人Protocol', 'Extract methods from papers, save protocols') }}</p>
-<span class="action-arrow">{{ _('查看收藏', 'View') }} →</span></a>
+<div class="page-header cosmic-section-head">
+    <p class="section-kicker">{{ _('实验方法', 'Methods') }}</p>
+    <h1>{{ _('实验收藏', 'Experiment Collection') }}</h1>
+    <p class="text-muted">{{ _('实验方法视频 · 个人方法收藏', 'Method videos and personal method collections') }}</p>
+</div>
+<div class="action-grid cosmic-action-grid">
+    <a href="{{ url_for('protocols') }}" class="action-card cosmic-action-card">
+        <div class="action-icon" aria-hidden="true">&#9654;</div>
+        <h3>{{ _('实验方法视频', 'Method Videos') }}</h3>
+        <p>{{ _('观看管理员上传的实验操作视频', 'Watch uploaded experimental operation videos') }}</p>
+        <span class="action-arrow">{{ _('查看视频', 'Watch') }} &#8594;</span>
+    </a>
+    <a href="{{ url_for('agent_methods') }}" class="action-card cosmic-action-card">
+        <div class="action-icon" aria-hidden="true">&#9638;</div>
+        <h3>{{ _('实验方法收藏', 'Method Collections') }}</h3>
+        <p>{{ _('通过 Agent 提取文献实验方法收藏到个人方法库', 'Extract methods from papers and save them to your method library') }}</p>
+        <span class="action-arrow">{{ _('查看收藏', 'View') }} &#8594;</span>
+    </a>
 </div>
 {% if videos %}
-<div class="card"><div class="card-header"><h2>{{ _('最新视频', 'Latest Videos') }}</h2></div><div class="card-body">
-<div class="video-grid">{% for v in videos[:3] %}
-<div class="video-card"><div class="video-info"><h3>{{ v.title }}</h3>
-<div class="video-meta"><span class="badge">{{ v.category }}</span></div></div></div>
-{% endfor %}</div></div></div>{% endif %}
+<div class="card cosmic-panel">
+    <div class="card-header"><h2>{{ _('最新视频', 'Latest Videos') }}</h2></div>
+    <div class="card-body">
+        <div class="video-grid">
+            {% for v in videos[:3] %}
+            <div class="video-card cosmic-video-card">
+                <div class="video-info">
+                    <h3>{{ v.title }}</h3>
+                    <div class="video-meta"><span class="badge">{{ v.category }}</span></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

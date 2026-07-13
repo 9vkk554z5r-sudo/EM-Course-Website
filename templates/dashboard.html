@@ -1,308 +1,186 @@
 {% extends "base.html" %}
-{% block title %}{{ _("首页", "Home") }}{% endblock %}
+{% block title %}{{ selected_course.name }}工作台 - {{ platform_name }}{% endblock %}
+{% block body_class %}course-workbench-route life-product-theme{% endblock %}
 {% block content %}
+<div class="research-dashboard">
+    <section class="research-hero workbench-hero-cyber">
+        <div class="research-identity">
+            <p class="section-kicker">{{ selected_course.label }}</p>
+            <h1 class="workbench-title"><span>{{ selected_course.name }}</span><span>{{ _('课程工作台', 'Course Workspace') }}</span></h1>
+            <p class="workbench-subtitle">{{ _('围绕当前研究方向构建文献星云、总结实验方法、完成学习任务及进行科研问答', 'Build literature nebulas, summarize experimental methods, complete learning tasks and ask research questions around the current research direction') }}</p>
+            <div class="research-context-row workbench-metrics" data-dashboard-metrics data-initial-topic="{{ primary_topic }}" data-initial-track="{{ subscription_count }}" data-initial-imports="{{ bookmark_count }}" data-initial-streak="{{ streak }}">
+                <span class="metric-card topic-metric" data-topic-frame>
+                    <strong id="currentTopicValue">{{ primary_topic }}</strong>
+                    <em>{{ _('当前研究主题', 'Current Topic') }}</em>
+                    <i class="topic-pulse" aria-hidden="true"></i>
+                </span>
+                <span class="metric-card"><strong id="trackedTopicCount">{{ subscription_count }}</strong><em>{{ _('追踪主题', 'Tracked Topics') }}</em></span>
+                <span class="metric-card"><strong id="importedPaperCount">{{ bookmark_count }}</strong><em>{{ _('收藏文献', 'Saved Papers') }}</em></span>
+                <span class="metric-card"><strong id="studyDayCount">{{ streak }}</strong><em>{{ _('连续学习', 'Study Streak') }}</em></span>
+            </div>
+            <div class="topic-orbit-frame" aria-hidden="true">
+                <div class="topic-orbit-core" id="topicOrbitCore">{{ primary_topic }}</div>
+                <span class="topic-orbit-node node-a">Literature</span>
+                <span class="topic-orbit-node node-b">Protocol</span>
+                <span class="topic-orbit-node node-c">Task</span>
+                <span class="topic-orbit-node node-d">Q&amp;A</span>
+            </div>
+        </div>
 
-<style>
-/* === Merged Hero Layout === */
-.hero-container { display: flex; flex-direction: column; border: 2px solid rgba(59,130,246,0.3); border-radius: 14px; background: rgba(15,23,58,0.85); backdrop-filter: blur(8px); box-shadow: 0 0 30px rgba(59,130,246,0.1); margin-bottom: 20px; overflow: hidden; }
+        <div class="assistant-command pixel-assistant">
+            <div class="command-head pixel-command-head">
+                <div>
+                    <p class="section-kicker">{{ _('科研助手', 'Research Assistant') }}</p>
+                    <h2>{{ _('智能科研助手', 'Smart Research Assistant') }}</h2>
+                </div>
+                <button type="button" class="history-clear-btn" onclick="clearChat()">{{ _('清除历史', 'Clear History') }}</button>
+            </div>
+            <div class="chat-history-label"><span>{{ _('聊天记录', 'Chat History') }}</span><i>{{ _('实时同步研究主题', 'Live topic sync') }}</i></div>
+            <div class="chat-history-shell">
+                <div class="em-bot-orbit" id="pixelRobot" data-face="calm" aria-label="{{ _('科研助手待机表情', 'Assistant idle expression') }}">
+                    <span class="em-scan-line"></span>
+                    <span class="em-grid-dot dot-a"></span>
+                    <span class="em-grid-dot dot-b"></span>
+                    <span class="em-grid-dot dot-c"></span>
+                    <span class="pixel-robot moving-robot">
+                        <span class="robot-antenna"></span>
+                        <span class="robot-screen"><i class="robot-eye eye-left"></i><i class="robot-eye eye-right"></i><i class="robot-mouth"></i></span>
+                        <span class="robot-body"></span>
+                        <span class="robot-lens"></span>
+                    </span>
+                </div>
+                <div id="chatArea" class="command-log pixel-chat-log">
+                    <div class="chat-msg bot">{{ _('输入 DOI、论文题目、实验问题或关键词我可以协助总结文献、比较方法、提取 protocol 或把问题带到文献星云中继续探索', 'Enter a DOI, paper title, experimental question or keyword. I can help summarize papers, compare methods, extract protocols or continue in the literature nebula') }}</div>
+                </div>
+            </div>
+            <div class="command-input pixel-command-input">
+                <input type="text" id="chatInput" placeholder="{{ _('例如：比较 RELION 和 cryoSPARC 的重构流程', 'Example: compare RELION and cryoSPARC reconstruction workflows') }}" onkeydown="if(event.key==='Enter') sendChat()">
+                <button class="btn btn-primary" onclick="sendChat()" data-loading-text="{{ _('发送中', 'Sending') }}">{{ _('发送', 'Send') }}</button>
+            </div>
+            <div class="prompt-row pixel-prompt-row">
+                <button type="button" onclick="quickAsk('{{ _('帮我总结一篇 cryo-EM 论文的核心方法', 'Summarize the core methods of a cryo-EM paper') }}')">{{ _('总结论文', 'Summarize') }}</button>
+                <button type="button" onclick="quickAsk('{{ _('找出 single particle analysis 的关键论文', 'Find key papers on single particle analysis') }}')">{{ _('关键论文', 'Key Papers') }}</button>
+                <button type="button" onclick="quickAsk('{{ _('提取样品制备 protocol 的步骤', 'Extract sample preparation protocol steps') }}')">{{ _('提取 Protocol', 'Extract Protocol') }}</button>
+            </div>
+        </div>
+    </section>
 
-/* Tiny stats bar at the top right */
-.hero-strip { display: flex; justify-content: flex-end; padding: 6px 14px; background: rgba(59,130,246,0.06); border-bottom: 1px solid rgba(59,130,246,0.08); gap: 10px; flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; }
-.hero-stat { display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; color: var(--text-secondary); white-space: nowrap; }
-.hero-stat .stat-icon { font-size: 0.85rem; width: auto; height: auto; background: none; border-radius: 0; display: inline; padding: 0; }
-.hero-stat .stat-val { font-weight: 600; color: var(--accent-cyan); }
-.hero-stat .stat-label { white-space: nowrap; margin-left: 2px; }
+    <section class="workbench-sections">
+        <div class="section-column large literature-nebula-entry-card">
+            <div class="section-head">
+                <div>
+                    <p class="section-kicker">文献</p>
+                    <h2>文献星云</h2>
+                </div>
+                <a href="{{ url_for('literature_hub') }}" class="btn btn-sm btn-primary">进入星云</a>
+            </div>
+            <a href="{{ url_for('literature_hub') }}" class="literature-nebula-preview" aria-label="{{ _('进入文献星云', 'Enter Literature Nebula') }}">
+                <span class="nebula-stars" aria-hidden="true"></span>
+                <span class="nebula-grid" aria-hidden="true"></span>
+                <span class="nebula-core" aria-hidden="true"></span>
+                <span class="nebula-ring ring-a" aria-hidden="true"></span>
+                <span class="nebula-ring ring-b" aria-hidden="true"></span>
+                <span class="nebula-paper node-a" aria-hidden="true"></span>
+                <span class="nebula-paper node-b" aria-hidden="true"></span>
+                <span class="nebula-keyword node-c" aria-hidden="true"></span>
+                <span class="nebula-author node-d" aria-hidden="true"></span>
+                <span class="nebula-flow flow-a" aria-hidden="true"></span>
+                <span class="nebula-flow flow-b" aria-hidden="true"></span>
+                <span class="nebula-copy"><strong>文献星云</strong><span>从 DOI、BibTeX、RIS 或 CSV 聚合论文、关键词、作者和方法关系</span></span>
+            </a>
+            <div class="nebula-entry-actions">
+                <a href="{{ url_for('literature_hub') }}"><strong>导入文献</strong><span>生成主题星云并识别中心论文</span></a>
+                <a href="{{ url_for('literature_weekly') }}"><strong>每周推荐</strong><span>把推荐文献接入星云探索</span></a>
+            </div>
+        </div>
 
-/* Main row: left skills | center chat | right skills */
-.hero-main { display: flex; gap: 8px; padding: 12px 14px; min-height: 260px; }
+        <div class="section-column daily-task-card">
+            <div class="section-head">
+                <div>
+                    <p class="section-kicker">今日</p>
+                    <h2>每日任务</h2>
+                </div>
+            </div>
+            <div class="daily-task-orbit" aria-hidden="true">
+                <span class="task-orbit-core"></span>
+                <span class="task-orbit-ring ring-a"></span>
+                <span class="task-orbit-ring ring-b"></span>
+                <span class="task-orbit-node task-a"></span>
+                <span class="task-orbit-node task-b"></span>
+                <span class="task-orbit-node task-c"></span>
+            </div>
+            <div class="daily-task-list">
+                <a href="{{ url_for('literature_hub') }}"><strong>导入本周阅读文献</strong><span>生成主题星云并查看中心论文</span></a>
+                <a href="{{ url_for('agent_methods') }}"><strong>整理实验方法</strong><span>把方法段落转为可执行 protocol</span></a>
+                <a href="{{ url_for('study') }}"><strong>完成今日学习训练</strong><span>状态：{{ "已完成" if today_checkin else "待完成" }}</span></a>
+            </div>
+        </div>
+    </section>
+    <section class="module-groups">
+        <div class="module-group daily-literature-entry-card">
+            <div class="section-head"><h2>每周文献推荐</h2><a href="{{ url_for('literature_weekly') }}">查看推荐</a></div>
+            <a href="{{ url_for('literature_weekly') }}" class="daily-literature-preview" aria-label="{{ _('打开每周文献推荐', 'Open Weekly Literature Recommendations') }}">
+                <span class="daily-lit-stars" aria-hidden="true"></span>
+                <span class="daily-lit-grid" aria-hidden="true"></span>
+                <span class="daily-lit-scan" aria-hidden="true"></span>
+                <span class="daily-lit-orbit orbit-a" aria-hidden="true"></span>
+                <span class="daily-lit-orbit orbit-b" aria-hidden="true"></span>
+                <span class="daily-lit-paper paper-a" aria-hidden="true"></span>
+                <span class="daily-lit-paper paper-b" aria-hidden="true"></span>
+                <span class="daily-lit-paper paper-c" aria-hidden="true"></span>
+                <span class="daily-lit-core" aria-hidden="true"></span>
+                <span class="daily-lit-copy"><strong>每周文献推荐</strong><span>围绕当前方向推送每周论文、关键词与阅读优先级</span></span>
+            </a>
+            <div class="daily-literature-actions">
+                {% if recent_papers %}
+                {% for paper in recent_papers[:2] %}
+                <a href="{{ paper.url or url_for('literature_hub') }}"><strong>{{ paper.title }}</strong><span>{{ paper.journal }} · {{ paper.year or 'N/A' }}</span></a>
+                {% endfor %}
+                {% else %}
+                <a href="{{ url_for('literature_hub') }}"><strong>生成本周推荐</strong><span>先导入 DOI、BibTeX、RIS 或 CSV</span></a>
+                <a href="{{ url_for('agent_subscription') }}"><strong>订阅研究主题</strong><span>让推荐更贴近你的方向</span></a>
+                {% endif %}
+            </div>
+        </div>
 
-/* Side skill columns (3 each) */
-.hero-side { display: flex; flex-direction: column; gap: 6px; width: 100px; flex-shrink: 0; justify-content: center; }
-.hero-side .agent-card { padding: 10px 12px; min-width: 0; width: 100%; }
-.hero-side .agent-icon { font-size: 1.3rem; }
-        .hero-side .agent-label { font-size: 0.75rem; white-space: nowrap; text-align: center; }
+        <div class="module-group method-lab-entry-card">
+            <div class="section-head"><h2>实验方法</h2><a href="{{ url_for('experiments_page') }}">打开</a></div>
+            <a href="{{ url_for('experiments_page') }}" class="method-lab-preview" aria-label="{{ _('打开实验方法', 'Open Methods') }}">
+                <span class="method-stars" aria-hidden="true"></span>
+                <span class="method-grid" aria-hidden="true"></span>
+                <span class="method-scan" aria-hidden="true"></span>
+                <span class="method-microscope" aria-hidden="true"><i></i></span>
+                <span class="method-beam" aria-hidden="true"></span>
+                <span class="method-sample sample-a" aria-hidden="true"></span>
+                <span class="method-sample sample-b" aria-hidden="true"></span>
+                <span class="method-protocol-lines" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="method-core-copy"><strong>实验方法</strong><span>视频学习与个人 Protocol 收藏统一进入这里</span></span>
+            </a>
+            <div class="method-entry-actions">
+                <a href="{{ url_for('protocols') }}"><strong>实验方法视频</strong><span>观看实验操作与流程训练</span></a>
+                <a href="{{ url_for('agent_methods') }}"><strong>实验方法收藏</strong><span>整理文献提取的 Protocol</span></a>
+            </div>
+        </div>
 
-/* Center: EM Agent */
-.hero-center h2 { font-size: 1.15rem; font-weight: 700; margin-bottom: 2px; color: var(--text-primary); letter-spacing: 1px; text-align: center; }
-.hero-center .hero-sub { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 8px; text-align: center; white-space: nowrap; }
-.hero-center .hero-sub { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 8px; text-align: center; }
-
-.hero-center .chat-area { max-height: 160px; overflow-y: auto; margin-bottom: 6px; padding: 6px 10px; background: rgba(10,15,36,0.4); border-radius: 8px; width: 100%; flex: 1; }
-.hero-center .chat-msg { padding: 6px 10px; margin-bottom: 4px; border-radius: 10px; font-size: 0.8rem; line-height: 1.4; max-width: 90%; }
-.hero-center .chat-msg.bot { background: rgba(59,130,246,0.12); color: var(--text-primary); }
-.hero-center .chat-msg.user { background: rgba(16,185,129,0.12); color: var(--text-primary); margin-left: auto; }
-.hero-center .chat-input-row { display: flex; gap: 6px; width: 100%; }
-.hero-center .chat-input-row button { flex-shrink: 0; white-space: nowrap; }
-.hero-center .chat-input { flex: 1; padding: 6px 10px; border: 1px solid rgba(59,130,246,0.2); border-radius: 6px; background: rgba(10,15,36,0.6); color: var(--text-primary); font-size: 0.8rem; }
-.hero-center .chat-input:focus { outline: none; border-color: var(--accent-blue); }
-
-@media (max-width: 768px) {
-  .hero-main { flex-direction: column; align-items: center; }
-        .hero-side { flex-direction: row; width: 100%; justify-content: center; overflow: visible; }
-        .hero-side .agent-card { width: auto; flex: 0 0 auto; padding: 8px 14px; min-width: 0; }
-  .hero-center .chat-area { max-height: 120px; }
-  .hero-strip { justify-content: center; }
-}
-</style>
-
-<!-- === Merged Hero Section === -->
-<div class="hero-container">
-
-<!-- Strip: tiny stats top-right -->
-<div class="hero-strip">
-  <span class="hero-stat"><span class="stat-icon">🔥</span><span class="stat-val">{{ streak }}</span> {{ _("连续打卡", "Streak") }}</span>
-  <span class="hero-stat"><span class="stat-icon">📚</span><span class="stat-val">{{ total_checkins }}</span> {{ _("学习天数", "Days") }}</span>
-  <span class="hero-stat"><span class="stat-icon">📡</span><span class="stat-val">{{ subscription_count }}</span> {{ _("订阅", "Subs") }}</span>
-  <span class="hero-stat"><span class="stat-icon">{{ "✅" if today_checkin else "⏳" }}</span><span class="stat-val">{{ _("已打卡", "Done") if today_checkin else _("待打卡", "Pending") }}</span></span>
+        <div class="module-group knowledge-forest-entry-card">
+            <div class="section-head"><h2>知识森林</h2><a href="{{ url_for('knowledge_forest') }}">进入森林</a></div>
+            <a href="{{ url_for('knowledge_forest') }}" class="cyber-forest-preview" aria-label="{{ _('进入知识森林', 'Enter Knowledge Forest') }}">
+                <span class="forest-sky" aria-hidden="true"></span>
+                <span class="forest-grid" aria-hidden="true"></span>
+                <span class="forest-tree tree-a" aria-hidden="true"></span>
+                <span class="forest-tree tree-b" aria-hidden="true"></span>
+                <span class="forest-tree tree-c" aria-hidden="true"></span>
+                <span class="forest-tree tree-d" aria-hidden="true"></span>
+                <span class="forest-scan" aria-hidden="true"></span>
+                <span class="forest-core-copy"><strong>知识森林</strong><span>每日知识点、答题测验与打卡成长统一进入这里</span></span>
+            </a>
+            <div class="forest-entry-actions">
+                <a href="{{ url_for('study') }}"><strong>每日学习</strong><span>继续知识点训练</span></a>
+                <a href="{{ url_for('rewards') }}"><strong>森林成长</strong><span>查看打卡奖励</span></a>
+            </div>
+        </div>
+    </section>
 </div>
 
-<!-- Main row: left skills | center chat | right skills -->
-<div class="hero-main">
-
-  <!-- Left skills (3) -->
-  <div class="hero-side">
-    <a href="{{ url_for('agent_literature_info') }}" class="agent-card"><div class="agent-icon">📄</div><div class="agent-label">{{ _("文献查询", "Lit Search") }}</div></a>
-    <a href="{{ url_for('agent_subscription') }}" class="agent-card"><div class="agent-icon">📬</div><div class="agent-label">{{ _("文献订阅", "Subscribe") }}</div></a>
-    <a href="{{ url_for('agent_citation') }}" class="agent-card"><div class="agent-icon">🌐</div><div class="agent-label">{{ _("引用网络", "Citations") }}</div></a>
-  </div>
-
-  <!-- Center: EM Agent Chat -->
-  <div class="hero-center">
-    <h2>🧠 EM Agent</h2>
-    <div class="hero-sub">{{ _("关于电子显微学或结构生物学的任何问题", "Ask about EM / Structural Biology") }}</div>
-    <div id="chatArea" class="chat-area">
-      <div class="chat-msg bot">{{ _("你好！请问你想了解电子显微学或结构生物学的哪些内容？", "Hi! Ask me about EM or structural biology.") }}</div>
-    </div>
-    <div class="chat-input-row">
-      <input type="text" id="chatInput" placeholder="{{ _("输入你想问的问题...", "Ask something...") }}" class="chat-input" onkeydown="if(event.key==='Enter') sendChat()">
-      <button onclick="sendChat()" class="btn btn-primary btn-sm" style="padding:6px 12px;font-size:0.75rem;">{{ _("发送", "Send") }}</button>
-    </div>
-  </div>
-    <div style="text-align:right;margin-top:4px;width:100%"><span style="font-size:0.65rem;color:var(--text-muted);cursor:pointer" onclick="clearChat()">{{ _("\u6e05\u9664\u5386\u53f2", "Clear history") }}</span></div>
-
-  <!-- Right skills (3) -->
-  <div class="hero-side">
-    <a href="{{ url_for('agent_presentation') }}" class="agent-card"><div class="agent-icon">📊</div><div class="agent-label">AI Pre</div></a>
-    <a href="{{ url_for('agent_methods') }}" class="agent-card"><div class="agent-icon">🔬</div><div class="agent-label">{{ _("实验方法", "Methods") }}</div></a>
-    <a href="{{ url_for('study') }}" class="agent-card"><div class="agent-icon">🎯</div><div class="agent-label">{{ _("每日测验", "Quiz") }}</div></a>
-  </div>
-
-</div><!-- /hero-main -->
-</div><!-- /hero-container -->
-
-<!-- Literature Nebula -->
-<div class="card"><div class="card-header"><h2>{{ _("🌌 我的文献星云", "🌌 My Lit Nebula") }}</h2><a href="{{ url_for('nebula') }}" class="btn btn-sm">{{ _("查看引用图谱", "View Citation Graph") }} &rarr;</a></div>
-<div class="card-body" style="padding:0;">
-<div id="nebula-container" style="width:100%;height:550px;background:radial-gradient(ellipse at center,#0a0f24 0%,#000 100%);border-radius:0 0 12px 12px;cursor:grab;"></div>
-</div></div>
-
-<!-- Knowledge Forest -->
-<div class="card"><div class="card-header"><h2>{{ _("🌲 我的知识森林", "🌲 My Knowledge Forest") }}</h2>
-<a href="{{ url_for('admin_knowledge') }}" class="btn btn-sm">LLM {{ _("更新", "Update") }}</a>
-<a href="{{ url_for('knowledge_forest') }}" class="btn btn-sm">{{ _("查看全部", "View All") }}</a></div>
-<div class="card-body forest-body">
-<div class="forest-grass">
-{% for kp in all_kps[:16] %}
-<a href="{{ url_for('study', difficulty=kp.difficulty) }}" class="forest-tree2" title="{{ kp.title }}">
-<div class="tree-icon2" style="font-size:{{ 1.5 if kp.difficulty=='advanced' else 1.2 if kp.difficulty=='intermediate' else 1.0 }}rem;">{{ "🌲" if kp.difficulty=='advanced' else "🌳" if kp.difficulty=='intermediate' else "🌱" }}</div>
-<div class="tree-label">{{ kp.title[:10] }}</div>
-</a>
-{% endfor %}
-</div></div></div>
-
-<!-- Experiment Method Ocean -->
-<div class="card"><div class="card-header"><h2>{{ _("🧪 实验方法库", "🧪 Experiment Lab") }}</h2><a href="{{ url_for('experiments_page') }}" class="btn btn-sm">{{ _("查看全部", "View All") }} &rarr;</a></div>
-<div class="card-body"><div class="ocean-grid">
-{% if user_protocols %}
-{% for p in user_protocols %}
-<a href="{{ url_for('agent_methods') }}" class="lab-beaker">
-<div class="beaker-icon">📋</div><div class="beaker-name">{{ p.name }}</div>
-<div class="beaker-desc">{{ p.paper_title[:30] }}</div>
-</a>
-{% endfor %}
-{% else %}
-<a href="{{ url_for('agent_methods') }}" class="lab-beaker">
-<div class="beaker-icon">🔬</div><div class="beaker-name">{{ _("cryo-EM 样品制备", "cryo-EM Sample Prep") }}</div><div class="beaker-desc">{{ _("示例: 冷冻电镜标准流程", "Sample: cryo-EM workflow") }}</div></a>
-<a href="{{ url_for('protocols') }}" class="lab-beaker">
-<div class="beaker-icon">🎬</div><div class="beaker-name">{{ _("实验视频教程", "Protocol Videos") }}</div><div class="beaker-desc">{{ _("查看管理员上传的Protocol视频", "Watch admin protocol videos") }}</div></a>
-{% endif %}
-</div></div></div>
-
-<script src="{{ url_for('static', filename='js/three.min.js') }}"></script>
-<script>
-var nebulaPapers = {{ sample_literature|tojson }};
-var nebulaCollectionUrl = "{{ url_for('nebula') }}";
-
-document.addEventListener('DOMContentLoaded', function() {
-    var c = document.getElementById('nebula-container');
-    if (!c || !window.THREE) return;
-    if (!nebulaPapers || nebulaPapers.length === 0) {
-        c.innerHTML = '<div class="nebula-empty">暂无已同步文献。前往“查看引用图谱”输入关键词或 DOI 生成星云。</div>';
-        return;
-    }
-
-    var W = c.clientWidth, H = 550;
-    var scene = new THREE.Scene();
-    var camera = new THREE.PerspectiveCamera(50, W/H, 0.1, 1000);
-    camera.position.z = 14;
-    var renderer = new THREE.WebGLRenderer({alpha: true, antialias: true});
-    renderer.setSize(W, H);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    c.appendChild(renderer.domElement);
-
-    var sg = new THREE.BufferGeometry();
-    var sp = [];
-    for (var i = 0; i < 2000; i++) {
-        var r = Math.pow(Math.random(), 1.5) * 40;
-        var a = Math.random() * Math.PI * 2 + r * 0.3;
-        var h = (Math.random() - 0.5) * r * 0.15;
-        sp.push(Math.cos(a) * r, h, Math.sin(a) * r);
-    }
-    sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
-    scene.add(new THREE.Points(sg, new THREE.PointsMaterial({color: 0xffffff, size: 0.05, transparent: true, opacity: 0.3})));
-
-    var lcv = document.createElement('canvas');
-    lcv.width = 512; lcv.height = 128;
-    var lcx = lcv.getContext('2d');
-    lcx.fillStyle = 'rgba(255,255,255,0.9)';
-    lcx.font = 'bold 28px Inter, sans-serif';
-    lcx.textAlign = 'center';
-    lcx.textBaseline = 'middle';
-    lcx.fillText('{{ _("我的文献", "My Library") }}', 256, 64);
-    var lt = new THREE.CanvasTexture(lcv);
-    var ls = new THREE.Sprite(new THREE.SpriteMaterial({map: lt, transparent: true, depthTest: false, blending: THREE.AdditiveBlending}));
-    ls.position.set(0, 2.2, 0);
-    ls.scale.set(5, 1.25, 1);
-    scene.add(ls);
-
-    var cc = new THREE.Color('#F5D76E');
-    var cg = new THREE.SphereGeometry(1.2, 32, 32);
-    var cm = new THREE.MeshPhongMaterial({color: cc, emissive: cc, emissiveIntensity: 0.8});
-    var center = new THREE.Mesh(cg, cm);
-    scene.add(center);
-
-    var gcv = document.createElement('canvas');
-    gcv.width = 256; gcv.height = 256;
-    var gctx = gcv.getContext('2d');
-    var grad = gctx.createRadialGradient(128, 128, 0, 128, 128, 128);
-    grad.addColorStop(0, 'rgba(245,215,110,0.6)');
-    grad.addColorStop(0.3, 'rgba(245,215,110,0.25)');
-    grad.addColorStop(0.6, 'rgba(245,215,110,0.1)');
-    grad.addColorStop(1, 'rgba(245,215,110,0)');
-    gctx.fillStyle = grad;
-    gctx.fillRect(0, 0, 256, 256);
-    var gtex = new THREE.CanvasTexture(gcv);
-    var gsm = new THREE.SpriteMaterial({map: gtex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false});
-    var gsprite = new THREE.Sprite(gsm);
-    gsprite.scale.set(20, 20, 1);
-    scene.add(gsprite);
-
-    var l1 = new THREE.DirectionalLight(0xffffff, 1.2);
-    l1.position.set(10, 20, 10);
-    scene.add(l1);
-    scene.add(new THREE.AmbientLight(0x404060));
-
-    var meshes = [];
-    nebulaPapers.forEach(function(p, i) {
-        var sz = 0.2 + Math.random() * 0.1;
-        var col = new THREE.Color('#F5D76E');
-        col.multiplyScalar(0.5 + Math.random() * 0.5);
-        var g = new THREE.SphereGeometry(sz, 12, 12);
-        var m = new THREE.MeshPhongMaterial({color: col, emissive: col, emissiveIntensity: 0.2});
-        var mesh = new THREE.Mesh(g, m);
-        var t = i / nebulaPapers.length;
-        var angle = t * Math.PI * 2 + t * 2;
-        var r = 1.5 + t * 6 + t * Math.sin(t * 10) * 0.5;
-        var h = (Math.random() - 0.5) * r * 0.4;
-        mesh.position.set(Math.cos(angle) * r, h, Math.sin(angle) * r);
-        mesh.userData = {url: nebulaCollectionUrl};
-        scene.add(mesh);
-        meshes.push({mesh: mesh, angle: angle, radius: r, height: h, speed: 0.15 + Math.random() * 0.2});
-
-        var cv = document.createElement('canvas');
-        cv.width = 200; cv.height = 48;
-        var cx = cv.getContext('2d');
-        cx.fillStyle = 'rgba(0,0,0,0.5)';
-        cx.fillRect(4, 4, 192, 40);
-        cx.fillStyle = '#fff';
-        cx.font = '12px Inter, sans-serif';
-        cx.textAlign = 'center';
-        cx.fillText(p.label || (p.title || '').slice(0, 15), 100, 30);
-        var tex = new THREE.CanvasTexture(cv);
-        var sm = new THREE.SpriteMaterial({map: tex, transparent: true, depthTest: false});
-        var sprite = new THREE.Sprite(sm);
-        sprite.position.set(Math.cos(angle) * r, h + 1, Math.sin(angle) * r);
-        sprite.scale.set(2, 0.5, 1);
-        scene.add(sprite);
-        mesh.userData.sprite = sprite;
-    });
-
-    var raycaster = new THREE.Raycaster(), mouse = new THREE.Vector2(), hovered = null;
-    var isDragging = false, px, py, rx = 0, ry = 0, wasDragged = false;
-
-    c.addEventListener('mousemove', function(e) {
-        var r = c.getBoundingClientRect();
-        mouse.x = ((e.clientX - r.left) / r.width) * 2 - 1;
-        mouse.y = -((e.clientY - r.top) / r.height) * 2 + 1;
-        raycaster.setFromCamera(mouse, camera);
-        var hits = raycaster.intersectObjects(meshes.map(function(m){return m.mesh;}));
-        if (hits.length > 0) { c.style.cursor = 'pointer'; hovered = hits[0].object; }
-        else { c.style.cursor = 'grab'; hovered = null; }
-    });
-
-    c.addEventListener('click', function() {
-        if (wasDragged) return;
-        if (hovered && hovered.userData.url) window.location.href = hovered.userData.url;
-    });
-
-    c.addEventListener('mousedown', function(e) { isDragging = true; wasDragged = false; px = e.clientX; py = e.clientY; });
-    window.addEventListener('mouseup', function() { isDragging = false; });
-    c.addEventListener('mousemove', function(e) {
-        if (isDragging) { wasDragged = true;
-            ry += (e.clientX - px) * 0.008;
-            rx += (e.clientY - py) * 0.008;
-            px = e.clientX; py = e.clientY;
-        }
-    });
-
-    c.addEventListener('wheel', function(e) {
-        e.preventDefault();
-        var z = camera.position.z + e.deltaY * 0.02;
-        if (z > 7 && z < 35) camera.position.z = z;
-    }, {passive: false});
-
-    var autoRotate = true;
-    c.addEventListener('mousedown', function() { autoRotate = false; });
-    window.addEventListener('mouseup', function() { setTimeout(function() { autoRotate = true; }, 3000); });
-
-    function animate() {
-        requestAnimationFrame(animate);
-        if (autoRotate && !isDragging) ry += 0.003;
-        meshes.forEach(function(m) {
-            m.angle += 0.01 * m.speed;
-            m.mesh.position.x = Math.cos(m.angle) * m.radius;
-            m.mesh.position.z = Math.sin(m.angle) * m.radius;
-            m.mesh.rotation.y += 0.02;
-            if (m.mesh.userData.sprite) {
-                m.mesh.userData.sprite.position.x = Math.cos(m.angle) * m.radius;
-                m.mesh.userData.sprite.position.z = Math.sin(m.angle) * m.radius;
-            }
-        });
-        camera.position.x = Math.sin(ry) * Math.cos(rx) * 14;
-        camera.position.y = Math.sin(rx) * 6 + 2;
-        camera.position.z = Math.cos(ry) * Math.cos(rx) * 14;
-        camera.lookAt(0, 0, 0);
-        renderer.render(scene, camera);
-    }
-    animate();
-
-    window.addEventListener('resize', function() {
-        W = c.clientWidth; H = 550;
-        camera.aspect = W / H;
-        camera.updateProjectionMatrix();
-        renderer.setSize(W, H);
-    });
-});
-</script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=10"></script>
 {% endblock %}

@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}{{ platform_name }}{% endblock %}
+{% block body_class %}public-platform life-product-theme{% endblock %}
+{% block content %}
+<section class="platform-hero education-hero">
+    <div class="home-science-bg" aria-hidden="true">
+        <span class="science-grid"></span>
+        <span class="science-particles"></span>
+    </div>
+
+    <div class="hero-shell">
+        <div class="hero-content">
+            <p class="section-kicker">{{ _('生命科学学习平台', 'Life Science Learning Platform') }}</p>
+            <h1>{{ _('生命科学课程助手', 'Life Science Course Assistant') }}</h1>
+            <p class="hero-copy phrase-lines hero-slogan"><span>{{ _('面向生命科学学习与科研训练的智能课程工作台', 'Intelligent course workspace for life science learning and research training') }}</span><span>{{ _('整合课程学习、文献追踪、实验方法与科研知识图谱', 'Integrates courses, literature tracking, experimental methods and research knowledge graphs') }}</span></p>
+            <div class="hero-actions">
+                <a href="{{ url_for('courses') }}" class="btn btn-primary btn-large">{{ _('选择学科星系', 'Choose Galaxy') }}</a>
+                <a href="{{ url_for('dashboard') if current_user.is_authenticated else url_for('courses') }}" class="btn btn-outline btn-large">{{ _('进入我的课程', 'Enter My Courses') }}</a>
+            </div>
+                        <p class="hero-galaxy-note">{{ _('进入不同生命科学星系搭建专属课程工作台', 'Enter different life science galaxies to build a dedicated course workspace') }}</p>
+        </div>
+
+        <div class="life-visual" aria-hidden="true">
+            <div class="life-visual-core system-map-visual">
+                <svg class="learning-system-svg" viewBox="0 0 520 520" focusable="false">
+                    <defs>
+                        <linearGradient id="systemLine" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#00e5ff"/>
+                            <stop offset="55%" stop-color="#2ef2c3"/>
+                            <stop offset="100%" stop-color="#4f8cff"/>
+                        </linearGradient>
+                        <radialGradient id="systemCore" cx="50%" cy="50%" r="50%">
+                            <stop offset="0%" stop-color="#f3faff"/>
+                            <stop offset="38%" stop-color="#2ef2c3"/>
+                            <stop offset="100%" stop-color="#00e5ff" stop-opacity="0"/>
+                        </radialGradient>
+                        <filter id="systemGlow">
+                            <feGaussianBlur stdDeviation="3.5" result="blur"/>
+                            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                        </filter>
+                    </defs>
+                    <g class="system-orbits" fill="none">
+                        <circle cx="260" cy="260" r="150" stroke="rgba(100,220,255,.18)" stroke-width="1.3"/>
+                        <circle cx="260" cy="260" r="104" stroke="url(#systemLine)" stroke-width="1.4" opacity=".3"/>
+                    </g>
+                    <g class="system-links" stroke="rgba(160,230,255,.45)" stroke-width="1.8" fill="none">
+                        <path d="M260 260 L160 150"/>
+                        <path d="M260 260 L360 150"/>
+                        <path d="M260 260 L160 370"/>
+                        <path d="M260 260 L360 370"/>
+                        <path d="M160 150 C212 128 308 128 360 150" opacity=".34"/>
+                        <path d="M160 370 C212 392 308 392 360 370" opacity=".34"/>
+                    </g>
+                    <g class="system-core-node" filter="url(#systemGlow)">
+                        <circle cx="260" cy="260" r="54" fill="rgba(5,10,24,.86)" stroke="rgba(46,242,195,.62)" stroke-width="2"/>
+                        <circle cx="260" cy="260" r="34" fill="url(#systemCore)" opacity=".88"/>
+                    </g>
+                    <g class="system-node node-course" transform="translate(160 150)">
+                        <circle r="34"/><path d="M-12 -9h24v21h-24zM-7 -3h14M-7 4h10"/><text y="54" text-anchor="middle">{{ _('课程学习', 'Course Study') }}</text>
+                    </g>
+                    <g class="system-node node-literature" transform="translate(360 150)">
+                        <circle r="34"/><circle cx="-10" cy="-5" r="5"/><circle cx="11" cy="-10" r="6"/><circle cx="8" cy="12" r="5"/><path d="M-5 -6l10 -3M-7 -1l11 10M12 -4l-3 11"/><text y="54" text-anchor="middle">{{ _('文献星云', 'Literature Nebula') }}</text>
+                    </g>
+                    <g class="system-node node-protocol" transform="translate(160 370)">
+                        <circle r="34"/><path d="M-9 -17h18M-5 -17v13l-13 22h36l-13 -22v-13M-11 9h22"/><text y="54" text-anchor="middle">{{ _('实验方法', 'Methods') }}</text>
+                    </g>
+                    <g class="system-node node-ai" transform="translate(360 370)">
+                        <circle r="34"/><path d="M-16 -10h32a7 7 0 0 1 7 7v12a7 7 0 0 1-7 7h-11l-10 8v-8h-11a7 7 0 0 1-7-7v-12a7 7 0 0 1 7-7z"/><path d="M-9 3h7M5 3h8"/><text y="54" text-anchor="middle">{{ _('科研问答', 'Research Q&A') }}</text>
+                    </g>
+                </svg>
+                <div class="system-center-label">{{ _('生命科学课程助手', 'Life Science Course Assistant') }}</div>
+                <div class="system-caption-row" aria-hidden="true"><span>{{ _('课程', 'Course') }}</span><i></i><span>{{ _('文献星云', 'Literature Nebula') }}</span><i></i><span>{{ _('实验方法', 'Methods') }}</span><i></i><span>{{ _('AI助手', 'AI Assistant') }}</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="hero-instrument-panel" aria-label="平台能力">
+        <div class="science-feature-card">
+            <span class="feature-number">01</span>
+            <span class="feature-icon" aria-hidden="true">
+                <svg viewBox="0 0 48 48">
+                    <circle cx="12" cy="16" r="5"/>
+                    <circle cx="34" cy="13" r="6"/>
+                    <circle cx="29" cy="34" r="5"/>
+                    <path d="M17 16l11-2M15 20l10 11M33 19l-3 10"/>
+                </svg>
+            </span>
+            <span>01</span>
+            <strong>文献星云</strong>
+            <p class="phrase-lines feature-lines"><span>从 DOI、BibTeX、RIS 或 CSV 导入文献</span><span>生成可解释的论文关系网络</span></p>
+        </div>
+        <div class="science-feature-card">
+            <span class="feature-number">02</span>
+            <span class="feature-icon" aria-hidden="true">
+                <svg viewBox="0 0 48 48">
+                    <path d="M18 8h12M21 8v12L11 36c-1.6 3 0 5 3.4 5h19.2c3.4 0 5-2 3.4-5L27 20V8"/>
+                    <path d="M16 32h16M19 26h10"/>
+                    <circle cx="20" cy="36" r="1.8"/>
+                    <circle cx="28" cy="35" r="1.5"/>
+                </svg>
+            </span>
+            <span>02</span>
+            <strong>实验方法库</strong>
+            <p class="phrase-lines feature-lines"><span>把论文中的样品制备、成像、重构和分析步骤</span><span>整理成可复用流程</span></p>
+        </div>
+        <div class="science-feature-card">
+            <span class="feature-number">03</span>
+            <span class="feature-icon" aria-hidden="true">
+                <svg viewBox="0 0 48 48">
+                    <path d="M12 14h24a6 6 0 0 1 6 6v8a6 6 0 0 1-6 6H25l-8 6v-6h-5a6 6 0 0 1-6-6v-8a6 6 0 0 1 6-6Z"/>
+                    <path d="M16 24h6M27 24h5M20 14v-4M30 14v-4"/>
+                    <circle cx="22" cy="24" r="1"/>
+                    <circle cx="32" cy="24" r="1"/>
+                </svg>
+            </span>
+            <span>03</span>
+            <strong>课程科研助手</strong>
+            <p class="phrase-lines feature-lines"><span>围绕当前方向追踪任务、阅读计划</span><span>同步学习训练进度</span></p>
+        </div>
+    </div>
+</section>
+
+<section class="platform-capabilities">
+    <div class="capability-copy">
+        <p class="section-kicker">学习与科研一体化</p>
+        <h2>从课程学习进入真实科研工作流</h2>
+        <p class="phrase-lines capability-lines single-line"><span>面向学习与科研训练的统一入口</span></p>
+    </div>
+    <div class="capability-workflow" aria-label="科研学习工作流">
+        <article class="workflow-step" title="识别中心论文 核心关键词 活跃作者网络">
+            <span class="workflow-icon" aria-hidden="true">
+                <svg viewBox="0 0 48 48">
+                    <circle cx="13" cy="17" r="5"/>
+                    <circle cx="34" cy="13" r="5"/>
+                    <circle cx="32" cy="34" r="5"/>
+                    <path d="M18 16l11-2M16 21l12 10M34 18l-2 11"/>
+                </svg>
+            </span>
+            <span>图谱</span>
+            <strong>文献星云探索</strong>
+            <p class="phrase-lines workflow-lines"><span>识别中心论文</span><span>核心关键词</span><span>活跃作者网络</span></p>
+        </article>
+        <article class="workflow-step" title="{{ _('实验步骤 注意事项 实验方法标准化', 'Experimental Steps Notes Method Standardization') }}">
+            <span class="workflow-icon" aria-hidden="true">
+                <svg viewBox="0 0 48 48">
+                    <path d="M17 8h14M21 8v11L12 36c-1.4 2.8.2 4.8 3.4 4.8h17.2c3.2 0 4.8-2 3.4-4.8L27 19V8"/>
+                    <path d="M17 32h14M20 26h8"/>
+                </svg>
+            </span>
+            <span>方法</span>
+            <strong>实验方法整理</strong>
+            <p class="phrase-lines workflow-lines"><span>实验步骤</span><span>注意事项</span><span>{{ _('实验方法标准化', 'Method Standardization') }}</span></p>
+        </article>
+        <article class="workflow-step" title="课程任务 打卡训练 知识点复盘">
+            <span class="workflow-icon" aria-hidden="true">
+                <svg viewBox="0 0 48 48">
+                    <path d="M10 12h26a4 4 0 0 1 4 4v22H14a4 4 0 0 1-4-4V12Z"/>
+                    <path d="M16 18h14M16 24h18M16 30h10"/>
+                    <path d="M14 38V16a4 4 0 0 1 4-4"/>
+                </svg>
+            </span>
+            <span>课程</span>
+            <strong>学习路径管理</strong>
+            <p class="phrase-lines workflow-lines"><span>课程任务</span><span>打卡训练</span><span>知识点复盘</span></p>
+        </article>
+        <article class="workflow-step" title="文献上下文 实验方法上下文 课程问答入口">
+            <span class="workflow-icon" aria-hidden="true">
+                <svg viewBox="0 0 48 48">
+                    <path d="M12 14h24a6 6 0 0 1 6 6v7a6 6 0 0 1-6 6H25l-8 6v-6h-5a6 6 0 0 1-6-6v-7a6 6 0 0 1 6-6Z"/>
+                    <path d="M16 24h4M25 24h7"/>
+                </svg>
+            </span>
+            <span>助手</span>
+            <strong>科研问答入口</strong>
+            <p class="phrase-lines workflow-lines"><span>文献上下文</span><span>实验方法上下文</span><span>课程问答入口</span></p>
+        </article>
+    </div>
+</section>
+{% endblock %}
