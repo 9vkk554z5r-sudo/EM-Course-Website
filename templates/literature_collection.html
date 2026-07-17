@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}{{ _("文献收藏夹", "Collection") }}{% endblock %}
 {% block content %}
 <div class="page-header"><h1>{{ _("📚 我的文献收藏", "📚 My Collection") }}</h1>
@@ -71,7 +71,7 @@ function loadBookmarks() {
         if(items.length === 0) { empty.style.display = "block"; document.getElementById("bookmarkList").innerHTML = ""; return; }
         empty.style.display = "none";
         items.forEach(function(b){
-            html += "<div class=\"paper-item\"><div class=\"paper-title\"><a href=\"/bookmark/"+b.id+"\" style=\"color:inherit;text-decoration:none\">"+b.title+"</a></div><div class=\"paper-meta\">"+b.authors+" · "+b.journal+" ("+b.year+") · Source: "+b.source+"<a href=\"/bookmark/"+b.id+"\" class=\"btn btn-sm btn-primary\" style=\"margin-left:8px\">🔍 {{ _("查看", "View") }}</a><a href=\"#\" onclick=\"deleteBookmark("+b.id+");return false\" class=\"btn btn-sm btn-danger\" style=\"margin-left:4px\">{{ _("删除", "Delete") }}</a></div></div>";
+            html += "<div class=\"paper-item\"><div class=\"paper-title\">"+b.title+"</div><div class=\"paper-meta\">"+b.authors+" · "+b.journal+" ("+b.year+") · Source: "+b.source+"<a href=\"#\" onclick=\"deleteBookmark("+b.id+");return false\" class=\"btn btn-sm btn-danger\" style=\"margin-left:8px\">Remove</a></div></div>";
         });
         document.getElementById("bookmarkList").innerHTML = html;
     });

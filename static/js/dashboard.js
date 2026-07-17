@@ -172,27 +172,9 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('resize', resize);
 });
 
-function markdownToHtml(md){
-    if(!md)return '';
-    var h=md
-        .replace(/</g,'&lt;').replace(/>/g,'&gt;')
-        .replace(/```([\s\S]*?)```/g,'<pre><code>$1</code></pre>')
-        .replace(/`([^`]+)`/g,'<code>$1</code>')
-        .replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>')
-        .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-        .replace(/\*(.+?)\*/g,'<em>$1</em>')
-        .replace(/^### (.+)$/gm,'<h5>$1</h5>')
-        .replace(/^## (.+)$/gm,'<h4>$1</h4>')
-        .replace(/^# (.+)$/gm,'<h3>$1</h3>')
-        .replace(/^- (.+)$/gm,'\u2022 $1')
-        .replace(/\n\n/g,'<br><br>')
-        .replace(/\n/g,'<br>');
-    return h;
-}
+function sendChat(){var i=document.getElementById("chatInput"),a=document.getElementById("chatArea"),q=i.value.trim();if(!q)return;a.innerHTML+='<div class="chat-msg user">'+q+"</div>";i.value="";a.scrollTop=a.scrollHeight;a.innerHTML+='<div class="chat-msg bot" style="opacity:0.6;">Thinking...</div>';fetch("/api/agent-chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q})}).then(function(r){return r.json()}).then(function(d){var m=a.querySelectorAll(".chat-msg.bot"),l=m[m.length-1];if(l&&l.textContent==="Thinking...")l.remove();a.innerHTML+='<div class="chat-msg bot">'+(d.answer||"No response")+"</div>";a.scrollTop=a.scrollHeight}).catch(function(e){a.innerHTML+='<div class="chat-msg bot">Error: '+e+"</div>"})}
 
-function sendChat(){var i=document.getElementById("chatInput"),a=document.getElementById("chatArea"),q=i.value.trim();if(!q)return;a.innerHTML+='<div class="chat-msg user">'+q+"</div>";i.value="";a.scrollTop=a.scrollHeight;a.innerHTML+='<div class="chat-msg bot" style="opacity:0.6;">Thinking...</div>';fetch("/api/agent-chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q})}).then(function(r){return r.json()}).then(function(d){var m=a.querySelectorAll(".chat-msg.bot"),l=m[m.length-1];if(l&&l.textContent==="Thinking...")l.remove();a.innerHTML+='<div class="chat-msg bot">'+markdownToHtml(d.answer||'No response')+'</div>';a.scrollTop=a.scrollHeight}).catch(function(e){a.innerHTML+='<div class="chat-msg bot">Error: '+markdownToHtml(e)+'</div>'})}
-
-function loadChatHistory(){fetch("/api/chat/history").then(function(r){return r.json()}).then(function(msgs){var a=document.getElementById("chatArea");if(!a)return;msgs.forEach(function(m){a.innerHTML+='<div class="chat-msg '+(m.role==="user"?"user":"bot")+'">'+(m.role==='user'?m.message:markdownToHtml(m.message))+'</div>'});a.scrollTop=a.scrollHeight})}
+function loadChatHistory(){fetch("/api/chat/history").then(function(r){return r.json()}).then(function(msgs){var a=document.getElementById("chatArea");if(!a)return;msgs.forEach(function(m){a.innerHTML+='<div class="chat-msg '+(m.role==="user"?"user":"bot")+'">'+m.message+"</div>"});a.scrollTop=a.scrollHeight})}
 function clearChat(){if(!confirm("Clear chat history?"))return;fetch("/api/chat/clear",{method:"POST"}).then(function(){var a=document.getElementById("chatArea");if(a)a.innerHTML='<div class="chat-msg bot">Chat cleared. Start fresh!</div>'})}
 function saveChat(role,msg){fetch("/api/chat/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({role:role,message:msg})})}
 document.addEventListener("DOMContentLoaded",function(){loadChatHistory()});

@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -75,6 +75,7 @@ class LiteratureItem(db.Model):
     journal = db.Column(db.String(300), default="")
     year = db.Column(db.Integer)
     doi = db.Column(db.String(200), unique=True)
+    openalex_id = db.Column(db.String(50), unique=True, index=True, nullable=True)
     abstract = db.Column(db.Text, default="")
     url = db.Column(db.String(500), default="")
     topic = db.Column(db.String(200), default="")
@@ -93,6 +94,10 @@ class CitationLink(db.Model):
 
     source = db.relationship("LiteratureItem", foreign_keys=[source_id], backref="cited_by")
     target = db.relationship("LiteratureItem", foreign_keys=[target_id], backref="cites")
+
+    __table_args__ = (
+        db.UniqueConstraint("source_id", "target_id", name="unique_citation_edge"),
+    )
 
 
 class LiteratureSubscription(db.Model):
@@ -115,11 +120,9 @@ class KnowledgePoint(db.Model):
     difficulty = db.Column(db.String(20), nullable=False)
     category = db.Column(db.String(100), default="general")
     day_of_week = db.Column(db.Integer)
-    source = db.Column(db.String(50), default="system")  # system, admin, user, llm, user_corrected
+    source = db.Column(db.String(50), default="system")  # system or admin
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    correction_count = db.Column(db.Integer, default=0)
-    last_corrected_at = db.Column(db.DateTime, nullable=True)
 
 
 class DailyCheckin(db.Model):
@@ -207,6 +210,10 @@ class ApiKey(db.Model):
     provider = db.Column(db.String(50), default="openai")
     key_name = db.Column(db.String(100), default="default")
     encrypted_key = db.Column(db.Text, nullable=False)
+    endpoint = db.Column(db.String(500), default="")
+    model_name = db.Column(db.String(100), default="")
+    deployment = db.Column(db.String(200), default="")
+    api_style = db.Column(db.String(30), default="auto")
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     user = db.relationship("User", backref="api_keys")
@@ -308,12 +315,3 @@ class UserStudyPlan(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     user = db.relationship("User", backref="study_plans")
-
-class KnowledgeFile(db.Model):
-    __tablename__ = "knowledge_files"
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    filename = db.Column(db.String(200), nullable=False)
-    content = db.Column(db.Text, nullable=False)
-    uploaded_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    user = db.relationship("User", backref="knowledge_files")

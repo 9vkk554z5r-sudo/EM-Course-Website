@@ -1,0 +1,24 @@
+﻿{% extends "base.html" %}
+{% block title %}文献详情{% endblock %}
+{% block content %}
+<div class="page-header">
+<h1>{{ paper.title }}</h1>
+<p class="text-muted">{{ paper.authors }} · {{ paper.journal }} ({{ paper.year }})</p>
+<a href="{{ url_for('planets') }}" class="btn btn-sm btn-outline">← 返回星群</a>
+</div>
+<div class="card"><div class="card-header"><h2>📄 文献信息</h2></div><div class="card-body">
+<div class="knowledge-content">
+<p><strong>标题：</strong>{{ paper.title }}</p>
+<p><strong>作者：</strong>{{ paper.authors }}</p>
+<p><strong>期刊：</strong>{{ paper.journal }}</p>
+<p><strong>年份：</strong>{{ paper.year }}</p>
+{% if paper.doi %}<p><strong>DOI：</strong><a href="https://doi.org/{{ paper.doi }}" target="_blank">{{ paper.doi }}</a></p>{% endif %}
+{% if paper.url %}<p><a href="{{ paper.url }}" target="_blank" class="btn btn-outline">🔗 查看原文</a></p>{% endif %}
+</div>
+</div></div>
+{% if planet %}
+<div class="card"><div class="card-header"><h2>🪐 所属星球</h2></div><div class="card-body">
+<p>星球名称：<a href="{{ url_for('planet_detail', pid=planet.id) }}">{{ planet.name }}</a></p>
+<p>关键词：{{ planet.topic }}</p>
+</div></div>{% endif %}
+{% endblock %}

@@ -1,0 +1,58 @@
+﻿{% extends "base.html" %}
+{% block title %}{{ _("系统优化日志", "Optimization Log") }}{% endblock %}
+{% block content %}
+<div class="page-header"><h1>🚀 {{ _("系统优化日志", "Optimization Log") }}</h1>
+<p class="text-muted">{{ _("最近对 EM Agent 进行的三项核心优化", "Three core optimizations for EM Agent") }}</p>
+<a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline">← {{ _("返回首页", "Back to Home") }}</a></div>
+
+<div class="card" style="border-left:4px solid #3b82f6">
+<div class="card-header"><h2>🔍 {{ _("优化1：RAG 降低文献幻觉", "Opt 1: RAG Reduces Hallucination") }}</h2>
+<span class="badge" style="background:#10b981">✅ {{ _("已部署", "Deployed") }}</span></div>
+<div class="card-body">
+<p><strong>{{ _("目标", "Goal") }}:</strong> {{ _("用户提问时，Agent优先检索学术文献、知识库和上传文件，基于真实数据回答，不依赖LLM内部知识", "Triple retrieval before answering") }}</p>
+<p><strong>{{ _("三重检索机制", "Triple Retrieval") }}:</strong></p>
+<ul>
+<li>📚 OpenAlex {{ _("学术文献 — 搜索5篇最相关论文", "academic papers - search top 5") }}</li>
+<li>🧠 KnowledgePoint {{ _("知识库 — 优先用户修正版本", "knowledge base - prefer user-corrected") }}</li>
+<li>📄 KnowledgeFile {{ _("上传文件 — 关键词匹配内容片段", "uploaded files - keyword match") }}</li>
+</ul>
+<p><strong>{{ _("低温度 LLM", "Low-temp LLM") }}:</strong> {{ _("temperature=0.1，严格控制随机性", "strict randomness control") }}</p>
+<p><strong>{{ _("\u7cfb\u7edf\u63d0\u793a\u8bcd", "System Prompt") }}:</strong> {{ _("\u8981\u6c42\u300c\u4fe1\u606f\u4e0d\u8db3\u8bf7\u660e\u786e\u8bf4\u660e\u300d\uff0c\u7981\u6b62\u7f16\u9020", "say if info insufficient, do not fabricate") }}</p>
+</div></div>
+
+<div class="card" style="border-left:4px solid #8b5cf6">
+<div class="card-header"><h2>✏️ {{ _("优化2：自我修正提升可信度", "Opt 2: Self-Correction for Credibility") }}</h2>
+<span class="badge" style="background:#10b981">✅ {{ _("已部署", "Deployed") }}</span></div>
+<div class="card-body">
+<p><strong>{{ _("目标", "Goal") }}:</strong> {{ _("用户编辑知识点后系统自动标记修正版本，修正越多在RAG中排序越靠前", "User edits tracked, corrected versions prioritized in RAG") }}</p>
+<ul>
+<li>📊 {{ _("知识点模型新增 correction_count 字段", "New correction_count field") }}</li>
+<li>🏷️ {{ _("编辑后 source 自动标记为 user_corrected", "Source auto-tagged as user_corrected") }}</li>
+<li>⬆️ {{ _("RAG检索按 correction_count 降序排列", "RAG sorts by correction_count DESC") }}</li>
+<li>📁 {{ _("LLM生成知识点时参考用户上传文件上下文", "LLM gen references uploaded files") }}</li>
+</ul>
+</div></div>
+
+<div class="card" style="border-left:4px solid #f59e0b">
+<div class="card-header"><h2>💬 {{ _("优化3：对话历史学习", "Opt 3: Chat History Learning") }}</h2>
+<span class="badge" style="background:#10b981">✅ {{ _("已部署", "Deployed") }}</span></div>
+<div class="card-body">
+<p><strong>{{ _("目标", "Goal") }}:</strong> {{ _("Agent能记住最近10轮对话，回答时有上下文连贯性", "Agent remembers last 10 exchanges") }}</p>
+<ul>
+<li>💾 {{ _("每次问答自动存入 ChatHistory 数据库", "Each Q&A saved to ChatHistory DB") }}</li>
+<li>🔄 {{ _("提问时拉取最近12条消息注入Prompt", "Fetch last 12 msgs into prompt") }}</li>
+<li>📜 {{ _("系统提示词要求参考对话历史保持连贯", "System prompt: reference chat history") }}</li>
+</ul>
+</div></div>
+
+<div class="card" style="border-left:4px solid #64748b">
+<div class="card-header"><h2>📁 {{ _("涉及文件", "Modified Files") }}</h2></div>
+<div class="card-body" style="font-size:0.85rem">
+<table style="width:100%;border-collapse:collapse">
+<tr style="border-bottom:1px solid rgba(59,130,246,0.1)"><td style="padding:6px;font-weight:600">app.py</td><td style="padding:6px">{{ _("agent_chat RAG三重检索 + 对话历史上下文注入 + 修正追踪路由", "RAG retrieval + chat history + correction routes") }}</td></tr>
+<tr style="border-bottom:1px solid rgba(59,130,246,0.05)"><td style="padding:6px;font-weight:600">models.py</td><td style="padding:6px">{{ _("KnowledgePoint新增correction_count、last_corrected_at", "New correction tracking fields") }}</td></tr>
+<tr style="border-bottom:1px solid rgba(59,130,246,0.05)"><td style="padding:6px;font-weight:600">agent_skills.py</td><td style="padding:6px">{{ _("info.get()替代info[]安全访问", "Safe dict access with .get()") }}</td></tr>
+<tr style="border-bottom:1px solid rgba(59,130,246,0.05)"><td style="padding:6px;font-weight:600">literature_weekly.html</td><td style="padding:6px">{{ _("收藏按钮data-attribute防引号问题", "Data-attribute fix for bookmark") }}</td></tr>
+</table>
+</div></div>
+{% endblock %}

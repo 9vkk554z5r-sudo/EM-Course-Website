@@ -91,7 +91,7 @@
 </div><!-- /hero-container -->
 
 <!-- Literature Nebula -->
-<div class="card"><div class="card-header"><h2>{{ _("🌌 我的文献星云", "🌌 My Lit Nebula") }}</h2><a href="{{ url_for('literature_collection') }}" class="btn btn-sm">{{ _("查看全部", "View All") }} &rarr;</a></div>
+<div class="card"><div class="card-header"><h2>{{ _("🌌 我的文献星云", "🌌 My Lit Nebula") }}</h2><a href="{{ url_for('nebula') }}" class="btn btn-sm">{{ _("查看引用图谱", "View Citation Graph") }} &rarr;</a></div>
 <div class="card-body" style="padding:0;">
 <div id="nebula-container" style="width:100%;height:550px;background:radial-gradient(ellipse at center,#0a0f24 0%,#000 100%);border-radius:0 0 12px 12px;cursor:grab;"></div>
 </div></div>
@@ -100,7 +100,6 @@
 <div class="card"><div class="card-header"><h2>{{ _("🌲 我的知识森林", "🌲 My Knowledge Forest") }}</h2>
 <a href="{{ url_for('admin_knowledge') }}" class="btn btn-sm">LLM {{ _("更新", "Update") }}</a>
 <a href="{{ url_for('knowledge_forest') }}" class="btn btn-sm">{{ _("查看全部", "View All") }}</a></div>
-                <a href="{{ url_for('knowledge_page') }}" class="btn btn-sm btn-outline" style="margin-left:4px">✏️ {{ _('修正知识', 'Edit KPs') }}</a>
 <div class="card-body forest-body">
 <div class="forest-grass">
 {% for kp in all_kps[:16] %}
@@ -132,11 +131,15 @@
 <script src="{{ url_for('static', filename='js/three.min.js') }}"></script>
 <script>
 var nebulaPapers = {{ sample_literature|tojson }};
-var nebulaCollectionUrl = "{{ url_for('literature_collection') }}";
+var nebulaCollectionUrl = "{{ url_for('nebula') }}";
 
 document.addEventListener('DOMContentLoaded', function() {
     var c = document.getElementById('nebula-container');
-    if (!c || !window.THREE || !nebulaPapers || nebulaPapers.length === 0) return;
+    if (!c || !window.THREE) return;
+    if (!nebulaPapers || nebulaPapers.length === 0) {
+        c.innerHTML = '<div class="nebula-empty">暂无已同步文献。前往“查看引用图谱”输入关键词或 DOI 生成星云。</div>';
+        return;
+    }
 
     var W = c.clientWidth, H = 550;
     var scene = new THREE.Scene();

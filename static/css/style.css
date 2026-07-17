@@ -557,6 +557,14 @@ a:hover { color: #67e8f9; text-decoration: none; }
     border-color: rgba(59, 130, 246, 0.2);
 }
 
+.paper-item-button {
+    width: 100%;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
 .paper-title {
     font-weight: 600;
     font-size: 0.92rem;
@@ -590,6 +598,45 @@ a:hover { color: #67e8f9; text-decoration: none; }
     color: var(--text-muted);
     margin-top: 6px;
     line-height: 1.5;
+}
+
+.citation-detail-panel {
+    margin-top: 16px;
+    padding: 16px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(6, 182, 212, 0.18);
+    background: rgba(6, 182, 212, 0.06);
+}
+
+.citation-detail-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.citation-detail-header h3 {
+    font-size: 1rem;
+    line-height: 1.35;
+}
+
+.citation-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px 16px;
+}
+
+.citation-detail-grid dt {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+}
+
+.citation-detail-grid dd {
+    color: var(--text-primary);
+    font-size: 0.86rem;
+    overflow-wrap: anywhere;
 }
 
 /* === Literature Page === */
@@ -762,6 +809,27 @@ a:hover { color: #67e8f9; text-decoration: none; }
     transform: translate(-50%, -50%);
     text-align: center;
     color: var(--text-muted);
+}
+
+.nebula-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.nebula-search-card .form-row {
+    margin-bottom: 6px;
+    align-items: flex-end;
+}
+
+#nebula-status {
+    margin-top: 8px;
+    font-size: 0.82rem;
 }
 
 .spinner {

@@ -2,7 +2,7 @@
 try: sys.stdout.reconfigure(encoding='utf-8')
 except: pass
 from datetime import datetime, timezone
-from openalex_client import (search_works, get_work_by_doi, extract_work_info, extract_key_points, works_to_citation_graph, recent_works_by_topic)
+from openalex_client import (search_works, get_work_by_doi, extract_work_info, extract_key_points, citation_graph, recent_works_by_topic)
 
 
 def log_activity(db, user_id, skill, action, input_data='', output_data='', status='success'):
@@ -41,7 +41,7 @@ def skill_literature_subscription(db, user_id, keyword, days=7):
         results = []
         for w in works:
             info = extract_work_info(w)
-        results.append({'title': info.get('title', ''), 'authors': info.get('first_author', ''), 'journal': info.get('journal', ''), 'date': info.get('publication_date', ''), 'doi': info.get('doi', '')})
+            results.append({'title': info['title'], 'authors': info['first_author'], 'journal': info['journal'], 'date': info['publication_date'], 'doi': info['doi']})
         log_activity(db, user_id, 'subscription', f'Keyword: {keyword}', f'Found {len(results)}')
         return {'keyword': keyword, 'days': days, 'results': results}, True
     except Exception as e:
@@ -51,16 +51,10 @@ def skill_literature_subscription(db, user_id, keyword, days=7):
 
 def skill_citation_network(db, user_id, query, query_type='keyword'):
     try:
-        works = []
-        if query_type == 'doi':
-            w = get_work_by_doi(query)
-            if w: works = [w]
-        elif query_type == 'keyword':
-            works = search_works(query, 15)
-        if not works:
+        graph = citation_graph(query, query_type=query_type, max_nodes=35)
+        if not graph.get('nodes'):
             log_activity(db, user_id, 'citation', f'Query: {query}', status='not_found')
             return {'found': False}, False
-        graph = works_to_citation_graph(works)
         nodes = graph.get('nodes', [])
         edges = graph.get('edges', [])
         hubs = sorted(nodes, key=lambda n: n.get('citation_count', 0), reverse=True)[:5]

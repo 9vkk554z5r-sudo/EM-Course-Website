@@ -1,0 +1,305 @@
+﻿{% extends "base.html" %}
+{% block title %}{{ _("首页", "Home") }}{% endblock %}
+{% block content %}
+
+<style>
+/* === Merged Hero Layout === */
+.hero-container { display: flex; flex-direction: column; border: 2px solid rgba(59,130,246,0.3); border-radius: 14px; background: rgba(15,23,58,0.85); backdrop-filter: blur(8px); box-shadow: 0 0 30px rgba(59,130,246,0.1); margin-bottom: 20px; overflow: hidden; }
+
+/* Tiny stats bar at the top right */
+.hero-strip { display: flex; justify-content: flex-end; padding: 6px 14px; background: rgba(59,130,246,0.06); border-bottom: 1px solid rgba(59,130,246,0.08); gap: 10px; flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; }
+.hero-stat { display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; color: var(--text-secondary); white-space: nowrap; }
+.hero-stat .stat-icon { font-size: 0.85rem; width: auto; height: auto; background: none; border-radius: 0; display: inline; padding: 0; }
+.hero-stat .stat-val { font-weight: 600; color: var(--accent-cyan); }
+.hero-stat .stat-label { white-space: nowrap; margin-left: 2px; }
+
+/* Main row: left skills | center chat | right skills */
+.hero-main { display: flex; gap: 8px; padding: 12px 14px; min-height: 260px; }
+
+/* Side skill columns (3 each) */
+.hero-side { display: flex; flex-direction: column; gap: 6px; width: 100px; flex-shrink: 0; justify-content: center; }
+.hero-side .agent-card { padding: 10px 12px; min-width: 0; width: 100%; }
+.hero-side .agent-icon { font-size: 1.3rem; }
+        .hero-side .agent-label { font-size: 0.75rem; white-space: nowrap; text-align: center; }
+
+/* Center: EM Agent */
+.hero-center h2 { font-size: 1.15rem; font-weight: 700; margin-bottom: 2px; color: var(--text-primary); letter-spacing: 1px; text-align: center; }
+.hero-center .hero-sub { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 8px; text-align: center; white-space: nowrap; }
+.hero-center .hero-sub { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 8px; text-align: center; }
+
+.hero-center .chat-area { max-height: 160px; overflow-y: auto; margin-bottom: 6px; padding: 6px 10px; background: rgba(10,15,36,0.4); border-radius: 8px; width: 100%; flex: 1; }
+.hero-center .chat-msg { padding: 6px 10px; margin-bottom: 4px; border-radius: 10px; font-size: 0.8rem; line-height: 1.4; max-width: 90%; }
+.hero-center .chat-msg.bot { background: rgba(59,130,246,0.12); color: var(--text-primary); }
+.hero-center .chat-msg.user { background: rgba(16,185,129,0.12); color: var(--text-primary); margin-left: auto; }
+.hero-center .chat-input-row { display: flex; gap: 6px; width: 100%; }
+.hero-center .chat-input-row button { flex-shrink: 0; white-space: nowrap; }
+.hero-center .chat-input { flex: 1; padding: 6px 10px; border: 1px solid rgba(59,130,246,0.2); border-radius: 6px; background: rgba(10,15,36,0.6); color: var(--text-primary); font-size: 0.8rem; }
+.hero-center .chat-input:focus { outline: none; border-color: var(--accent-blue); }
+
+@media (max-width: 768px) {
+  .hero-main { flex-direction: column; align-items: center; }
+        .hero-side { flex-direction: row; width: 100%; justify-content: center; overflow: visible; }
+        .hero-side .agent-card { width: auto; flex: 0 0 auto; padding: 8px 14px; min-width: 0; }
+  .hero-center .chat-area { max-height: 120px; }
+  .hero-strip { justify-content: center; }
+}
+</style>
+
+<!-- === Merged Hero Section === -->
+<div class="hero-container">
+
+<!-- Strip: tiny stats top-right -->
+<div class="hero-strip">
+  <span class="hero-stat"><span class="stat-icon">🔥</span><span class="stat-val">{{ streak }}</span> {{ _("连续打卡", "Streak") }}</span>
+  <span class="hero-stat"><span class="stat-icon">📚</span><span class="stat-val">{{ total_checkins }}</span> {{ _("学习天数", "Days") }}</span>
+  <span class="hero-stat"><span class="stat-icon">📡</span><span class="stat-val">{{ subscription_count }}</span> {{ _("订阅", "Subs") }}</span>
+  <span class="hero-stat"><span class="stat-icon">{{ "✅" if today_checkin else "⏳" }}</span><span class="stat-val">{{ _("已打卡", "Done") if today_checkin else _("待打卡", "Pending") }}</span></span>
+</div>
+
+<!-- Main row: left skills | center chat | right skills -->
+<div class="hero-main">
+
+  <!-- Left skills (3) -->
+  <div class="hero-side">
+    <a href="{{ url_for('agent_literature_info') }}" class="agent-card"><div class="agent-icon">📄</div><div class="agent-label">{{ _("文献查询", "Lit Search") }}</div></a>
+    <a href="{{ url_for('agent_subscription') }}" class="agent-card"><div class="agent-icon">📬</div><div class="agent-label">{{ _("文献订阅", "Subscribe") }}</div></a>
+    <a href="{{ url_for('agent_citation') }}" class="agent-card"><div class="agent-icon">🌐</div><div class="agent-label">{{ _("引用网络", "Citations") }}</div></a>
+  </div>
+
+  <!-- Center: EM Agent Chat -->
+  <div class="hero-center">
+    <h2>🧠 EM Agent</h2>
+    <div class="hero-sub">{{ _("关于电子显微学或结构生物学的任何问题", "Ask about EM / Structural Biology") }}</div>
+    <div id="chatArea" class="chat-area">
+      <div class="chat-msg bot">{{ _("你好！请问你想了解电子显微学或结构生物学的哪些内容？", "Hi! Ask me about EM or structural biology.") }}</div>
+    </div>
+    <div class="chat-input-row">
+      <input type="text" id="chatInput" placeholder="{{ _("输入你想问的问题...", "Ask something...") }}" class="chat-input" onkeydown="if(event.key==='Enter') sendChat()">
+      <button onclick="sendChat()" class="btn btn-primary btn-sm" style="padding:6px 12px;font-size:0.75rem;">{{ _("发送", "Send") }}</button>
+    </div>
+  </div>
+    <div style="text-align:right;margin-top:4px;width:100%"><span style="font-size:0.65rem;color:var(--text-muted);cursor:pointer" onclick="clearChat()">{{ _("\u6e05\u9664\u5386\u53f2", "Clear history") }}</span></div>
+
+  <!-- Right skills (3) -->
+  <div class="hero-side">
+    <a href="{{ url_for('agent_presentation') }}" class="agent-card"><div class="agent-icon">📊</div><div class="agent-label">AI Pre</div></a>
+    <a href="{{ url_for('agent_methods') }}" class="agent-card"><div class="agent-icon">🔬</div><div class="agent-label">{{ _("实验方法", "Methods") }}</div></a>
+    <a href="{{ url_for('study') }}" class="agent-card"><div class="agent-icon">🎯</div><div class="agent-label">{{ _("每日测验", "Quiz") }}</div></a>
+  </div>
+
+</div><!-- /hero-main -->
+</div><!-- /hero-container -->
+
+<!-- Literature Nebula -->
+<div class="card"><div class="card-header"><h2>{{ _("🌌 我的文献星云", "🌌 My Lit Nebula") }}</h2><a href="{{ url_for('literature_collection') }}" class="btn btn-sm">{{ _("查看全部", "View All") }} &rarr;</a></div>
+<div class="card-body" style="padding:0;">
+<div id="nebula-container" style="width:100%;height:550px;background:radial-gradient(ellipse at center,#0a0f24 0%,#000 100%);border-radius:0 0 12px 12px;cursor:grab;"></div>
+</div></div>
+
+<!-- Knowledge Forest -->
+<div class="card"><div class="card-header"><h2>{{ _("🌲 我的知识森林", "🌲 My Knowledge Forest") }}</h2>
+<a href="{{ url_for('admin_knowledge') }}" class="btn btn-sm">LLM {{ _("更新", "Update") }}</a>
+<a href="{{ url_for('knowledge_forest') }}" class="btn btn-sm">{{ _("查看全部", "View All") }}</a></div>
+                <a href="{{ url_for('knowledge_page') }}" class="btn btn-sm btn-outline" style="margin-left:4px">✏️ {{ _('修正知识', 'Edit KPs') }}</a>
+<div class="card-body forest-body">
+<div class="forest-grass">
+{% for kp in all_kps[:16] %}
+<a href="{{ url_for('study', difficulty=kp.difficulty) }}" class="forest-tree2" title="{{ kp.title }}">
+<div class="tree-icon2" style="font-size:{{ 1.5 if kp.difficulty=='advanced' else 1.2 if kp.difficulty=='intermediate' else 1.0 }}rem;">{{ "🌲" if kp.difficulty=='advanced' else "🌳" if kp.difficulty=='intermediate' else "🌱" }}</div>
+<div class="tree-label">{{ kp.title[:10] }}</div>
+</a>
+{% endfor %}
+</div></div></div>
+
+<!-- Experiment Method Ocean -->
+<div class="card"><div class="card-header"><h2>{{ _("🧪 实验方法库", "🧪 Experiment Lab") }}</h2><a href="{{ url_for('experiments_page') }}" class="btn btn-sm">{{ _("查看全部", "View All") }} &rarr;</a></div>
+<div class="card-body"><div class="ocean-grid">
+{% if user_protocols %}
+{% for p in user_protocols %}
+<a href="{{ url_for('agent_methods') }}" class="lab-beaker">
+<div class="beaker-icon">📋</div><div class="beaker-name">{{ p.name }}</div>
+<div class="beaker-desc">{{ p.paper_title[:30] }}</div>
+</a>
+{% endfor %}
+{% else %}
+<a href="{{ url_for('agent_methods') }}" class="lab-beaker">
+<div class="beaker-icon">🔬</div><div class="beaker-name">{{ _("cryo-EM 样品制备", "cryo-EM Sample Prep") }}</div><div class="beaker-desc">{{ _("示例: 冷冻电镜标准流程", "Sample: cryo-EM workflow") }}</div></a>
+<a href="{{ url_for('protocols') }}" class="lab-beaker">
+<div class="beaker-icon">🎬</div><div class="beaker-name">{{ _("实验视频教程", "Protocol Videos") }}</div><div class="beaker-desc">{{ _("查看管理员上传的Protocol视频", "Watch admin protocol videos") }}</div></a>
+{% endif %}
+</div></div></div>
+
+<script src="{{ url_for('static', filename='js/three.min.js') }}"></script>
+<script>
+var nebulaPapers = {{ sample_literature|tojson }};
+var nebulaCollectionUrl = "{{ url_for('literature_collection') }}";
+
+document.addEventListener('DOMContentLoaded', function() {
+    var c = document.getElementById('nebula-container');
+    if (!c || !window.THREE || !nebulaPapers || nebulaPapers.length === 0) return;
+
+    var W = c.clientWidth, H = 550;
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(50, W/H, 0.1, 1000);
+    camera.position.z = 14;
+    var renderer = new THREE.WebGLRenderer({alpha: true, antialias: true});
+    renderer.setSize(W, H);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    c.appendChild(renderer.domElement);
+
+    var sg = new THREE.BufferGeometry();
+    var sp = [];
+    for (var i = 0; i < 2000; i++) {
+        var r = Math.pow(Math.random(), 1.5) * 40;
+        var a = Math.random() * Math.PI * 2 + r * 0.3;
+        var h = (Math.random() - 0.5) * r * 0.15;
+        sp.push(Math.cos(a) * r, h, Math.sin(a) * r);
+    }
+    sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
+    scene.add(new THREE.Points(sg, new THREE.PointsMaterial({color: 0xffffff, size: 0.05, transparent: true, opacity: 0.3})));
+
+    var lcv = document.createElement('canvas');
+    lcv.width = 512; lcv.height = 128;
+    var lcx = lcv.getContext('2d');
+    lcx.fillStyle = 'rgba(255,255,255,0.9)';
+    lcx.font = 'bold 28px Inter, sans-serif';
+    lcx.textAlign = 'center';
+    lcx.textBaseline = 'middle';
+    lcx.fillText('{{ _("我的文献", "My Library") }}', 256, 64);
+    var lt = new THREE.CanvasTexture(lcv);
+    var ls = new THREE.Sprite(new THREE.SpriteMaterial({map: lt, transparent: true, depthTest: false, blending: THREE.AdditiveBlending}));
+    ls.position.set(0, 2.2, 0);
+    ls.scale.set(5, 1.25, 1);
+    scene.add(ls);
+
+    var cc = new THREE.Color('#F5D76E');
+    var cg = new THREE.SphereGeometry(1.2, 32, 32);
+    var cm = new THREE.MeshPhongMaterial({color: cc, emissive: cc, emissiveIntensity: 0.8});
+    var center = new THREE.Mesh(cg, cm);
+    scene.add(center);
+
+    var gcv = document.createElement('canvas');
+    gcv.width = 256; gcv.height = 256;
+    var gctx = gcv.getContext('2d');
+    var grad = gctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+    grad.addColorStop(0, 'rgba(245,215,110,0.6)');
+    grad.addColorStop(0.3, 'rgba(245,215,110,0.25)');
+    grad.addColorStop(0.6, 'rgba(245,215,110,0.1)');
+    grad.addColorStop(1, 'rgba(245,215,110,0)');
+    gctx.fillStyle = grad;
+    gctx.fillRect(0, 0, 256, 256);
+    var gtex = new THREE.CanvasTexture(gcv);
+    var gsm = new THREE.SpriteMaterial({map: gtex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false});
+    var gsprite = new THREE.Sprite(gsm);
+    gsprite.scale.set(20, 20, 1);
+    scene.add(gsprite);
+
+    var l1 = new THREE.DirectionalLight(0xffffff, 1.2);
+    l1.position.set(10, 20, 10);
+    scene.add(l1);
+    scene.add(new THREE.AmbientLight(0x404060));
+
+    var meshes = [];
+    nebulaPapers.forEach(function(p, i) {
+        var sz = 0.2 + Math.random() * 0.1;
+        var col = new THREE.Color('#F5D76E');
+        col.multiplyScalar(0.5 + Math.random() * 0.5);
+        var g = new THREE.SphereGeometry(sz, 12, 12);
+        var m = new THREE.MeshPhongMaterial({color: col, emissive: col, emissiveIntensity: 0.2});
+        var mesh = new THREE.Mesh(g, m);
+        var t = i / nebulaPapers.length;
+        var angle = t * Math.PI * 2 + t * 2;
+        var r = 1.5 + t * 6 + t * Math.sin(t * 10) * 0.5;
+        var h = (Math.random() - 0.5) * r * 0.4;
+        mesh.position.set(Math.cos(angle) * r, h, Math.sin(angle) * r);
+        mesh.userData = {url: nebulaCollectionUrl};
+        scene.add(mesh);
+        meshes.push({mesh: mesh, angle: angle, radius: r, height: h, speed: 0.15 + Math.random() * 0.2});
+
+        var cv = document.createElement('canvas');
+        cv.width = 200; cv.height = 48;
+        var cx = cv.getContext('2d');
+        cx.fillStyle = 'rgba(0,0,0,0.5)';
+        cx.fillRect(4, 4, 192, 40);
+        cx.fillStyle = '#fff';
+        cx.font = '12px Inter, sans-serif';
+        cx.textAlign = 'center';
+        cx.fillText(p.label || (p.title || '').slice(0, 15), 100, 30);
+        var tex = new THREE.CanvasTexture(cv);
+        var sm = new THREE.SpriteMaterial({map: tex, transparent: true, depthTest: false});
+        var sprite = new THREE.Sprite(sm);
+        sprite.position.set(Math.cos(angle) * r, h + 1, Math.sin(angle) * r);
+        sprite.scale.set(2, 0.5, 1);
+        scene.add(sprite);
+        mesh.userData.sprite = sprite;
+    });
+
+    var raycaster = new THREE.Raycaster(), mouse = new THREE.Vector2(), hovered = null;
+    var isDragging = false, px, py, rx = 0, ry = 0, wasDragged = false;
+
+    c.addEventListener('mousemove', function(e) {
+        var r = c.getBoundingClientRect();
+        mouse.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+        mouse.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        var hits = raycaster.intersectObjects(meshes.map(function(m){return m.mesh;}));
+        if (hits.length > 0) { c.style.cursor = 'pointer'; hovered = hits[0].object; }
+        else { c.style.cursor = 'grab'; hovered = null; }
+    });
+
+    c.addEventListener('click', function() {
+        if (wasDragged) return;
+        if (hovered && hovered.userData.url) window.location.href = hovered.userData.url;
+    });
+
+    c.addEventListener('mousedown', function(e) { isDragging = true; wasDragged = false; px = e.clientX; py = e.clientY; });
+    window.addEventListener('mouseup', function() { isDragging = false; });
+    c.addEventListener('mousemove', function(e) {
+        if (isDragging) { wasDragged = true;
+            ry += (e.clientX - px) * 0.008;
+            rx += (e.clientY - py) * 0.008;
+            px = e.clientX; py = e.clientY;
+        }
+    });
+
+    c.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        var z = camera.position.z + e.deltaY * 0.02;
+        if (z > 7 && z < 35) camera.position.z = z;
+    }, {passive: false});
+
+    var autoRotate = true;
+    c.addEventListener('mousedown', function() { autoRotate = false; });
+    window.addEventListener('mouseup', function() { setTimeout(function() { autoRotate = true; }, 3000); });
+
+    function animate() {
+        requestAnimationFrame(animate);
+        if (autoRotate && !isDragging) ry += 0.003;
+        meshes.forEach(function(m) {
+            m.angle += 0.01 * m.speed;
+            m.mesh.position.x = Math.cos(m.angle) * m.radius;
+            m.mesh.position.z = Math.sin(m.angle) * m.radius;
+            m.mesh.rotation.y += 0.02;
+            if (m.mesh.userData.sprite) {
+                m.mesh.userData.sprite.position.x = Math.cos(m.angle) * m.radius;
+                m.mesh.userData.sprite.position.z = Math.sin(m.angle) * m.radius;
+            }
+        });
+        camera.position.x = Math.sin(ry) * Math.cos(rx) * 14;
+        camera.position.y = Math.sin(rx) * 6 + 2;
+        camera.position.z = Math.cos(ry) * Math.cos(rx) * 14;
+        camera.lookAt(0, 0, 0);
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', function() {
+        W = c.clientWidth; H = 550;
+        camera.aspect = W / H;
+        camera.updateProjectionMatrix();
+        renderer.setSize(W, H);
+    });
+});
+</script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=2"></script>
+{% endblock %}

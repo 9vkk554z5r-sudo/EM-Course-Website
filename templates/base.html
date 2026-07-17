@@ -38,17 +38,9 @@
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2z"/></svg>
                     {{ _("知识森林", "Forest") }}
                 </a>
-                <a href="{{ url_for("knowledge_page") }}" class="nav-link {% if request.endpoint == "knowledge_page" %}active{% endif %}">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                    {{ _("知识管理", "Knowledge") }}
-                </a>
                 <a href="{{ url_for("experiments_page") }}" class="nav-link {% if request.endpoint == "experiments_page" %}active{% endif %}">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
                     {{ _("实验方法库", "Experiments") }}
-                </a>
-                <a href="{{ url_for("optimization_log") }}" class="nav-link {% if request.endpoint == "optimization_log" %}active{% endif %}">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                    {{ _("优化日志", "Updates") }}
                 </a>
             </div>
             <div class="nav-user"><div class="nav-user">
