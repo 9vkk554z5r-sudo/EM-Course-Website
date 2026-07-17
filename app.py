@@ -16,6 +16,7 @@ from config import SECRET_KEY, SQLALCHEMY_DATABASE_URI, SQLALCHEMY_TRACK_MODIFIC
 from config import WEEKLY_LITERATURE_HOUR, WEEKLY_LITERATURE_MINUTE
 from models import db, User, LiteratureSubscription, LiteratureItem, CitationLink, KnowledgePoint, DailyCheckin, ProtocolVideo, UploadedLiterature, AttendanceReward, Quiz, QuizAttempt, ProtocolCollection, PresentationTemplate, AgentLog, ApiKey, LiteraturePlanet, PlanetPaper, ChatHistory, LiteratureCategory, BookmarkedLiterature, UserStudyPlan
 from knowledge_points import DIFFICULTY_LABELS, DIFFICULTY_COLORS
+from knowledge_study_v2 import knowledge_study_bp, build_custom_study_context
 import json
 import re
 import datetime as dt_module
@@ -67,6 +68,7 @@ def create_app():
 
 app = create_app()
 db.init_app(app)
+app.register_blueprint(knowledge_study_bp)
 
 PLATFORM_NAME = "生命科学课程助手"
 COURSE_REGISTRY = {
@@ -808,7 +810,7 @@ def study():
     quizzes = Quiz.query.filter_by(knowledge_point_id=point_id).all()
 
     return render_template(
-        "study.html",
+        "study_knowledge.html",
         point=today_point,
         point_id=point_id,
         difficulty=difficulty,
@@ -822,6 +824,7 @@ def study():
         week_days=week_days,
         week_labels=week_labels,
         week_dates=week_dates,
+        custom_study=build_custom_study_context(_selected_course()),
     )
 
 

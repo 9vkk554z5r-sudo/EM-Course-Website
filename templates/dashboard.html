@@ -5,9 +5,12 @@
 <div class="research-dashboard">
     <section class="research-hero workbench-hero-cyber">
         <div class="research-identity">
+            <div class="research-title-block">
             <p class="section-kicker">{{ selected_course.label }}</p>
             <h1 class="workbench-title"><span>{{ selected_course.name }}</span><span>{{ _('课程工作台', 'Course Workspace') }}</span></h1>
             <p class="workbench-subtitle">{{ _('围绕当前研究方向构建文献星云、总结实验方法、完成学习任务及进行科研问答', 'Build literature nebulas, summarize experimental methods, complete learning tasks and ask research questions around the current research direction') }}</p>
+            </div>
+            <div class="research-overview-block">
             <div class="research-context-row workbench-metrics" data-dashboard-metrics data-initial-topic="{{ primary_topic }}" data-initial-track="{{ subscription_count }}" data-initial-imports="{{ bookmark_count }}" data-initial-streak="{{ streak }}">
                 <span class="metric-card topic-metric" data-topic-frame>
                     <strong id="currentTopicValue">{{ primary_topic }}</strong>
@@ -24,6 +27,7 @@
                 <span class="topic-orbit-node node-b">Protocol</span>
                 <span class="topic-orbit-node node-c">Task</span>
                 <span class="topic-orbit-node node-d">Q&amp;A</span>
+            </div>
             </div>
         </div>
 
@@ -101,13 +105,20 @@
                     <h2>每日任务</h2>
                 </div>
             </div>
-            <div class="daily-task-orbit" aria-hidden="true">
-                <span class="task-orbit-core"></span>
-                <span class="task-orbit-ring ring-a"></span>
-                <span class="task-orbit-ring ring-b"></span>
-                <span class="task-orbit-node task-a"></span>
-                <span class="task-orbit-node task-b"></span>
-                <span class="task-orbit-node task-c"></span>
+            <div class="daily-task-flow" aria-hidden="true">
+                <span class="task-flow-grid"></span>
+                <span class="task-flow-scan"></span>
+                <div class="task-day-chip">
+                    <span>DAILY FLOW</span>
+                    <strong>03</strong>
+                    <small>FOCUS TASKS</small>
+                </div>
+                <div class="task-flow-route">
+                    <span class="task-flow-line"><i></i></span>
+                    <span class="task-checkpoint point-a"><b>01</b><em>阅读</em></span>
+                    <span class="task-checkpoint point-b"><b>02</b><em>方法</em></span>
+                    <span class="task-checkpoint point-c"><b>03</b><em>学习</em></span>
+                </div>
             </div>
             <div class="daily-task-list">
                 <a href="{{ url_for('literature_hub') }}"><strong>导入本周阅读文献</strong><span>生成主题星云并查看中心论文</span></a>
@@ -182,5 +193,5 @@
     </section>
 </div>
 
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=10"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=11"></script>
 {% endblock %}

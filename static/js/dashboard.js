@@ -408,4 +408,26 @@ function saveChat(role, message) {
     });
 }
 
-document.addEventListener('DOMContentLoaded', function () { loadChatHistory(); });
+function upgradeChatInput() {
+    var input = document.getElementById('chatInput');
+    if (!input || input.tagName === 'TEXTAREA') return;
+
+    var textarea = document.createElement('textarea');
+    textarea.id = input.id;
+    textarea.className = input.className;
+    textarea.placeholder = input.placeholder;
+    textarea.rows = 3;
+    textarea.setAttribute('aria-label', input.placeholder || 'Research assistant input');
+    textarea.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendChat();
+        }
+    });
+    input.replaceWith(textarea);
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    upgradeChatInput();
+    loadChatHistory();
+});

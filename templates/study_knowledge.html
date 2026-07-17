@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+{% block title %}今日学习{% endblock %}
+{% block body_class %}life-product-theme study-route cosmic-task-route{% endblock %}
+{% block content %}
+{% set cs = custom_study %}
+<style>
+.study-knowledge-page { display:grid; gap:18px; }
+.study-knowledge-page [hidden] { display:none !important; }
+.study-knowledge-page .study-intro { display:flex; align-items:flex-end; justify-content:space-between; gap:20px; }
+.study-knowledge-page .study-intro h1 { margin:0 0 8px; }
+.study-knowledge-page .study-intro p { margin:0; max-width:820px; color:var(--cosmic-muted) !important; line-height:1.7; letter-spacing:.025em; word-spacing:.08em; }
+.study-knowledge-page .study-intro .section-kicker { color:#b9cbd8 !important; letter-spacing:.08em; }
+.study-knowledge-page .intro-actions { display:flex; gap:9px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+.study-knowledge-page .daily-strip { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+.study-knowledge-page .daily-metric { padding:16px; border:1px solid rgba(94,234,212,.14); border-radius:10px; background:rgba(9,21,32,.48); }
+.study-knowledge-page .daily-metric span { display:block; color:#b7c8d6 !important; font-size:.78rem; margin-bottom:6px; letter-spacing:.02em; }
+.study-knowledge-page .daily-metric strong { font-size:1.45rem; color:#f3faff !important; font-weight:750; text-shadow:0 0 18px rgba(100,220,255,.12); }
+.study-knowledge-page .study-layout { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(280px,.85fr); gap:18px; align-items:start; }
+.study-knowledge-page .queue-head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; }
+.study-knowledge-page .queue-chips { display:flex; flex-wrap:wrap; gap:7px; justify-content:flex-end; }
+.study-knowledge-page .queue-chip { padding:5px 9px; border-radius:999px; border:1px solid rgba(94,234,212,.18); color:var(--text-muted); font-size:.75rem; }
+.study-knowledge-page .study-progress { height:7px; border-radius:999px; overflow:hidden; background:rgba(148,163,184,.14); margin:16px 0 20px; }
+.study-knowledge-page .study-progress span { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,#2dd4bf,#60a5fa); transition:width .25s ease; }
+.study-knowledge-page .memory-card { min-height:380px; display:flex; flex-direction:column; justify-content:space-between; padding:24px; border:1px solid rgba(94,234,212,.18); border-radius:12px; background:linear-gradient(145deg,rgba(13,30,42,.9),rgba(8,17,29,.92)); transition:opacity .2s ease,transform .2s ease; }
+.study-knowledge-page .memory-card.is-updating { opacity:.5; transform:translateY(4px); }
+.study-knowledge-page .memory-meta { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+.study-knowledge-page .memory-meta span { font-size:.74rem; color:#9fb7c5; border:1px solid rgba(148,163,184,.18); border-radius:999px; padding:4px 8px; }
+.study-knowledge-page .memory-question h2 { margin:0 0 12px; font-size:1.55rem; }
+.study-knowledge-page .memory-hint { color:#aebfce !important; line-height:1.7; letter-spacing:.015em; }
+.study-knowledge-page .memory-answer { margin-top:20px; padding:18px; border-left:3px solid #2dd4bf; border-radius:0 8px 8px 0; background:rgba(45,212,191,.06); line-height:1.8; }
+.study-knowledge-page .answer-section + .answer-section { margin-top:16px; padding-top:16px; border-top:1px solid rgba(148,163,184,.12); }
+.study-knowledge-page .answer-section strong { display:block; margin-bottom:6px; color:#7dd3fc; }
+.study-knowledge-page .answer-section div { white-space:pre-wrap; }
+.study-knowledge-page .memory-actions { margin-top:24px; }
+.study-knowledge-page .rating-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:9px; }
+.study-knowledge-page .rating-btn { min-height:58px; cursor:pointer; border-radius:8px; border:1px solid rgba(148,163,184,.28); background:rgba(15,28,39,.88); color:#eef8ff !important; font-weight:650; letter-spacing:.025em; transition:.2s ease; }
+.study-knowledge-page .rating-btn:hover { transform:translateY(-2px); border-color:rgba(94,234,212,.5); }
+.study-knowledge-page .rating-btn small { display:block; margin-top:4px; color:#aebfce !important; font-weight:450; letter-spacing:.01em; }
+.study-knowledge-page .rating-btn[data-rating="again"] { border-color:rgba(248,113,113,.28); }
+.study-knowledge-page .rating-btn[data-rating="easy"] { border-color:rgba(74,222,128,.3); }
+.study-knowledge-page .keyboard-hint { margin:12px 0 0; color:#9fb3c3 !important; font-size:.74rem; text-align:center; letter-spacing:.015em; word-spacing:.05em; }
+.study-knowledge-page .review-status { min-height:22px; margin-top:10px; color:#7dd3fc; font-size:.84rem; }
+.study-knowledge-page .library-list { display:grid; gap:9px; }
+.study-knowledge-page .library-row { padding:12px; border:1px solid rgba(148,163,184,.14); border-radius:8px; background:rgba(7,16,26,.34); }
+.study-knowledge-page .library-row.is-active { border-color:rgba(45,212,191,.46); background:rgba(45,212,191,.06); }
+.study-knowledge-page .library-row-top { display:flex; justify-content:space-between; gap:10px; align-items:center; }
+.study-knowledge-page .library-row strong { display:block; overflow-wrap:anywhere; }
+.study-knowledge-page .library-row p { color:var(--text-muted); font-size:.78rem; margin:7px 0 0; }
+.study-knowledge-page .library-actions { display:flex; gap:7px; margin-top:10px; flex-wrap:wrap; }
+.study-knowledge-page details { border-top:1px solid rgba(148,163,184,.12); padding-top:12px; margin-top:12px; }
+.study-knowledge-page summary { cursor:pointer; color:#dcecf5 !important; font-weight:650; letter-spacing:.015em; }
+.study-knowledge-page .compact-form { display:grid; gap:10px; margin-top:12px; }
+.study-knowledge-page .compact-form label { color:#b7c8d6 !important; font-size:.78rem; }
+.study-knowledge-page .compact-form input,.study-knowledge-page .compact-form textarea,.study-knowledge-page .compact-form select { width:100%; margin-top:5px; }
+.study-knowledge-page .empty-study { padding:34px 20px; text-align:center; color:var(--text-muted); }
+.study-knowledge-page .empty-study h2 { color:var(--text-primary); }
+.study-knowledge-page .task-mix { display:flex; justify-content:center; flex-wrap:wrap; gap:8px; margin:18px 0 0; }
+.study-knowledge-page .task-mix span { padding:6px 10px; border-radius:999px; background:rgba(94,234,212,.07); color:#b6cbd5; font-size:.78rem; }
+.study-knowledge-page .completion-panel { text-align:left; }
+.study-knowledge-page .completion-panel > h2 { margin:0 0 8px; }
+.study-knowledge-page .completion-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:20px 0; }
+.study-knowledge-page .completion-metric { padding:14px; border:1px solid rgba(148,163,184,.14); border-radius:8px; background:rgba(5,15,25,.38); }
+.study-knowledge-page .completion-metric span { display:block; color:#b7c8d6 !important; font-size:.72rem; margin-bottom:5px; }
+.study-knowledge-page .completion-metric strong { font-size:1.2rem; color:#f3faff !important; }
+.study-knowledge-page .continue-panel { margin-top:22px; padding-top:20px; border-top:1px solid rgba(148,163,184,.14); }
+.study-knowledge-page .continue-actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+.study-knowledge-page .continue-custom { display:grid; grid-template-columns:minmax(150px,1fr) 120px auto; gap:8px; align-items:end; }
+@media (max-width:900px) {
+  .study-knowledge-page .study-layout { grid-template-columns:1fr; }
+  .study-knowledge-page .daily-strip,.study-knowledge-page .completion-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width:560px) {
+  .study-knowledge-page .study-intro,.study-knowledge-page .queue-head { align-items:flex-start; flex-direction:column; }
+  .study-knowledge-page .intro-actions,.study-knowledge-page .queue-chips { justify-content:flex-start; }
+  .study-knowledge-page .rating-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .study-knowledge-page .continue-custom { grid-template-columns:1fr; }
+}
+</style>
+
+<div class="study-knowledge-page">
+  <div class="page-header study-intro">
+    <div>
+      <p class="section-kicker">知识森林 · DAILY REVIEW</p>
+      <h1>今日学习</h1>
+      <p class="text-muted">到期复习优先 · 薄弱知识巩固 · 当前课程新知识补充 · 每日 10 个不同知识点</p>
+    </div>
+    <div class="intro-actions">
+      {% if cs.session.status == 'not_started' %}
+      <button type="button" class="btn btn-primary" data-start-session>开始今日学习</button>
+      {% elif cs.session.status == 'in_progress' %}
+      <a href="#dailyLearningCard" class="btn btn-primary">继续今日学习</a>
+      {% else %}
+      <button type="button" class="btn btn-primary" disabled>今日学习已完成</button>
+      {% endif %}
+      <a href="{{ url_for('knowledge_forest') }}" class="btn btn-outline btn-sm">返回知识森林</a>
+    </div>
+  </div>
+
+  <section class="daily-strip" aria-label="今日学习概览">
+    <div class="daily-metric"><span>今日任务进度</span><strong>{{ cs.queue_summary.completed }} / {{ cs.queue_summary.total }}</strong></div>
+    <div class="daily-metric"><span>今日待复习知识点</span><strong>{{ cs.queue_summary.review }}</strong></div>
+    <div class="daily-metric"><span>今日新知识点</span><strong>{{ cs.queue_summary.new }}</strong></div>
+    <div class="daily-metric"><span>连续学习天数</span><strong>{{ streak }} 天</strong></div>
+  </section>
+
+  <div class="study-layout">
+    <section class="card" id="dailyLearningCard">
+      <div class="card-header queue-head">
+        <div>
+          <h2>{{ cs.course_name }} · 今日任务</h2>
+          <p class="text-muted" style="margin:5px 0 0">任务生成后全天固定，刷新、退出或重新登录不会重置。</p>
+        </div>
+        <div class="queue-chips">
+          <span class="queue-chip">薄弱 {{ cs.queue_summary.weak }}</span>
+          <span class="queue-chip">已完成 {{ cs.queue_summary.completed }}</span>
+          <span class="queue-chip">实际复习 {{ cs.queue_summary.actual_reviews }}</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="study-progress" aria-label="今日任务进度"><span style="width:{{ cs.queue_summary.percent }}%"></span></div>
+
+        {% if cs.session.status == 'not_started' %}
+        <div class="empty-study">
+          <h2>今日 10 个知识点已经准备好</h2>
+          <p>先完成到期与薄弱知识复习，再学习当前课程的新知识。每次只展示一个知识点。</p>
+          <div class="task-mix">
+            <span>旧知识复习 {{ cs.queue_summary.review }}</span>
+            <span>薄弱知识 {{ cs.queue_summary.weak }}</span>
+            <span>新知识 {{ cs.queue_summary.new }}</span>
+          </div>
+        </div>
+        {% elif cs.is_learning and cs.current_entry %}
+        {% set entry = cs.current_entry %}
+        {% set task = entry.task %}
+        <article class="memory-card" data-memory-card>
+          <div>
+            <div class="memory-meta">
+              <span>{% if task.source_type == 'new' %}新知识{% elif task.source_type == 'weak' %}薄弱巩固{% elif task.source_type == 'overdue' %}逾期复习{% elif task.source_type == 'due' %}到期复习{% elif task.source_type == 'risk' %}遗忘风险{% else %}额外学习{% endif %}</span>
+              {% if entry.reason == 'repeat_again' %}<span>忘记后重复</span>{% elif entry.reason == 'repeat_hard' %}<span>模糊后重复</span>{% endif %}
+              <span>{{ task.item.difficulty }}</span>
+              {% if task.item.tags %}<span>{{ task.item.tags }}</span>{% endif %}
+            </div>
+            <div class="memory-question">
+              <h2>{{ task.item.title }}</h2>
+              <p class="memory-hint">{% if task.item.hint %}提示：{{ task.item.hint }}{% else %}先回忆概念、原理和适用场景，再查看答案。{% endif %}</p>
+            </div>
+            <div class="memory-answer" id="memoryAnswer" hidden>
+              <div class="answer-section"><strong>标准答案</strong><div>{{ cs.answer }}</div></div>
+              <div class="answer-section"><strong>详细解释</strong><div>{{ cs.explanation }}</div></div>
+            </div>
+          </div>
+          <div class="memory-actions">
+            <button type="button" class="btn btn-primary" id="revealAnswer">查看答案</button>
+            <div class="rating-grid" id="ratingGrid" hidden>
+              <button type="button" class="rating-btn" data-rating="again">忘记了<small>1 · 当天再次出现</small></button>
+              <button type="button" class="rating-btn" data-rating="hard">有点模糊<small>2 · 稍后再次巩固</small></button>
+              <button type="button" class="rating-btn" data-rating="good">基本掌握<small>3 · 正常间隔复习</small></button>
+              <button type="button" class="rating-btn" data-rating="easy">非常熟悉<small>4 · 延长复习间隔</small></button>
+            </div>
+            <p class="keyboard-hint">快捷键：空格查看答案 · 1 / 2 / 3 / 4 选择掌握情况</p>
+            <div class="review-status" id="reviewStatus" role="status"></div>
+          </div>
+        </article>
+        {% elif cs.is_complete %}
+        <div class="completion-panel">
+          <h2>今日基础学习已完成</h2>
+          <p class="text-muted">10 个不同知识点已经完成；当天重复出现只计入实际复习次数，不重复增加任务进度。</p>
+          <div class="completion-grid">
+            <div class="completion-metric"><span>完成知识点</span><strong>{{ cs.queue_summary.completed }}</strong></div>
+            <div class="completion-metric"><span>新学习</span><strong>{{ cs.result.new_completed }}</strong></div>
+            <div class="completion-metric"><span>旧知识复习</span><strong>{{ cs.result.old_completed }}</strong></div>
+            <div class="completion-metric"><span>薄弱知识巩固</span><strong>{{ cs.result.weak_completed }}</strong></div>
+            <div class="completion-metric"><span>实际复习次数</span><strong>{{ cs.result.actual_reviews }}</strong></div>
+            <div class="completion-metric"><span>今日掌握率</span><strong>{{ cs.result.mastery_rate }}%</strong></div>
+            <div class="completion-metric"><span>今日学习时长</span><strong data-study-timer>{{ cs.result.duration }}</strong></div>
+            <div class="completion-metric"><span>连续学习</span><strong>{{ streak }} 天</strong></div>
+          </div>
+          <div class="continue-panel">
+            <h3>继续学习</h3>
+            <p class="text-muted">额外学习不会取消今日完成状态，学习结果仍会更新掌握度和下次复习时间。</p>
+            <div class="continue-actions">
+              <button class="btn btn-primary btn-sm" type="button" data-continue-mode="mixed" data-continue-count="5">再学习 5 个</button>
+              <button class="btn btn-outline btn-sm" type="button" data-continue-mode="mixed" data-continue-count="10">再学习 10 个</button>
+              <button class="btn btn-outline btn-sm" type="button" data-continue-mode="review" data-continue-count="10">只复习旧知识</button>
+              <button class="btn btn-outline btn-sm" type="button" data-continue-mode="new" data-continue-count="10">只学习新知识</button>
+            </div>
+            <form class="continue-custom" id="customContinueForm">
+              <label>内容类型<select name="mode"><option value="mixed">新旧混合</option><option value="review">只复习旧知识</option><option value="new">只学习新知识</option></select></label>
+              <label>自定义数量<input name="count" type="number" min="1" max="50" value="5"></label>
+              <button class="btn btn-primary btn-sm">开始额外学习</button>
+            </form>
+            <div class="review-status" id="continueStatus" role="status"></div>
+          </div>
+        </div>
+        {% else %}
+        <div class="empty-study"><h2>当前没有待学习内容</h2><p>今日进度已经保存，请稍后返回。</p></div>
+        {% endif %}
+      </div>
+    </section>
+
+    <aside class="card">
+      <div class="card-header"><h2>我的知识库</h2></div>
+      <div class="card-body">
+        {% if cs.libraries %}
+        <div class="library-list">
+          {% for row in cs.libraries %}
+          {% set library = row.library %}
+          <div class="library-row {% if cs.active_library and library.id == cs.active_library.id %}is-active{% endif %}">
+            <div class="library-row-top"><strong>{{ library.name }}</strong>{% if library.is_active %}<span class="badge badge-success">学习中</span>{% endif %}</div>
+            <p>{{ row.item_count }} 条内容 · {{ row.mastered }} 条已掌握</p>
+            <div class="library-actions">
+              {% if not library.is_active %}<form method="post" action="{{ url_for('knowledge_study.activate_library', library_id=library.id) }}"><button class="btn btn-sm btn-outline">设为当前</button></form>{% endif %}
+              <a class="btn btn-sm btn-outline" href="{{ url_for('study', library=library.id) }}">查看</a>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">当前使用 {{ cs.course_name }} 课程知识库。你也可以上传自己的知识内容。</p>
+        {% endif %}
+
+        <details>
+          <summary>上传知识库</summary>
+          <form class="compact-form" method="post" enctype="multipart/form-data" action="{{ url_for('knowledge_study.upload_library') }}" data-upload-form>
+            <label>导入到<select name="library_id"><option value="">创建新知识库</option>{% for row in cs.libraries %}<option value="{{ row.library.id }}" {% if cs.active_library and row.library.id == cs.active_library.id %}selected{% endif %}>{{ row.library.name }}</option>{% endfor %}</select></label>
+            <label>文件<input type="file" name="knowledge_file" accept=".csv,.json,.txt,.md" required></label>
+            <p class="text-muted" style="font-size:.75rem;margin:0">支持 CSV、JSON、TXT、Markdown，最大 2 MB。今日任务生成后不会因上传而重置。</p>
+            <button class="btn btn-primary btn-sm">上传并导入</button>
+          </form>
+        </details>
+
+        <details>
+          <summary>新建空白知识库</summary>
+          <form class="compact-form" method="post" action="{{ url_for('knowledge_study.create_library') }}">
+            <label>名称<input name="name" maxlength="120" required placeholder="例如：细胞生物学核心概念"></label>
+            <label>说明<textarea name="description" rows="2" placeholder="这个知识库的学习目标"></textarea></label>
+            <button class="btn btn-primary btn-sm">创建知识库</button>
+          </form>
+        </details>
+
+        {% if cs.active_library %}
+        <details>
+          <summary>手动添加内容</summary>
+          <form class="compact-form" method="post" action="{{ url_for('knowledge_study.add_library_item', library_id=cs.active_library.id) }}">
+            <label>知识标题<input name="title" maxlength="240" required></label>
+            <label>知识内容<textarea name="content" rows="5" required></textarea></label>
+            <label>回忆提示<input name="hint" maxlength="500"></label>
+            <label>标签<input name="tags" maxlength="500" placeholder="概念, 方法"></label>
+            <label>难度<select name="difficulty"><option value="beginner">入门</option><option value="intermediate" selected>中级</option><option value="advanced">高级</option></select></label>
+            <button class="btn btn-primary btn-sm">加入知识库</button>
+          </form>
+        </details>
+        <details>
+          <summary>知识库设置</summary>
+          <form class="compact-form" method="post" action="{{ url_for('knowledge_study.update_library_settings', library_id=cs.active_library.id) }}">
+            <label>说明<textarea name="description" rows="2">{{ cs.active_library.description }}</textarea></label>
+            <button class="btn btn-primary btn-sm">保存说明</button>
+          </form>
+          <form method="post" action="{{ url_for('knowledge_study.archive_library', library_id=cs.active_library.id) }}" style="margin-top:10px" onsubmit="return confirm('归档后不会删除内容和学习记录，确定继续吗？')"><button class="btn btn-sm btn-outline">归档知识库</button></form>
+        </details>
+        {% endif %}
+      </div>
+    </aside>
+  </div>
+
+  <section class="card">
+    <div class="card-header"><h2>今日学习结果</h2></div>
+    <div class="card-body">
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
+        <div class="stat-card"><div class="stat-info"><span class="stat-value">{{ cs.queue_summary.completed }}</span><span class="stat-label">完成不同知识点</span></div></div>
+        <div class="stat-card"><div class="stat-info"><span class="stat-value">{{ cs.queue_summary.actual_reviews }}</span><span class="stat-label">实际复习次数</span></div></div>
+        <div class="stat-card"><div class="stat-info"><span class="stat-value">{{ cs.result.mastery_rate }}%</span><span class="stat-label">今日掌握率</span></div></div>
+        <div class="stat-card"><div class="stat-info"><span class="stat-value" data-study-timer>{{ cs.result.duration }}</span><span class="stat-label">今日学习时长</span></div></div>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var sessionId = {{ custom_study.session.id }};
+  var sessionActive = {{ 'true' if custom_study.is_learning else 'false' }};
+  var persistedSeconds = {{ custom_study.session.elapsed_seconds }};
+  var pageStartedAt = Date.now();
+  var lastSyncAt = Date.now();
+  var statusNode = document.getElementById('reviewStatus');
+
+  function postJson(url, payload) {
+    return fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
+      .then(function (response) { return response.json().then(function (data) { return {ok:response.ok,data:data}; }); })
+      .then(function (result) { if (!result.ok) throw new Error(result.data.message || '操作失败'); return result.data; });
+  }
+  function takeElapsed() {
+    var now = Date.now();
+    var seconds = Math.max(0, Math.floor((now - lastSyncAt) / 1000));
+    lastSyncAt = now;
+    persistedSeconds += seconds;
+    return seconds;
+  }
+  function formatDuration(total) {
+    total = Math.max(0, Math.floor(total));
+    var minutes = Math.floor(total / 60), seconds = total % 60;
+    if (minutes >= 60) return Math.floor(minutes / 60) + '小时' + (minutes % 60) + '分钟';
+    return minutes + '分' + String(seconds).padStart(2,'0') + '秒';
+  }
+  function updateTimer() {
+    var live = persistedSeconds + (sessionActive ? Math.floor((Date.now() - lastSyncAt) / 1000) : 0);
+    document.querySelectorAll('[data-study-timer]').forEach(function (node) { node.textContent = formatDuration(live); });
+  }
+  window.setInterval(updateTimer, 1000);
+  if (sessionActive) {
+    window.setInterval(function () {
+      var seconds = takeElapsed();
+      if (seconds) postJson('{{ url_for("knowledge_study.save_session_time") }}', {session_id:sessionId,seconds:seconds}).catch(function () {});
+    }, 30000);
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') {
+        var seconds = takeElapsed();
+        if (seconds && navigator.sendBeacon) navigator.sendBeacon('{{ url_for("knowledge_study.save_session_time") }}', new Blob([JSON.stringify({session_id:sessionId,seconds:seconds})], {type:'application/json'}));
+      }
+    });
+  }
+
+  document.querySelectorAll('[data-start-session]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      button.disabled = true;
+      postJson('{{ url_for("knowledge_study.start_session") }}', {session_id:sessionId})
+        .then(function () { window.location.reload(); })
+        .catch(function (error) { button.disabled = false; alert(error.message); });
+    });
+  });
+
+  var revealButton = document.getElementById('revealAnswer');
+  var answer = document.getElementById('memoryAnswer');
+  var ratingGrid = document.getElementById('ratingGrid');
+  if (revealButton) {
+    revealButton.addEventListener('click', function () {
+      answer.hidden = false;
+      ratingGrid.hidden = false;
+      revealButton.hidden = true;
+    });
+  }
+  document.querySelectorAll('.rating-btn').forEach(function (button) {
+    button.addEventListener('click', function () {
+      if (!ratingGrid || ratingGrid.hidden) return;
+      document.querySelectorAll('.rating-btn').forEach(function (item) { item.disabled = true; });
+      var card = document.querySelector('[data-memory-card]');
+      if (card) card.classList.add('is-updating');
+      if (statusNode) statusNode.textContent = '正在保存学习结果与下次复习时间…';
+      postJson('{{ url_for("knowledge_study.review_item") }}', {entry_id:{{ custom_study.current_entry.id if custom_study.current_entry else 'null' }},rating:button.dataset.rating,elapsed_seconds:takeElapsed()})
+        .then(function (data) {
+          if (statusNode) statusNode.textContent = data.session_status === 'completed' ? '今日基础任务已完成。' : '已保存，正在进入下一个知识点…';
+          window.setTimeout(function () { window.location.reload(); }, 300);
+        })
+        .catch(function (error) {
+          if (statusNode) statusNode.textContent = error.message;
+          document.querySelectorAll('.rating-btn').forEach(function (item) { item.disabled = false; });
+          if (card) card.classList.remove('is-updating');
+        });
+    });
+  });
+
+  function beginContinue(mode, count, button) {
+    var status = document.getElementById('continueStatus');
+    if (button) button.disabled = true;
+    if (status) status.textContent = '正在生成额外学习队列…';
+    postJson('{{ url_for("knowledge_study.continue_learning") }}', {session_id:sessionId,mode:mode,count:count})
+      .then(function () { window.location.reload(); })
+      .catch(function (error) { if (button) button.disabled = false; if (status) status.textContent = error.message; });
+  }
+  document.querySelectorAll('[data-continue-mode]').forEach(function (button) {
+    button.addEventListener('click', function () { beginContinue(button.dataset.continueMode, parseInt(button.dataset.continueCount,10), button); });
+  });
+  var customForm = document.getElementById('customContinueForm');
+  if (customForm) customForm.addEventListener('submit', function (event) {
+    event.preventDefault();
+    beginContinue(customForm.elements.mode.value, parseInt(customForm.elements.count.value,10), customForm.querySelector('button'));
+  });
+
+  document.addEventListener('keydown', function (event) {
+    var tag = (event.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+    if (event.code === 'Space' && revealButton && !revealButton.hidden) { event.preventDefault(); revealButton.click(); return; }
+    var ratingMap = {'1':'again','2':'hard','3':'good','4':'easy'};
+    if (ratingMap[event.key] && ratingGrid && !ratingGrid.hidden) {
+      var ratingButton = document.querySelector('.rating-btn[data-rating="' + ratingMap[event.key] + '"]');
+      if (ratingButton) ratingButton.click();
+    }
+  });
+
+  document.querySelectorAll('[data-upload-form]').forEach(function (form) {
+    form.addEventListener('submit', function (event) {
+      var input = form.querySelector('input[type="file"]');
+      if (input.files[0] && input.files[0].size > 2 * 1024 * 1024) { event.preventDefault(); alert('文件不能超过 2 MB'); }
+    });
+  });
+})();
+</script>
+{% endblock %}
