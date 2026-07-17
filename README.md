@@ -1,4 +1,4 @@
-﻿# EM Course Website
+# EM Course Website
 
 ## 本地运行
 

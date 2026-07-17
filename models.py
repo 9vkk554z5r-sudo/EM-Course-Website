@@ -14,6 +14,7 @@ class User(UserMixin, db.Model):
     student_id = db.Column(db.String(20), unique=True, nullable=False, index=True)
     name = db.Column(db.String(50), nullable=False)
     email = db.Column(db.String(120), nullable=False)
+    phone = db.Column(db.String(30), unique=True, nullable=True, index=True)
     password_hash = db.Column(db.String(256), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     registered_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -121,6 +122,8 @@ class KnowledgePoint(db.Model):
     category = db.Column(db.String(100), default="general")
     day_of_week = db.Column(db.Integer)
     source = db.Column(db.String(50), default="system")  # system or admin
+    correction_count = db.Column(db.Integer, default=0)
+    last_corrected_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
@@ -176,6 +179,8 @@ class ProtocolCollection(db.Model):
     methods_summary = db.Column(db.Text, default="")
     protocol_links = db.Column(db.Text, default="")  # JSON list
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    category = db.Column(db.String(100), default='general')
+    flowchart_steps = db.Column(db.Text, default='')  # JSON list
     user = db.relationship("User", backref="protocols")
 
 
@@ -315,3 +320,105 @@ class UserStudyPlan(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     user = db.relationship("User", backref="study_plans")
+
+
+class UserKnowledgeLibrary(db.Model):
+    __tablename__ = "user_knowledge_libraries"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    name = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.Text, default="")
+    source_filename = db.Column(db.String(255), default="")
+    daily_new_count = db.Column(db.Integer, default=5)
+    review_limit = db.Column(db.Integer, default=50)
+    is_active = db.Column(db.Boolean, default=False, nullable=False)
+    is_archived = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    user = db.relationship("User", backref="knowledge_libraries")
+    items = db.relationship("UserKnowledgeItem", backref="library", lazy="dynamic", cascade="all, delete-orphan")
+
+
+class UserKnowledgeItem(db.Model):
+    __tablename__ = "user_knowledge_items"
+
+    id = db.Column(db.Integer, primary_key=True)
+    library_id = db.Column(db.Integer, db.ForeignKey("user_knowledge_libraries.id"), nullable=False, index=True)
+    title = db.Column(db.String(240), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    hint = db.Column(db.Text, default="")
+    tags = db.Column(db.String(500), default="")
+    difficulty = db.Column(db.String(20), default="intermediate")
+    position = db.Column(db.Integer, default=0)
+    source_ref = db.Column(db.String(255), default="")
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class KnowledgeReviewProgress(db.Model):
+    __tablename__ = "knowledge_review_progress"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    item_id = db.Column(db.Integer, db.ForeignKey("user_knowledge_items.id"), nullable=False, index=True)
+    state = db.Column(db.String(20), default="new", nullable=False)
+    repetitions = db.Column(db.Integer, default=0)
+    interval_days = db.Column(db.Integer, default=0)
+    ease_factor = db.Column(db.Float, default=2.3)
+    next_review_date = db.Column(db.Date, default=date.today, nullable=False, index=True)
+    last_reviewed_at = db.Column(db.DateTime)
+    lapses = db.Column(db.Integer, default=0)
+    total_reviews = db.Column(db.Integer, default=0)
+    last_rating = db.Column(db.String(20), default="")
+
+    item = db.relationship("UserKnowledgeItem", backref="review_progress")
+    user = db.relationship("User", backref="knowledge_review_progress")
+
+    __table_args__ = (db.UniqueConstraint("user_id", "item_id", name="unique_user_knowledge_progress"),)
+
+
+class DailyKnowledgeTask(db.Model):
+    __tablename__ = "daily_knowledge_tasks"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    item_id = db.Column(db.Integer, db.ForeignKey("user_knowledge_items.id"), nullable=False, index=True)
+    study_date = db.Column(db.Date, nullable=False, index=True)
+    position = db.Column(db.Integer, default=0)
+    queue_type = db.Column(db.String(20), default="new")
+    state = db.Column(db.String(20), default="pending", nullable=False)
+    attempts = db.Column(db.Integer, default=0)
+    completed_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    item = db.relationship("UserKnowledgeItem", backref="daily_tasks")
+
+    __table_args__ = (db.UniqueConstraint("user_id", "item_id", "study_date", name="unique_daily_knowledge_task"),)
+
+
+class KnowledgeReviewLog(db.Model):
+    __tablename__ = "knowledge_review_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    item_id = db.Column(db.Integer, db.ForeignKey("user_knowledge_items.id"), nullable=False, index=True)
+    task_id = db.Column(db.Integer, db.ForeignKey("daily_knowledge_tasks.id"), nullable=True)
+    rating = db.Column(db.String(20), nullable=False)
+    previous_interval = db.Column(db.Integer, default=0)
+    next_interval = db.Column(db.Integer, default=0)
+    reviewed_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+
+    item = db.relationship("UserKnowledgeItem", backref="review_logs")
+    task = db.relationship("DailyKnowledgeTask", backref="review_logs")
+
+
+class KnowledgeFile(db.Model):
+    __tablename__ = "knowledge_files"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    filename = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    uploaded_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    user = db.relationship("User", backref="knowledge_files")

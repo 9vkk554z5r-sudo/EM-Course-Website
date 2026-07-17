@@ -1,4 +1,4 @@
-﻿import unittest
+import unittest
 
 from openalex_client import extract_work_info, works_to_citation_graph
 

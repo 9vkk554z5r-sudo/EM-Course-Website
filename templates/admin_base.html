@@ -1,18 +1,19 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
+{% block body_class %}life-product-theme admin-route{% endblock %}
 {% block scripts %}{% endblock %}
 {% block content %}
-<div class="admin-layout">
-    <aside class="admin-sidebar">
-        <h3>管理后台</h3>
-        <a href="{{ url_for('admin_dashboard') }}" class="admin-nav-link {% if request.endpoint == 'admin_dashboard' %}active{% endif %}">概览</a>
-        <a href="{{ url_for('admin_knowledge') }}" class="admin-nav-link {% if request.endpoint == 'admin_knowledge' %}active{% endif %}">知识库</a>
-        <a href="{{ url_for('admin_videos') }}" class="admin-nav-link {% if request.endpoint == 'admin_videos' %}active{% endif %}">实验视频</a>
-        <a href="{{ url_for('admin_users') }}" class="admin-nav-link {% if request.endpoint == 'admin_users' %}active{% endif %}">用户管理</a>
-       <a href="{{ url_for('admin_api_keys') }}" class="admin-nav-link {% if request.endpoint == 'admin_api_keys' %}active{% endif %}">API Keys</a>
-        <a href="{{ url_for('admin_presentation_templates') }}" class="admin-nav-link {% if request.endpoint == 'admin_presentation_templates' %}active{% endif %}">PPT模板</a>
-       <a href="{{ url_for('dashboard') }}" class="admin-nav-link">返回前台</a>
+<div class="admin-layout cosmic-admin-layout">
+    <aside class="admin-sidebar cosmic-admin-sidebar">
+        <h3>{{ _('管理后台', 'Admin Console') }}</h3>
+        <a href="{{ url_for('admin_dashboard') }}" class="admin-nav-link {% if request.endpoint == 'admin_dashboard' %}active{% endif %}">{{ _('概览', 'Overview') }}</a>
+        <a href="{{ url_for('admin_knowledge') }}" class="admin-nav-link {% if request.endpoint == 'admin_knowledge' %}active{% endif %}">{{ _('知识库', 'Knowledge Base') }}</a>
+        <a href="{{ url_for('admin_videos') }}" class="admin-nav-link {% if request.endpoint == 'admin_videos' %}active{% endif %}">{{ _('实验视频', 'Videos') }}</a>
+        <a href="{{ url_for('admin_users') }}" class="admin-nav-link {% if request.endpoint == 'admin_users' %}active{% endif %}">{{ _('用户管理', 'Users') }}</a>
+        <a href="{{ url_for('admin_api_keys') }}" class="admin-nav-link {% if request.endpoint == 'admin_api_keys' %}active{% endif %}">API Keys</a>
+        <a href="{{ url_for('admin_presentation_templates') }}" class="admin-nav-link {% if request.endpoint == 'admin_presentation_templates' %}active{% endif %}">{{ _('PPT模板', 'PPT Templates') }}</a>
+        <a href="{{ url_for('dashboard') }}" class="admin-nav-link">{{ _('返回前台', 'Back to Workspace') }}</a>
     </aside>
-    <main class="admin-main">
+    <main class="admin-main cosmic-admin-main">
         {% block admin_content %}{% endblock %}
     </main>
 </div>

@@ -1,12 +1,12 @@
-﻿{% extends "admin_base.html" %}
-{% block title %}管理后台 — 概览{% endblock %}
+{% extends "admin_base.html" %}
+{% block title %}{{ _('管理后台 - 概览', 'Admin Console - Overview') }}{% endblock %}
 {% block admin_content %}
-<div class="page-header"><h1>管理后台概览</h1></div>
-<div class="stats-grid">
-    <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-info"><span class="stat-value">{{ total_users }}</span><span class="stat-label">注册用户</span></div></div>
-    <div class="stat-card"><div class="stat-icon">📚</div><div class="stat-info"><span class="stat-value">{{ total_checkins }}</span><span class="stat-label">总打卡次数</span></div></div>
-    <div class="stat-card"><div class="stat-icon">📰</div><div class="stat-info"><span class="stat-value">{{ total_literature }}</span><span class="stat-label">文献总数</span></div></div>
-    <div class="stat-card"><div class="stat-icon">🎬</div><div class="stat-info"><span class="stat-value">{{ total_videos }}</span><span class="stat-label">实验视频</span></div></div>
-    <div class="stat-card"><div class="stat-icon">🧠</div><div class="stat-info"><span class="stat-value">{{ total_knowledge }}</span><span class="stat-label">知识点</span></div></div>
+<div class="page-header cosmic-section-head"><p class="section-kicker">{{ _('管理后台', 'Admin Console') }}</p><h1>{{ _('管理后台概览', 'Admin Overview') }}</h1></div>
+<div class="stats-grid cosmic-stats-grid">
+    <div class="stat-card cosmic-stat-card"><div class="stat-icon">&#128101;</div><div class="stat-info"><span class="stat-value">{{ total_users }}</span><span class="stat-label">{{ _('注册用户', 'Users') }}</span></div></div>
+    <div class="stat-card cosmic-stat-card"><div class="stat-icon">&#128202;</div><div class="stat-info"><span class="stat-value">{{ total_checkins }}</span><span class="stat-label">{{ _('总打卡次数', 'Check-ins') }}</span></div></div>
+    <div class="stat-card cosmic-stat-card"><div class="stat-icon">&#128196;</div><div class="stat-info"><span class="stat-value">{{ total_literature }}</span><span class="stat-label">{{ _('文献总数', 'Literature') }}</span></div></div>
+    <div class="stat-card cosmic-stat-card"><div class="stat-icon">&#127916;</div><div class="stat-info"><span class="stat-value">{{ total_videos }}</span><span class="stat-label">{{ _('实验视频', 'Videos') }}</span></div></div>
+    <div class="stat-card cosmic-stat-card"><div class="stat-icon">&#129504;</div><div class="stat-info"><span class="stat-value">{{ total_knowledge }}</span><span class="stat-label">{{ _('知识点', 'Knowledge Points') }}</span></div></div>
 </div>
 {% endblock %}

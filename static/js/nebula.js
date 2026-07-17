@@ -1,4 +1,4 @@
-﻿// OpenAlex citation network visualization.
+// OpenAlex citation network visualization.
 document.addEventListener('DOMContentLoaded', function () {
     var container = document.getElementById('nebula-container');
     var form = document.getElementById('nebula-search-form');

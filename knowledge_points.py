@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 Electron microscopy knowledge points organized by difficulty and category.
 Used for the daily check-in study feature.

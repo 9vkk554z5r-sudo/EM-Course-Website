@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """Literature retrieval and citation synchronization backed by OpenAlex."""
 from datetime import datetime, timezone
 

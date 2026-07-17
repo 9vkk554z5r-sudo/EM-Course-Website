@@ -35,6 +35,22 @@
 <button type="submit" class="btn btn-primary">📊 {{ _("分析我的PPT", "Analyze") }}</button>
 </form></div></div>
 
+<div class="card"><div class="card-header"><h2>{{ _("📁 我的评分模板", "📁 My Scoring Templates") }}</h2>
+<a href="#" onclick="var f=document.getElementById('templateForm');f.style.display=f.style.display=='none'?'block':'none';return false" class="btn btn-sm">{{ _("创建模板", "Create") }}</a></div>
+<div class="card-body">
+<div id="templateForm" style="display:none;margin-bottom:12px">
+<form method="POST" action="{{ url_for('user_upload_presentation_template') }}" class="form">
+<div class="form-group"><input type="text" name="title" placeholder="{{ _('模板名称', 'Template Name') }}" required style="width:100%"></div>
+<div class="form-group"><textarea name="description" rows="2" placeholder="{{ _('描述 (可选)', 'Description (optional)') }}" style="width:100%"></textarea></div>
+<div id="criteriaRows"><div class="form-row"><div class="form-group"><input type="text" name="dimension[]" placeholder="{{ _('评分维度', 'Dimension') }}" style="width:100%"></div>
+<div class="form-group" style="flex:0 0 80px"><input type="text" name="weight[]" placeholder="{{ _('权重', 'Weight') }}" style="width:100%"></div>
+<div class="form-group flex-grow"><input type="text" name="standard[]" placeholder="{{ _('评分标准', 'Standard') }}" style="width:100%"></div></div></div>
+<button type="button" class="btn btn-sm btn-outline" onclick="var r=document.getElementById('criteriaRows');var c=r.children[0].cloneNode(true);r.appendChild(c)">+ {{ _('添加维度', 'Add Dimension') }}</button>
+<button type="submit" class="btn btn-primary">{{ _('保存模板', 'Save Template') }}</button>
+</form></div>
+<div class="template-list">{% for t in templates %}<div class="paper-item"><span class="paper-title">📋 {{ t.title }}</span>
+<div class="paper-meta">{{ t.description or '' }} · {{ _('评分维度', 'Dimensions') }}: {{ t.criteria|length }}</div></div>{% else %}<p class="text-muted">{{ _('还没有模板，点击上方创建', 'No templates yet. Create one!') }}</p>{% endfor %}</div></div></div>
+
 {% if result %}{% if result.found %}
 <div class="card"><div class="card-header"><h2>{{ _("📄 文献信息", "📄 Paper Info") }}</h2></div><div class="card-body">
 <div class="knowledge-content">{{ result.info.title }}</div>

@@ -1,69 +1,202 @@
 ﻿{% extends "base.html" %}
-{% block title %}{{ _("实验方法总结", "Methods") }}{% endblock %}
+{% block title %}{{ _('实验方法收藏', 'Method Collections') }}{% endblock %}
+{% block body_class %}life-product-theme experiment-route method-page-route{% endblock %}
 {% block content %}
-<div class="page-header"><h1>🔬 {{ _("实验方法总结", "Experimental Methods") }}</h1><p class="text-muted">{{ _("提取文献实验方法，生成Protocol流程图", "Extract methods, generate protocol flowcharts") }}</p></div>
+<div class="page-header cosmic-section-head">
+    <p class="section-kicker">{{ _('实验方法', 'Methods') }}</p>
+    <h1>{{ _('实验方法收藏', 'Method Collections') }}</h1>
+    <p class="text-muted">{{ _('提取文献中的实验方法并整理为可复用流程', 'Extract experimental methods from papers and organize them into reusable workflows') }}</p>
+</div>
 
-<div class="card"><div class="card-header"><h2>{{ _("提取方法", "Extract Methods") }}</h2></div><div class="card-body">
-<form method="POST" class="form">
-<div class="form-row"><div class="form-group flex-grow"><input type="text" name="query" placeholder="DOI / 文献标题" value="{{ query }}" required></div>
-<div class="form-group"><select name="query_type"><option value="doi">DOI</option><option value="title">{{ _("标题", "Title") }}</option></select></div>
-<button type="submit" class="btn btn-primary">🔍 {{ _("提取", "Extract") }}</button></div>
-<div class="form-group"><input type="text" name="save_name" placeholder="{{ _("收藏名称 (可选)", "Save name (optional)") }}" style="width:100%"></div>
-</form></div></div>
+<div class="card cosmic-panel method-extract-panel">
+    <div class="card-header"><h2>{{ _('提取方法', 'Extract Methods') }}</h2></div>
+    <div class="card-body">
+        <form method="POST" class="form cosmic-form">
+            <div class="form-row">
+                <div class="form-group flex-grow"><input type="text" name="query" placeholder="DOI / {{ _('文献标题', 'Paper title') }}" value="{{ query }}" required></div>
+                <div class="form-group"><select name="query_type"><option value="doi">DOI</option><option value="title">{{ _('标题', 'Title') }}</option></select></div>
+                <button type="submit" class="btn btn-primary">{{ _('提取', 'Extract') }}</button>
+            </div>
+            <div class="form-group"><input type="text" name="save_name" placeholder="{{ _('收藏名称可选', 'Save name optional') }}" style="width:100%"></div>
+        </form>
+    </div>
+</div>
 
 {% if result %}
 {% if result.found %}
-<div class="card"><div class="card-header"><h2>{{ _("📄 方法结果", "📄 Methods") }}: {{ result.title[:60] }}</h2></div><div class="card-body">
-<h3>{{ _("实验方法", "Methods") }}:</h3>
-<ul>{% for m in result.methods %}<li>{{ m }}</li>{% endfor %}</ul>
-{% if result.protocol_links %}
-<div style="margin-top:12px"><strong>{{ _("Protocol链接:", "Protocol Links:") }}</strong>
-{% set links = result.protocol_links %}
-{% if links is string %}{% set links = links|fromjson %}{% endif %}
-<ul>{% for l in links %}<li><a href="{{ l }}" target="_blank">{{ l[:50] }}...</a></li>{% endfor %}</ul>
-</div>{% endif %}
-{% if result.saved %}<p class="text-muted">✅ {{ _("已保存到收藏夹", "Saved to collection") }}</p>{% endif %}
-
-<!-- Flowchart -->
-<div style="margin-top:16px;padding:16px;background:rgba(10,15,36,0.5);border-radius:8px">
-<h3>📊 {{ _("Protocol流程图", "Protocol Flowchart") }}</h3>
-<div id="flowchart" style="margin-top:12px;overflow-x:auto;min-height:100px;padding:20px"></div>
+<div class="card cosmic-panel">
+    <div class="card-header"><h2>{{ _('方法结果', 'Method Results') }}: {{ result.title[:60] }}</h2></div>
+    <div class="card-body">
+        <h3>{{ _('实验方法', 'Methods') }}</h3>
+        <ul class="method-list">{% for m in result.methods %}<li>{{ m }}</li>{% endfor %}</ul>
+        
+        {% if result.flowchart_steps %}
+        <div class="method-flow-panel">
+            <h3>{{ _('实验方法流程图', 'Method Flowchart') }}</h3>
+            <div id="flowchart" class="method-flowchart" data-steps='{{ result.flowchart_steps | tojson | safe }}'></div>
+        </div>
+        {% endif %}
+        
+        {% if result.protocol_links %}
+        <div class="method-links"><strong>{{ _('协议链接', 'Protocol Links') }}</strong>
+            {% set links = result.protocol_links %}
+            {% if links is string %}{% set links = links|fromjson %}{% endif %}
+            <ul class="protocol-link-list">{% for l in links %}<li><a href="{{ l.url }}" target="_blank" class="protocol-link">{{ l.label }}</a></li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+        
+        {% if result.saved %}<p class="text-muted">{{ _('已保存到收藏夹', 'Saved to collection') }}</p>{% endif %}
+    </div>
 </div>
-</div></div>
 {% else %}
-<div class="card"><div class="card-header"><h2>{{ _("提示", "Notice") }}</h2></div><div class="card-body"><p class="text-muted">{{ _("未找到文献", "Paper not found") }}</p></div></div>
+<div class="card cosmic-panel"><div class="card-header"><h2>{{ _('提示', 'Notice') }}</h2></div><div class="card-body"><p class="text-muted">{{ _('未找到文献', 'Paper not found') }}</p></div></div>
 {% endif %}
 {% endif %}
 
-<div class="card"><div class="card-header"><h2>{{ _("📚 我的Protocol收藏", "📚 My Protocol Collection") }}</h2></div><div class="card-body">
-{% if protocols %}
-<div class="paper-list">{% for p in protocols %}
-<div class="paper-item"><span class="paper-title">{{ p.name }}</span>
-<div class="paper-meta">{{ p.paper_title[:50] }} &middot; <a href="{{ url_for('agent_methods') }}?method_id={{ p.id }}">{{ _("查看", "View") }}</a></div></div>
-{% endfor %}</div>
-{% else %}<p class="text-muted">{{ _("还没有收藏", "No protocols yet") }}</p>{% endif %}
-</div></div>
+<div class="card cosmic-panel">
+    <div class="card-header">
+        <h2>{{ _('我的实验方法收藏', 'My Method Collection') }}</h2>
+        <div class="filter-tabs cosmic-filter-tabs" style="margin-top:8px">
+            <a href="{{ url_for('agent_methods') }}" class="filter-tab {% if not request.args.get('cat') %}active{% endif %}">{{ _('全部', 'All') }}</a>
+            {% for cat in categories %}
+            <a href="{{ url_for('agent_methods', cat=cat) }}" class="filter-tab {% if request.args.get('cat')==cat %}active{% endif %}">{{ cat }}</a>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="card-body">
+        {% if protocols %}
+        <div class="paper-list cosmic-paper-list">
+            {% for p in protocols %}
+            <div class="paper-item cosmic-paper-item">
+                <span class="paper-title">{{ p.name }}</span>
+                <div class="paper-meta">
+                    {{ p.paper_title[:50] }} &middot; 
+                    <span class="badge">{{ p.category or 'general' }}</span>
+                    <form method="POST" style="display:inline" class="inline-form">
+                        <input type="hidden" name="action" value="update_category">
+                        <input type="hidden" name="collection_id" value="{{ p.id }}">
+                        <select name="category" onchange="this.form.submit()">
+                            <option value="general" {% if p.category=='general' %}selected{% endif %}>General</option>
+                            <option value="样品制备" {% if p.category=='样品制备' %}selected{% endif %}>样品制备</option>
+                            <option value="数据采集" {% if p.category=='数据采集' %}selected{% endif %}>数据采集</option>
+                            <option value="图像处理" {% if p.category=='图像处理' %}selected{% endif %}>图像处理</option>
+                            <option value="分析重构" {% if p.category=='分析重构' %}selected{% endif %}>分析重构</option>
+                            <option value="其他" {% if p.category=='其他' %}selected{% endif %}>其他</option>
+                        </select>
+                    </form>
+                    <form method="POST" style="display:inline" onsubmit="return confirm('{{ _('确定删除？', 'Delete?') }}')">
+                        <input type="hidden" name="action" value="delete_collection">
+                        <input type="hidden" name="collection_id" value="{{ p.id }}">
+                        <button type="submit" class="btn-small btn-danger">{{ _('删除', 'Delete') }}</button>
+                    </form>
+                </div>
+                {% if p.flowchart_steps %}
+                <div class="saved-flowchart-wrapper">
+                    <button class="btn-small" onclick="toggleFlowchart('fc-{{ p.id }}')">{{ _('查看流程图', 'View Flowchart') }}</button>
+                    <div id="fc-{{ p.id }}" class="saved-flowchart" style="display:none"></div>
+                </div>
+                <script>document.addEventListener("DOMContentLoaded", function(){
+                    var steps = {{ p.flowchart_steps | safe }};
+                    if(steps && steps.length) renderFlowchart(steps, 'fc-{{ p.id }}');
+                });</script>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}<p class="text-muted">{{ _('还没有方法收藏', 'No methods yet') }}</p>{% endif %}
+    </div>
+</div>
+
+<div class="card cosmic-panel">
+    <div class="card-header"><h2>{{ _('添加协议视频链接', 'Add Protocol Video URL') }}</h2></div>
+    <div class="card-body">
+        <form method="POST" class="form cosmic-form">
+            <input type="hidden" name="action" value="add_video_url">
+            <div class="form-row">
+                <div class="form-group flex-grow"><input type="text" name="title" placeholder="{{ _('视频标题', 'Video title') }}" required></div>
+                <div class="form-group"><input type="url" name="video_url" placeholder="URL (YouTube / Bilibili / 协议链接)" required></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><input type="text" name="description" placeholder="{{ _('描述可选', 'Description optional') }}"></div>
+                <div class="form-group"><select name="category"><option value="general">General</option><option value="样品制备">样品制备</option><option value="数据采集">数据采集</option><option value="图像处理">图像处理</option><option value="分析重构">分析重构</option></select></div>
+                <button type="submit" class="btn btn-primary">{{ _('添加', 'Add') }}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if videos %}
+<div class="card cosmic-panel">
+    <div class="card-header"><h2>{{ _('协议视频', 'Protocol Videos') }}</h2></div>
+    <div class="card-body">
+        <div class="video-grid cosmic-video-grid">
+            {% for v in videos %}
+            <div class="video-card cosmic-video-card">
+                <div class="video-thumb cosmic-video-thumb">
+                    {% if v.video_url %}<a href="{{ v.video_url }}" target="_blank" class="video-link">
+                        <div class="video-placeholder" aria-hidden="true">&#127916; {{ v.title }}</div>
+                    </a>
+                    {% else %}<div class="video-placeholder" aria-hidden="true">&#127916;</div>{% endif %}
+                </div>
+                <div class="video-info">
+                    <h3>{{ v.title }}</h3>
+                    <p class="text-muted">{{ v.description[:80] }}</p>
+                    <div class="video-meta"><span class="badge">{{ v.category }}</span></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <script>
-function renderFlowchart(steps) {
-    var div = document.getElementById("flowchart");
-    if(!steps || steps.length === 0) { div.innerHTML = "<p class=\"text-muted\">{{ _("暂无流程步骤", "No steps") }}</p>"; return; }
-    var html = "<div style=\"display:flex;flex-direction:column;align-items:center;gap:6px\">";
+function renderFlowchart(steps, elementId) {
+    var div = document.getElementById(elementId || "flowchart");
+    if(!div) return;
+    if(!steps || steps.length === 0) { div.innerHTML = "<p>{{ _('暂无流程步骤', 'No steps') }}</p>"; return; }
+    var html = '<div class="method-flow-stack">';
     steps.forEach(function(s, i) {
-        html += "<div style=\"padding:10px 18px;background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(139,92,246,0.1));border:1px solid rgba(59,130,246,0.2);border-radius:8px;text-align:center;font-size:0.85rem;min-width:180px;max-width:400px\">"+s+"</div>";
-        if(i < steps.length - 1) {
-            html += "<div style=\"color:var(--accent-cyan);font-size:1rem\">&#8595;</div>";
-        }
+        html += '<div class="method-flow-step">' + s + '</div>';
+        if(i < steps.length - 1) html += '<div class="method-flow-arrow">&#8595;</div>';
     });
-    html += "</div>";
+    html += '</div>';
     div.innerHTML = html;
 }
 
+function toggleFlowchart(elementId) {
+    var el = document.getElementById(elementId);
+    if(el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
 document.addEventListener("DOMContentLoaded", function() {
-    var stepsDiv = document.getElementById("flowchart");
-    if(stepsDiv && !stepsDiv.innerHTML.trim()) {
-        renderFlowchart(["Sample Step 1", "Sample Step 2", "Sample Step 3"]);
+    // Render flowchart from result
+    var fc = document.getElementById("flowchart");
+    if(fc && fc.dataset.steps) {
+        try {
+            var steps = JSON.parse(fc.dataset.steps);
+            renderFlowchart(steps);
+        } catch(e) {}
     }
 });
 </script>
+<style>
+.method-flow-panel { margin: 16px 0; }
+.method-flowchart { margin: 12px 0; }
+.method-flow-stack { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.method-flow-step { background: var(--primary-light, #e8f0fe); border: 1px solid var(--primary, #3b82f6); border-radius: 6px; padding: 8px 16px; max-width: 500px; text-align: center; font-size: 14px; }
+.method-flow-arrow { font-size: 20px; color: var(--primary, #3b82f6); }
+.protocol-link-list { list-style: none; padding-left: 0; }
+.protocol-link-list li { margin: 6px 0; }
+.protocol-link { display: inline-block; padding: 4px 12px; background: #f0f4ff; border-radius: 4px; text-decoration: none; color: var(--primary, #3b82f6); }
+.protocol-link:hover { background: #dbe8ff; }
+.inline-form { display: inline; margin: 0 6px; }
+.inline-form select { padding: 2px 6px; font-size: 12px; border-radius: 4px; border: 1px solid #ccc; }
+.btn-small { padding: 2px 10px; font-size: 12px; border-radius: 4px; cursor: pointer; border: 1px solid #ccc; background: #f5f5f5; }
+.btn-danger { color: #d32f2f; border-color: #d32f2f; background: #fff; }
+.video-link { text-decoration: none; }
+.video-placeholder { padding: 20px; text-align: center; background: #f0f0f0; border-radius: 4px; cursor: pointer; }
+.saved-flowchart-wrapper { margin: 8px 0; }
+.saved-flowchart { margin: 8px 0; }
+</style>
 {% endblock %}

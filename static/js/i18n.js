@@ -1,2 +1,2 @@
-﻿// i18n client
+// i18n client
 console.log('i18n loaded');

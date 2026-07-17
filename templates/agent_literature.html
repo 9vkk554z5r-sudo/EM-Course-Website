@@ -16,14 +16,33 @@
 <p><strong>{{ _("通讯作者", "Corresponding") }}:</strong> {{ r.info.corresponding_author }}</p>
 <ul>{% for p in r.key_points %}<li>{{ p }}</li>{% endfor %}</ul>
 <div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap">
+<div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap">
 <select class="bm-cat" style="font-size:0.72rem;padding:3px 6px;border-radius:4px;background:rgba(10,15,36,0.6);color:var(--text-primary);border:1px solid rgba(59,130,246,0.2)">
 <option value="">{{ _("\u9009\u62e9\u5206\u7c7b", "Category") }}</option></select>
-<button class="btn btn-sm btn-primary" onclick='bookmarkPaper(this,"{{ r.info.title|e }}","{{ r.info.first_author|e }}","{{ r.info.journal|e }}",{{ r.info.publication_date[:4] if r.info.publication_date else "null" }},"{{ r.info.doi|e }}","","search")'>📌 {{ _("\u6536\u85cf", "Bookmark") }}</button></div>
+<button class="btn btn-sm btn-primary" onclick='bookmarkPaper(this,"{{ r.info.title|e }}","{{ r.info.first_author|e }}","{{ r.info.journal|e }}",{{ r.info.publication_date[:4] if r.info.publication_date else "null" }},"{{ r.info.doi|e }}","","search")'>📌 {{ _("\u6536\u85cf", "Bookmark") }}</button>
+<input type="text" class="bm-new-cat" placeholder="'新收藏夹'" style="width:90px;font-size:0.7rem;padding:3px 6px;border-radius:4px;background:rgba(10,15,36,0.6);color:var(--text-primary);border:1px solid rgba(59,130,246,0.2)">
+<button class="btn btn-sm btn-outline" onclick="createCategory(this)" style="font-size:0.7rem;cursor:pointer">+ 创建</button>
+<a href="/literature/collection" class="btn btn-sm btn-outline" style="font-size:0.7rem;text-decoration:none;cursor:pointer">查看收藏夹</a>
+</div>
 </div>{% endfor %}
-</div></div>{% else %}
 <div class="card"><div class="card-header"><h2>{{ _("提示", "Notice") }}</h2></div><div class="card-body"><p class="text-muted">{{ _("未找到相关文献", "No results found") }}</p></div></div>
 {% endif %}{% endif %}
 <script>
+function createCategory(btn) {
+    var input = btn.parentElement.querySelector('.bm-new-cat');
+    var name = input ? input.value.trim() : '';
+    if (!name) return alert('请输入收藏夹名称');
+    fetch('/api/literature/categories', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:name})})
+    .then(function(r){return r.json()}).then(function(d){
+        if(d.ok) {
+            input.value = '';
+            loadCatOptions(function(cats) {
+                var lastCat = cats[cats.length - 1];
+                if(lastCat) { document.querySelectorAll('.bm-cat').forEach(function(sel){ sel.value = lastCat.id; }); }
+            });
+        } else { alert('创建失败'); }
+    });
+}
 function bookmarkPaper(btn,title,authors,journal,year,doi,url,source) {
     var sel=btn.parentElement.querySelector(".bm-cat");
     var catId=sel?sel.value:"";
@@ -31,7 +50,7 @@ function bookmarkPaper(btn,title,authors,journal,year,doi,url,source) {
         body:JSON.stringify({title:title,authors:authors,journal:journal,year:year,doi:doi,url:url,source:source,category_id:catId||null})})
     .then(function(r){return r.json()}).then(function(d){if(d.ok)alert("{{ _("已收藏!", "Bookmarked!") }}");else alert(d.error);});
 }
-function loadCatOptions(){fetch("/api/literature/categories").then(function(r){return r.json()}).then(function(cats){document.querySelectorAll(".bm-cat").forEach(function(sel){cats.forEach(function(c){var opt=document.createElement("option");opt.value=c.id;opt.textContent=c.name;sel.appendChild(opt);});});});}
+function loadCatOptions(cb){fetch("/api/literature/categories").then(function(r){return r.json()}).then(function(cats){document.querySelectorAll(".bm-cat").forEach(function(sel){cats.forEach(function(c){var opt=document.createElement("option");opt.value=c.id;opt.textContent=c.name;sel.appendChild(opt);});});if(cb)cb(cats);});}
 document.addEventListener("DOMContentLoaded",loadCatOptions);
 </script>
 {% endblock %}

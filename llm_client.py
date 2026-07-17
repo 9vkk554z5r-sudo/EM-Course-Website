@@ -23,6 +23,17 @@ PROVIDER_DEFAULTS = {
 }
 
 
+
+
+def _resolve_endpoint(endpoint: str, provider: str) -> str:
+    """Return the default endpoint for *provider* when *endpoint* is empty."""
+    if endpoint:
+        return endpoint
+    defaults = PROVIDER_DEFAULTS.get(provider)
+    if defaults:
+        return defaults[0]
+    return ""
+
 def config_from_environment() -> Optional[LLMConfig]:
     """Load a standalone configuration without relying on Codex or the database."""
     api_key = os.environ.get("LLM_API_KEY", "").strip()
@@ -92,7 +103,7 @@ def _payload(config: LLMConfig, prompt: str, system: str, style: str) -> Dict[st
         }
     else:
         data = {"model": config.model, "messages": messages, "max_tokens": 1200}
-    if config.deployment:
+    if config.deployment and config.provider in ("azure", "custom"):
         data["deployment"] = config.deployment
         data["deployment_node"] = config.deployment
     return data

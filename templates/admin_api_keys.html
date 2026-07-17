@@ -82,6 +82,7 @@
                 <form method="POST" action="{{ url_for('admin_test_api_key', k_id=k.id) }}">
                     <button type="submit" class="btn btn-sm btn-outline">测试连接</button>
                 </form>
+                <a href="/admin/api-keys/set-active/{{ k.id }}" class="btn btn-sm btn-primary" style="margin-left:4px">使用此配置</a>
                 <a href="{{ url_for('admin_delete_api_key', k_id=k.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('确认删除该配置？')">删除</a>
             </div>
         </div>

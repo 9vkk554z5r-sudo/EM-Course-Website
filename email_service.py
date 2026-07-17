@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -70,7 +70,7 @@ def send_weekly_literature():
             <html><head><meta charset="utf-8"></head>
             <body style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
                 <div style="background:linear-gradient(135deg,#1e3a5f,#3b82f6);color:white;padding:30px 20px;border-radius:12px;text-align:center;">
-                    <h1 style="margin:0;font-size:24px;">电子显微学前沿文献周报</h1>
+                    <h1 style="margin:0;font-size:24px;">电子显微学文献周报</h1>
                     <p style="margin:8px 0 0;opacity:0.9;">{datetime.now().strftime('%Y年%m月%d日')}</p>
                 </div>
                 <div style="padding:20px 0;">
@@ -79,14 +79,14 @@ def send_weekly_literature():
                     {items_html}
                 </div>
                 <div style="border-top:1px solid #e5e7eb;padding:15px 0;color:#9ca3af;font-size:12px;text-align:center;">
-                    <p>本邮件由电子显微学前沿课程Agent自动生成 | 退订请登录网站设置</p>
+                    <p>本邮件由电子显微学课程 Agent自动生成 | 退订请登录网站设置</p>
                 </div>
             </body></html>
             """
 
             send_email(
                 to_addr=user.email,
-                subject=f"电子显微学前沿文献周报 — {datetime.now().strftime('%Y-%m-%d')}",
+                subject=f"电子显微学文献周报 — {datetime.now().strftime('%Y-%m-%d')}",
                 html_content=html,
             )
 

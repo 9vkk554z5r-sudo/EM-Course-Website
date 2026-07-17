@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """OpenAlex client and citation-graph builder.
 
 All graph edges come from OpenAlex ``referenced_works`` records. No topical or

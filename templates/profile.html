@@ -1,5 +1,5 @@
-﻿{% extends "base.html" %}
-{% block title %}个人中心 — 电子显微学前沿课程{% endblock %}
+{% extends "base.html" %}
+{% block title %}个人中心 — 电子显微学课程{% endblock %}
 {% block content %}
 <div class="profile-page">
     <div class="page-header">
@@ -19,6 +19,7 @@
                         <h3>{{ current_user.name }}</h3>
                         <p>学号: {{ current_user.student_id }}</p>
                         <p>邮箱: {{ current_user.email }}</p>
+                        <p>手机号: {{ current_user.phone or '未填写' }}</p>
                         <p>注册时间: {{ current_user.registered_at.strftime('%Y-%m-%d') }}</p>
                     </div>
                 </div>
