@@ -1,23 +1,40 @@
 ﻿{% extends "base.html" %}
-{% block title %}文献星云 - {{ platform_name }}{% endblock %}
-{% block body_class %}literature-workspace-route life-product-theme{% endblock %}
+{% block title %}NEPHELE｜文献星云 - {{ platform_name }}{% endblock %}
+{% block body_class %}literature-workspace-route life-product-theme literature-hub-route{% endblock %}
 {% block content %}
-<div class="literature-workspace graph-workbench" data-initial-view="overview">
-    <header class="literature-head">
-        <div>
-            <p class="section-kicker">文献智能分析</p>
-            <h1>文献星云</h1>
-            <p>导入真实文献后，系统会从论文、关键词、作者、方法和主题之间生成可解释的关系网络，并给出下一步阅读建议。</p>
+<div class="literature-workspace graph-workbench literature-hub-page" data-initial-view="overview">
+    <header class="literature-head literature-hub-hero">
+        <div class="literature-hero-copy">
+            <p class="section-kicker">NEPHELE · LITERATURE UNIVERSE</p>
+            <h1>NEPHELE｜文献星云</h1>
+            <p>让散落论文在同一片星云中形成轨道、星链与主题星座，并给出下一步阅读建议</p>
         </div>
         <form class="graph-seed-form" data-graph-search>
-            <input type="search" name="q" value="cryo-EM" placeholder="输入 DOI、标题或关键词">
-            <button type="submit" class="btn btn-primary" data-loading-text="生成中">生成星云</button>
+            <label for="literature-seed">研究主题</label>
+            <div><input id="literature-seed" type="search" name="q" value="cryo-EM" placeholder="输入 DOI、标题或关键词"><button type="submit" class="btn btn-primary" data-loading-text="生成中">点亮星云</button></div>
         </form>
+        <div class="unified-search-examples" style="margin-top:10px" aria-label="跨学科检索示例">
+            <span style="font-size:12px;color:#8899aa;margin-right:8px">跨学科示例</span>
+            <button type="button" class="btn btn-sm btn-outline" data-example-query="artificial intelligence" style="margin:2px">人工智能</button>
+            <button type="button" class="btn btn-sm btn-outline" data-example-query="quantum computing" style="margin:2px">量子计算</button>
+            <button type="button" class="btn btn-sm btn-outline" data-example-query="climate change economics" style="margin:2px">气候经济</button>
+            <button type="button" class="btn btn-sm btn-outline" data-example-query="perovskite solar cells" style="margin:2px">材料科学</button>
+            <button type="button" class="btn btn-sm btn-outline" data-example-query="exoplanet atmosphere" style="margin:2px">天体物理</button>
+        </div>
+        <nav class="literature-service-links" aria-label="文献服务">
+            <a href="{{ url_for('literature_weekly') }}"><span class="service-index">01</span><span><strong>PULSAR｜前沿脉冲</strong><small>围绕当前方向整理论文与阅读优先级</small></span><i>进入</i></a>
+            <a href="{{ url_for('agent_subscription') }}"><span class="service-index">02</span><span><strong>BEACON｜主题信标</strong><small>追踪研究主题并接收文献更新提醒</small></span><i>管理</i></a>
+            <a href="{{ url_for('nebula') }}"><span class="service-index">03</span><span><strong>NEXUS｜引用星链</strong><small>查看真实引用关系与论文连接</small></span><i>打开</i></a>
+        </nav>
     </header>
 
-    <div style="display:flex;gap:12px;flex-wrap:wrap;margin:12px 0">
-<section class="import-console" data-import-console>
-        <div class="import-tabs" role="tablist">
+    <section class="import-console literature-import-console" data-import-console>
+        <header class="literature-panel-heading">
+            <div><p class="section-kicker">ORBIT · IMPORT LIBRARY</p><h2>ORBIT｜文献入轨</h2><span>选择一种方式建立本地文献库</span></div>
+            <div class="import-status" data-import-status><strong>本地文献库</strong><span data-paper-count>0 篇文献</span><button type="button" class="btn btn-sm btn-outline" data-load-sample>载入示例数据</button><button type="button" class="btn btn-sm btn-outline" data-clear-library>清空本地导入</button></div>
+        </header>
+
+        <div class="import-tabs" role="tablist" aria-label="文献导入方式">
             <button type="button" class="active" data-import-tab="doi">DOI 批量</button>
             <button type="button" data-import-tab="bibtex">BibTeX</button>
             <button type="button" data-import-tab="ris">RIS</button>
@@ -31,54 +48,35 @@
                 <textarea name="doiText" rows="5" placeholder="10.1038/s41586-020-2008-3&#10;10.1126/science.abe6674"></textarea>
                 <button type="submit" class="btn btn-primary">导入 DOI</button>
             </form>
-
             <form class="import-panel" data-import-panel="bibtex">
                 <label>BibTeX 文件或文本</label>
                 <input type="file" name="bibFile" accept=".bib,.txt">
                 <textarea name="bibText" rows="5" placeholder="@article{key, title={...}, author={...}, year={2024}, doi={...}}"></textarea>
                 <button type="submit" class="btn btn-primary">解析 BibTeX</button>
             </form>
-
             <form class="import-panel" data-import-panel="ris">
                 <label>RIS 文件或文本</label>
                 <input type="file" name="risFile" accept=".ris,.txt">
                 <textarea name="risText" rows="5" placeholder="TY  - JOUR&#10;TI  - Paper title&#10;AU  - Author, A&#10;PY  - 2024&#10;ER  -"></textarea>
                 <button type="submit" class="btn btn-primary">解析 RIS</button>
             </form>
-
             <form class="import-panel" data-import-panel="csv">
                 <label>CSV 文件或文本，字段：title, authors, year, doi, journal, abstract, keywords</label>
                 <input type="file" name="csvFile" accept=".csv,.txt">
                 <textarea name="csvText" rows="5" placeholder="title,authors,year,doi,journal,abstract,keywords"></textarea>
                 <button type="submit" class="btn btn-primary">解析 CSV</button>
             </form>
-
             <form class="import-panel manual-form" data-import-panel="manual">
-                <div class="form-grid two">
-                    <div class="form-group"><label>标题</label><input name="title" required placeholder="论文标题"></div>
-                    <div class="form-group"><label>作者</label><input name="authors" placeholder="作者，用分号或逗号分隔"></div>
-                </div>
-                <div class="form-grid three">
-                    <div class="form-group"><label>年份</label><input name="year" type="number" min="1900" max="2100" placeholder="2024"></div>
-                    <div class="form-group"><label>DOI</label><input name="doi" placeholder="10.xxxx/..."></div>
-                    <div class="form-group"><label>期刊</label><input name="journal" placeholder="Nature Methods"></div>
-                </div>
+                <div class="form-grid two"><div class="form-group"><label>标题</label><input name="title" required placeholder="论文标题"></div><div class="form-group"><label>作者</label><input name="authors" placeholder="作者，用分号或逗号分隔"></div></div>
+                <div class="form-grid three"><div class="form-group"><label>年份</label><input name="year" type="number" min="1900" max="2100" placeholder="2024"></div><div class="form-group"><label>DOI</label><input name="doi" placeholder="10.xxxx/..."></div><div class="form-group"><label>期刊</label><input name="journal" placeholder="Nature Methods"></div></div>
                 <div class="form-group"><label>关键词</label><input name="keywords" placeholder="cryo-EM; single particle analysis; RELION"></div>
                 <div class="form-group"><label>摘要</label><textarea name="abstract" rows="4" placeholder="摘要或简述"></textarea></div>
                 <button type="submit" class="btn btn-primary">添加文献</button>
             </form>
         </div>
-
-        <div class="import-status" data-import-status>
-            <strong>本地文献库</strong>
-            <span data-paper-count>0 篇文献</span>
-            <button type="button" class="btn btn-sm btn-outline" data-load-sample>载入示例数据</button>
-            <button type="button" class="btn btn-sm btn-outline" data-clear-library>清空本地导入</button>
-            <a href="{{ url_for('nebula') }}" class="btn btn-sm btn-primary">进入动态星云 · 引用网络</a>
-        </div>
     </section>
 
-    <section class="graph-toolbar">
+    <section class="graph-toolbar literature-graph-toolbar">
         <div class="view-switch" data-graph-views>
             <button type="button" class="active" data-view="overview">总览</button>
             <button type="button" data-view="citation">引用网络</button>
@@ -88,72 +86,73 @@
         <div class="graph-status" data-graph-status>等待文献数据</div>
     </section>
 
-    <section class="graph-layout" style="display:flex;flex-direction:column;gap:12px">
-        <!-- Top: Compact filter bar -->
-        <div style="display:flex;gap:16px;flex-wrap:wrap;padding:10px 14px;background:rgba(10,15,36,0.6);border-radius:10px;border:1px solid rgba(59,130,246,0.12)">
-            <div><span style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:4px">年份</span>
-                <select data-filter-year style="font-size:0.8rem;padding:4px 8px;border-radius:6px">
-                    <option value="all">全部</option><option value="2020">2020+</option><option value="2015">2015+</option><option value="2010">2010+</option>
-                </select>
-            </div>
-            <div><span style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:4px">相关度</span>
-                <select data-filter-relevance style="font-size:0.8rem;padding:4px 8px;border-radius:6px">
-                    <option value="0">全部</option><option value="0.45">0.45+</option><option value="0.65">0.65+</option><option value="0.8">0.80+</option>
-                </select>
-            </div>
-            <div style="display:flex;align-items:flex-end">
-                <label class="check-row"><input type="checkbox" data-filter-bookmarked> 仅看收藏</label>
-            </div>
-            <div><span style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:4px">节点类型</span>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:0.8rem">
-                    <label><input type="checkbox" value="Paper" checked> 论文</label>
-                    <label><input type="checkbox" value="Keyword" checked> 关键词</label>
-                    <label><input type="checkbox" value="Author" checked> 作者</label>
-                    <label><input type="checkbox" value="Method" checked> 方法</label>
-                    <label><input type="checkbox" value="Topic" checked> 主题</label>
-                </div>
-            </div>
-            <div><span style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:4px">图例</span>
-                <div style="display:flex;gap:8px;font-size:0.75rem;flex-wrap:wrap">
-                    <span><i class="legend-dot paper"></i>论文</span>
-                    <span><i class="legend-dot keyword"></i>关键词</span>
-                    <span><i class="legend-dot author"></i>作者</span>
-                    <span><i class="legend-dot method"></i>方法</span>
-                    <span><i class="legend-line cites"></i>引用</span>
-                    <span><i class="legend-line similar"></i>相似</span>
-                </div>
-            </div>
-        </div>
+    <section class="graph-layout literature-graph-layout">
+        <aside class="graph-sidebar literature-filter-sidebar">
+            <section class="filter-block">
+                <p class="section-kicker">FILTERS</p>
+                <h2>ORBIT｜轨道筛选</h2>
+                <label for="filter-year">年份</label>
+                <select id="filter-year" data-filter-year><option value="all">全部年份</option><option value="2020">2020+</option><option value="2015">2015+</option><option value="2010">2010+</option></select>
+                <label for="filter-relevance">相关度</label>
+                <select id="filter-relevance" data-filter-relevance><option value="0">全部相关度</option><option value="0.45">0.45+</option><option value="0.65">0.65+</option><option value="0.8">0.80+</option></select>
+                <label class="check-row"><input type="checkbox" data-filter-bookmarked>仅看收藏</label>
+            </section>
+            <section class="filter-block type-filter" data-filter-types>
+                <h2>节点类型</h2>
+                <label><input type="checkbox" value="Paper" checked><span><i class="legend-dot paper"></i>论文</span></label>
+                <label><input type="checkbox" value="Keyword" checked><span><i class="legend-dot keyword"></i>关键词</span></label>
+                <label><input type="checkbox" value="Author" checked><span><i class="legend-dot author"></i>作者</span></label>
+                <label><input type="checkbox" value="Method" checked><span><i class="legend-dot method"></i>方法</span></label>
+                <label><input type="checkbox" value="Topic" checked><span><i class="legend-dot topic"></i>主题</span></label>
+            </section>
+            <section class="legend-block">
+                <h2>NEXUS｜星链图例</h2>
+                <div class="legend-grid"><span><i class="legend-line cites"></i>引用</span><span><i class="legend-line similar"></i>相似</span><span><i class="legend-line keyword-link"></i>共享关键词</span><span><i class="legend-line author-link"></i>同一作者</span></div>
+            </section>
+        </aside>
 
-        <!-- Center: Canvas (full width, taller) -->
-        <main style="width:100%;min-height:500px;border-radius:10px;overflow:hidden;background:rgba(10,15,36,0.4);border:1px solid rgba(59,130,246,0.12)">
-            <div class="graph-canvas" data-graph-canvas >
-                <div class="graph-empty"><strong>还没有导入文献</strong><span>请使用上方 DOI、BibTeX、RIS、CSV 或手动添加文献。也可以先载入示例数据体验星云。</span></div>
+        <main class="graph-stage literature-graph-stage">
+            <header class="graph-stage-heading"><div><p class="section-kicker">CONSTELLATION · KNOWLEDGE MAP</p><h2 data-graph-title>CONSTELLATION｜主题星座</h2></div><span data-graph-meta>0 nodes · 0 relations</span></header>
+        <div class="graph-metrics" style="display:flex;gap:16px;padding:8px 16px;font-size:13px;color:#8899aa">
+
+            <span><strong id="node-count" style="color:#e8eef2">-</strong> 文献</span>
+<span><strong id="edge-count" style="color:#e8eef2">-</strong> 真实引用关系</span>
+            <span><strong id="topic-count" style="color:#e8eef2">-</strong> 研究主题</span>
+<span><strong id="selected-citations" style="color:#2dd4bf">-</strong> 当前文献被引</span>
+        </div>
+            <div class="graph-canvas" data-graph-canvas>
+                <div class="graph-empty"><strong>还没有导入文献</strong><span>使用上方 DOI、BibTeX、RIS、CSV 或手动添加文献，也可以载入示例数据体验星云</span></div>
             </div>
         </main>
 
-        <!-- Bottom: Details + Analysis side by side (equal height) -->
-        <div style="display:flex;gap:16px;align-items:stretch;min-height:120px">
-            <div style="flex:1;padding:14px;background:rgba(10,15,36,0.4);border-radius:10px;border:1px solid rgba(59,130,246,0.08);display:flex;flex-direction:column;min-height:100px;justify-content:center" data-node-detail>
-                <p style="margin:0;font-size:0.7rem;color:var(--accent-cyan)">📌 选择节点</p>
-                <h3 style="margin:6px 0;font-size:1rem">选择一个节点</h3>
-                <p style="margin:4px 0;font-size:0.8rem;color:var(--text-muted);flex:1">点击论文、作者、关键词或方法节点，查看摘要、关系和下一步操作。</p>
-            </div>
-            <div style="flex:1;padding:14px;background:rgba(10,15,36,0.4);border-radius:10px;border:1px solid rgba(59,130,246,0.08);display:flex;flex-direction:column;min-height:100px;justify-content:center" data-analysis-panel>
-                <p style="margin:0;font-size:0.7rem;color:var(--accent-cyan)">📊 分析</p>
-                <h3 style="margin:6px 0;font-size:1rem">分析摘要</h3>
-                <p style="margin:4px 0;font-size:0.8rem;color:var(--text-muted);flex:1">导入文献后显示核心主题、关键论文、高频关键词、主要作者和数据质量提示。</p>
-            </div>
-        </div>
+        <aside class="graph-insight-column literature-insight-column">
+            <section class="node-detail" data-node-detail>
+                <p class="section-kicker">SELECTED NODE</p>
+                <h2>选择一个节点</h2>
+                <p>点击论文、作者、关键词或方法节点，查看摘要、关系和下一步操作</p>
+            </section>
+            <section class="hub-papers" data-hub-papers>
+                <p class="section-kicker">HUB PAPERS</p>
+                <h2>NEXUS｜枢纽论文 Top 5</h2>
+                <p>综合网络连接数与被引次数排序</p>
+
+                <ol class="hub-list" data-hub-list style="padding-left:20px;margin-top:8px">
+                    <li class="hub-placeholder" style="color:#8899aa;font-size:13px">图谱生成后显示关键文献</li>
+                </ol>
+            </section>
+            <section class="analysis-panel" data-analysis-panel>
+                <p class="section-kicker">ANALYSIS</p>
+                <h2>ATLAS｜图谱洞察</h2>
+                <p>导入文献后显示核心主题、关键论文、高频关键词、主要作者和数据质量提示</p>
+            </section>
+        </aside>
     </section>
 </div>
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/literature_store.js') }}?v=4"></script>
 <script src="{{ url_for('static', filename='js/literature_parsers.js') }}?v=4"></script>
-<script src="{{ url_for('static', filename='js/literature_graph_builder.js') }}?v=4"></script>
-<script src="{{ url_for('static', filename='js/literature_import.js') }}?v=5"></script>
-<script src="{{ url_for('static', filename='js/literature_graph.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/literature_graph_builder.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/literature_import.js') }}?v=6"></script>
+<script src="{{ url_for('static', filename='js/literature_graph.js') }}?v=7"></script>
 {% endblock %}
-
-

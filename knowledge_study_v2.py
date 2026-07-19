@@ -8,6 +8,7 @@ in the database so refreshes and new logins resume the exact same session.
 
 import csv
 import json
+import re
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -36,6 +37,9 @@ from spaced_repetition import VALID_RATINGS, schedule_review
 
 knowledge_study_bp = Blueprint("knowledge_study", __name__)
 BASE_DAILY_TARGET = 10
+MAX_DAILY_TARGET = 50
+VALID_STUDY_MODES = {"mixed", "new", "review", "advanced"}
+VALID_DIFFICULTIES = {"all", "beginner", "intermediate", "advanced"}
 COURSE_NAMES = {
     "electron-microscopy": "冷冻电子显微学",
     "structural-biology": "结构生物学",
@@ -80,31 +84,33 @@ def _is_course_library(library):
     return bool(library and (library.source_filename or "").startswith("__course__:"))
 
 
-def _private_libraries(user_id):
-    return (
-        UserKnowledgeLibrary.query.filter(
-            UserKnowledgeLibrary.user_id == user_id,
-            UserKnowledgeLibrary.is_archived.is_(False),
-            ~UserKnowledgeLibrary.source_filename.like("__course__:%"),
-        )
-        .order_by(UserKnowledgeLibrary.is_active.desc(), UserKnowledgeLibrary.updated_at.desc())
-        .all()
-    )
+def _available_libraries(user_id, course_slug, course_name):
+    course_library = _ensure_course_library(user_id, course_slug, course_name)
+    libraries = UserKnowledgeLibrary.query.filter_by(user_id=user_id, is_archived=False).all()
+    libraries.sort(key=lambda library: (
+        not library.is_active,
+        not _is_course_library(library),
+        -(library.updated_at.timestamp() if library.updated_at else 0),
+    ))
+    return libraries, course_library
 
 
-def _active_private_library(user_id, requested_id=None):
-    libraries = _private_libraries(user_id)
+def _active_library(user_id, course_slug, course_name, requested_id=None):
+    libraries, course_library = _available_libraries(user_id, course_slug, course_name)
     if requested_id:
         requested = next((library for library in libraries if library.id == requested_id), None)
         if requested:
             return requested
-    return next((library for library in libraries if library.is_active), libraries[0] if libraries else None)
+    return next((library for library in libraries if library.is_active), course_library)
 
 
 def _ensure_course_library(user_id, course_slug, course_name):
     marker = f"__course__:{course_slug}"
     library = UserKnowledgeLibrary.query.filter_by(user_id=user_id, source_filename=marker).first()
     if not library:
+        has_active = UserKnowledgeLibrary.query.filter_by(
+            user_id=user_id, is_archived=False, is_active=True
+        ).first()
         library = UserKnowledgeLibrary(
             user_id=user_id,
             name=f"{course_name}课程知识库",
@@ -112,7 +118,7 @@ def _ensure_course_library(user_id, course_slug, course_name):
             source_filename=marker,
             daily_new_count=BASE_DAILY_TARGET,
             review_limit=200,
-            is_active=False,
+            is_active=has_active is None,
         )
         db.session.add(library)
         db.session.flush()
@@ -141,23 +147,39 @@ def _ensure_course_library(user_id, course_slug, course_name):
             source_ref=source_ref,
         ))
     db.session.flush()
+    if not UserKnowledgeLibrary.query.filter_by(
+        user_id=user_id, is_archived=False, is_active=True
+    ).first():
+        library.is_active = True
+        db.session.flush()
     return library
 
 
-def _learning_pool(user_id, course_slug, course_name, requested_library_id=None):
-    course_library = _ensure_course_library(user_id, course_slug, course_name)
-    active_private = _active_private_library(user_id, requested_library_id)
-    ordered_library_ids = []
-    if active_private and active_private.items.filter_by(is_active=True).count():
-        ordered_library_ids.append(active_private.id)
-    ordered_library_ids.append(course_library.id)
-    priority = {library_id: index for index, library_id in enumerate(ordered_library_ids)}
-    items = UserKnowledgeItem.query.filter(
-        UserKnowledgeItem.library_id.in_(ordered_library_ids),
-        UserKnowledgeItem.is_active.is_(True),
-    ).all()
-    items.sort(key=lambda item: (priority.get(item.library_id, 99), item.position or 0, item.id))
-    return items, active_private
+def _learning_pool(
+    user_id,
+    course_slug,
+    course_name,
+    requested_library_id=None,
+    study_mode_override=None,
+    difficulty_override=None,
+):
+    active_library = _active_library(user_id, course_slug, course_name, requested_library_id)
+    query = UserKnowledgeItem.query.filter_by(library_id=active_library.id, is_active=True)
+    effective_mode = study_mode_override or active_library.study_mode or "mixed"
+    difficulty = difficulty_override or active_library.difficulty_filter or "all"
+    if effective_mode == "advanced":
+        difficulty = "advanced"
+    if difficulty in VALID_DIFFICULTIES - {"all"}:
+        query = query.filter_by(difficulty=difficulty)
+    items = query.order_by(UserKnowledgeItem.position.asc(), UserKnowledgeItem.id.asc()).all()
+    content_filter = (active_library.content_filter or "").strip().lower()
+    if content_filter:
+        keywords = [word for word in re.split(r"[\s,，;；]+", content_filter) if word]
+        items = [
+            item for item in items
+            if any(word in " ".join((item.title or "", item.content or "", item.tags or "")).lower() for word in keywords)
+        ]
+    return items, active_library
 
 
 def _get_or_create_memory(user_id, item_id, course_slug):
@@ -241,9 +263,14 @@ def _candidate_buckets(items, states):
     ]
 
 
-def _select_distinct_items(items, states, target):
+def _select_distinct_items(items, states, target, study_mode="mixed"):
     selected, selected_ids = [], set()
-    for source_type, bucket in _candidate_buckets(items, states):
+    buckets = _candidate_buckets(items, states)
+    if study_mode == "new":
+        buckets = [(source_type, bucket) for source_type, bucket in buckets if source_type == "new"]
+    elif study_mode == "review":
+        buckets = [(source_type, bucket) for source_type, bucket in buckets if source_type != "new"]
+    for source_type, bucket in buckets:
         for item in bucket:
             if item.id in selected_ids:
                 continue
@@ -255,15 +282,22 @@ def _select_distinct_items(items, states, target):
 
 
 def _create_daily_session(user_id, course_slug, course_name, requested_library_id=None):
-    items, _ = _learning_pool(user_id, course_slug, course_name, requested_library_id)
+    items, library = _learning_pool(user_id, course_slug, course_name, requested_library_id)
     states = _memory_map(user_id, items)
-    selected = _select_distinct_items(items, states, BASE_DAILY_TARGET)
+    requested_target = _clamp_int(library.daily_new_count, BASE_DAILY_TARGET, 1, MAX_DAILY_TARGET)
+    study_mode = library.study_mode if library.study_mode in VALID_STUDY_MODES else "mixed"
+    selected = _select_distinct_items(items, states, requested_target, study_mode)
     session = DailyLearningSession(
         user_id=user_id,
+        library_id=library.id,
         course_slug=course_slug,
         study_date=date.today(),
         status="not_started",
-        base_target=BASE_DAILY_TARGET,
+        base_target=len(selected),
+        requested_target=requested_target,
+        study_mode=study_mode,
+        difficulty_filter=library.difficulty_filter if library.difficulty_filter in VALID_DIFFICULTIES else "all",
+        content_filter=(library.content_filter or "")[:200],
     )
     db.session.add(session)
     db.session.flush()
@@ -286,6 +320,31 @@ def _create_daily_session(user_id, course_slug, course_name, requested_library_i
         ))
     db.session.commit()
     return session
+
+
+def _discard_unstarted_session(user_id, course_slug):
+    session = DailyLearningSession.query.filter_by(
+        user_id=user_id,
+        course_slug=course_slug,
+        study_date=date.today(),
+        status="not_started",
+    ).first()
+    if not session:
+        return False
+    LearningReviewEvent.query.filter_by(session_id=session.id).delete(synchronize_session=False)
+    DailyLearningQueueEntry.query.filter_by(session_id=session.id).delete(synchronize_session=False)
+    DailyLearningTask.query.filter_by(session_id=session.id).delete(synchronize_session=False)
+    db.session.delete(session)
+    db.session.flush()
+    return True
+
+
+def _rebuild_unstarted_session(requested_library_id=None):
+    course_slug, course_name = _current_course()
+    rebuilt = _discard_unstarted_session(current_user.id, course_slug)
+    if rebuilt:
+        _create_daily_session(current_user.id, course_slug, course_name, requested_library_id)
+    return rebuilt
 
 
 def _get_or_create_session(user_id, course_slug, course_name, requested_library_id=None):
@@ -334,6 +393,10 @@ def build_custom_study_context(course=None):
     is_learning = session.status == "in_progress" or (session.status == "completed" and session.continue_active)
     current_entry = pending[0] if is_learning and pending else None
     base_tasks = DailyLearningTask.query.filter_by(session_id=session.id, is_base=True).order_by(DailyLearningTask.assigned_order).all()
+    if not session.library_id and base_tasks:
+        session.library_id = base_tasks[0].item.library_id
+        session.requested_target = session.base_target
+        db.session.commit()
     completed_base = sum(task.first_completed_at is not None for task in base_tasks)
     source_counts = {
         "review": sum(task.source_type in {"due", "overdue", "risk"} for task in base_tasks),
@@ -346,26 +409,41 @@ def build_custom_study_context(course=None):
     new_completed = sum(task.first_completed_at is not None and task.source_type == "new" for task in base_tasks)
     old_completed = sum(task.first_completed_at is not None and task.source_type in {"due", "overdue", "risk"} for task in base_tasks)
     weak_completed = sum(task.first_completed_at is not None and task.source_type == "weak" for task in base_tasks)
-    private_libraries = _private_libraries(current_user.id)
-    active_private = _active_private_library(current_user.id, requested_library_id)
+    libraries, course_library = _available_libraries(current_user.id, course_slug, course_name)
+    active_library = _active_library(current_user.id, course_slug, course_name, requested_library_id)
+    session_library = db.session.get(UserKnowledgeLibrary, session.library_id) if session.library_id else course_library
     library_rows = []
-    for library in private_libraries:
+    for library in libraries:
         item_count = library.items.filter_by(is_active=True).count()
         mastered = KnowledgeMemoryState.query.join(UserKnowledgeItem).filter(
             KnowledgeMemoryState.user_id == current_user.id,
             KnowledgeMemoryState.state == "mastered",
             UserKnowledgeItem.library_id == library.id,
         ).count()
-        library_rows.append({"library": library, "item_count": item_count, "mastered": mastered})
+        library_rows.append({
+            "library": library,
+            "item_count": item_count,
+            "mastered": mastered,
+            "is_course": _is_course_library(library),
+        })
 
     answer, explanation = _answer_parts(current_entry.task.item) if current_entry else ("", "")
+    answered_entries = DailyLearningQueueEntry.query.join(DailyLearningTask).filter(
+        DailyLearningQueueEntry.session_id == session.id,
+        DailyLearningQueueEntry.answered_at.is_not(None),
+        DailyLearningTask.is_base.is_(True),
+        DailyLearningQueueEntry.reason == "base",
+    ).all()
+    average_answer_score = round(sum(entry.answer_score or 0 for entry in answered_entries) / len(answered_entries)) if answered_entries else 0
+    correct_answers = sum(bool(entry.answer_correct) for entry in answered_entries)
     progress_percent = round(completed_base * 100 / max(1, session.base_target))
     return {
         "session": session,
         "course_slug": course_slug,
         "course_name": course_name,
         "libraries": library_rows,
-        "active_library": active_private,
+        "active_library": active_library,
+        "session_library": session_library,
         "current_entry": current_entry,
         "current_task": current_entry.task if current_entry else None,
         "answer": answer,
@@ -373,6 +451,7 @@ def build_custom_study_context(course=None):
         "pending_count": len(pending),
         "queue_summary": {
             "total": session.base_target,
+            "requested": session.requested_target,
             "completed": completed_base,
             "percent": progress_percent,
             "review": source_counts["review"],
@@ -386,6 +465,9 @@ def build_custom_study_context(course=None):
             "weak_completed": weak_completed,
             "actual_reviews": session.actual_review_count,
             "mastery_rate": mastery_rate,
+            "answered": len(answered_entries),
+            "correct_answers": correct_answers,
+            "answer_score": average_answer_score,
             "duration": _format_duration(session.elapsed_seconds),
         },
         "is_learning": is_learning,
@@ -401,6 +483,8 @@ def start_session():
     session = DailyLearningSession.query.filter_by(id=data.get("session_id"), user_id=current_user.id).first()
     if not session:
         return jsonify({"ok": False, "message": "今日学习任务不存在"}), 404
+    if session.base_target <= 0:
+        return jsonify({"ok": False, "message": "当前筛选条件下没有可学习内容，请调整知识库设置"}), 409
     if session.status == "not_started":
         session.status = "in_progress"
         session.started_at = _utcnow()
@@ -452,17 +536,128 @@ def _insert_repeat_entry(session, task, current_entry, repeat_after, rating):
 def _sync_daily_checkin(session):
     if DailyCheckin.query.filter_by(user_id=session.user_id, date=session.study_date).first():
         return False
-    point = KnowledgePoint.query.order_by(KnowledgePoint.id.asc()).first()
+    base_tasks = DailyLearningTask.query.filter_by(session_id=session.id, is_base=True).order_by(
+        DailyLearningTask.assigned_order.asc()
+    ).all()
+    point = None
+    for task in base_tasks:
+        source_ref = task.item.source_ref or ""
+        if source_ref.startswith("system:"):
+            try:
+                point = db.session.get(KnowledgePoint, int(source_ref.split(":", 1)[1]))
+            except (TypeError, ValueError):
+                point = None
+        if point:
+            break
+    point = point or KnowledgePoint.query.order_by(KnowledgePoint.id.asc()).first()
     if not point:
         return False
+    answered_entries = DailyLearningQueueEntry.query.join(DailyLearningTask).filter(
+        DailyLearningQueueEntry.session_id == session.id,
+        DailyLearningTask.is_base.is_(True),
+        DailyLearningQueueEntry.reason == "base",
+        DailyLearningQueueEntry.answered_at.is_not(None),
+    ).all()
+    average_score = round(sum(entry.answer_score or 0 for entry in answered_entries) / max(1, len(answered_entries)))
+    checkin_score = max(10, min(30, round(10 + average_score * 0.2)))
+    difficulty = session.difficulty_filter if session.difficulty_filter in VALID_DIFFICULTIES - {"all"} else "intermediate"
     db.session.add(DailyCheckin(
         user_id=session.user_id,
         knowledge_point_id=point.id,
-        difficulty="intermediate",
-        score=30,
+        difficulty=difficulty,
+        score=checkin_score,
         date=session.study_date,
     ))
     return True
+
+
+def _answer_terms(text):
+    normalized = re.sub(r"\s+", " ", (text or "").strip().lower())
+    latin = set(re.findall(r"[a-z0-9][a-z0-9_-]+", normalized))
+    cjk_terms = set()
+    for segment in re.findall(r"[\u4e00-\u9fff]+", normalized):
+        if len(segment) == 1:
+            cjk_terms.add(segment)
+        else:
+            cjk_terms.update(segment[index:index + 2] for index in range(len(segment) - 1))
+    return latin | cjk_terms
+
+
+def _evaluate_answer(submitted, reference):
+    submitted_text = (submitted or "").strip()
+    reference_text = (reference or "").strip()
+    if not submitted_text:
+        return 0, False
+    submitted_terms = _answer_terms(submitted_text)
+    reference_terms = _answer_terms(reference_text)
+    if not submitted_terms or not reference_terms:
+        score = 100 if submitted_text.lower() == reference_text.lower() else 35
+        return score, score >= 55
+    overlap = len(submitted_terms & reference_terms)
+    precision = overlap / max(1, len(submitted_terms))
+    recall = overlap / max(1, len(reference_terms))
+    score = round(70 * precision + 30 * min(1, recall * 3))
+    compact_submitted = re.sub(r"\W+", "", submitted_text.lower())
+    compact_reference = re.sub(r"\W+", "", reference_text.lower())
+    if len(compact_submitted) >= 4 and compact_submitted in compact_reference:
+        score = max(score, 75)
+    score = max(0, min(100, score))
+    return score, score >= 55
+
+
+@knowledge_study_bp.route("/api/study/answer", methods=["POST"])
+@login_required
+def submit_answer():
+    data = request.get_json(silent=True) or {}
+    submitted = (data.get("answer") or "").strip()
+    if not submitted:
+        return jsonify({"ok": False, "message": "请先写下你的回答；不会时也可以填写“暂时不会”"}), 400
+    if len(submitted) > 4000:
+        return jsonify({"ok": False, "message": "回答不能超过 4000 个字符"}), 400
+    entry = DailyLearningQueueEntry.query.join(DailyLearningSession).filter(
+        DailyLearningQueueEntry.id == data.get("entry_id"),
+        DailyLearningQueueEntry.state == "pending",
+        DailyLearningSession.user_id == current_user.id,
+        DailyLearningSession.study_date == date.today(),
+    ).first()
+    if not entry:
+        return jsonify({"ok": False, "message": "当前学习卡片不存在或已完成"}), 404
+    session = entry.session
+    if not (session.status == "in_progress" or session.continue_active):
+        return jsonify({"ok": False, "message": "请先开始或继续今日学习"}), 409
+    pending = _pending_entries(session)
+    if not pending or pending[0].id != entry.id:
+        return jsonify({"ok": False, "message": "学习队列已更新，请刷新页面"}), 409
+    answer, explanation = _answer_parts(entry.task.item)
+    score, correct = _evaluate_answer(submitted, explanation or answer)
+    entry.submitted_answer = submitted
+    entry.answer_score = score
+    entry.answer_correct = correct
+    entry.answered_at = _utcnow()
+    entry.shown_at = entry.shown_at or _utcnow()
+    session.last_activity_at = _utcnow()
+    db.session.commit()
+    if score >= 80:
+        recommended_rating = "easy"
+        feedback = "回答与知识点高度匹配，可以尝试延长复习间隔。"
+    elif score >= 55:
+        recommended_rating = "good"
+        feedback = "已覆盖主要信息，请对照标准答案补充细节。"
+    elif score >= 25:
+        recommended_rating = "hard"
+        feedback = "回答涉及部分要点，建议标记为“有点模糊”。"
+    else:
+        recommended_rating = "again"
+        feedback = "与标准答案重合较少，建议稍后再次学习。"
+    return jsonify({
+        "ok": True,
+        "score": score,
+        "correct": correct,
+        "feedback": feedback,
+        "recommended_rating": recommended_rating,
+        "answer": answer,
+        "explanation": explanation,
+    })
 
 
 @knowledge_study_bp.route("/api/study/review", methods=["POST"])
@@ -486,6 +681,8 @@ def review_item():
     current = _pending_entries(session)
     if not current or current[0].id != entry.id:
         return jsonify({"ok": False, "message": "学习队列已更新，请刷新页面"}), 409
+    if not entry.answered_at:
+        return jsonify({"ok": False, "message": "请先提交回答并对照标准答案"}), 409
 
     state = _get_or_create_memory(current_user.id, entry.task.item_id, session.course_slug)
     previous_mastery = state.mastery_score
@@ -544,12 +741,13 @@ def review_item():
     ).count()
     session.base_completed_count = completed_base
     checked_in = False
-    if completed_base >= session.base_target and session.status != "completed":
+    pending_after_review = _pending_entries(session)
+    if completed_base >= session.base_target and session.status != "completed" and not pending_after_review:
         session.status = "completed"
         session.base_completed_at = _utcnow()
         session.continue_active = False
         checked_in = _sync_daily_checkin(session)
-    elif session.status == "completed" and session.continue_active and not _pending_entries(session):
+    elif session.status == "completed" and session.continue_active and not pending_after_review:
         session.continue_active = False
     db.session.commit()
     return jsonify({
@@ -578,7 +776,14 @@ def _append_queue_entry(session, task, reason):
 
 def _continue_candidates(session, mode):
     course_name = COURSE_NAMES.get(session.course_slug, session.course_slug)
-    items, _ = _learning_pool(current_user.id, session.course_slug, course_name)
+    items, _ = _learning_pool(
+        current_user.id,
+        session.course_slug,
+        course_name,
+        requested_library_id=session.library_id,
+        study_mode_override="mixed",
+        difficulty_override="advanced" if mode == "advanced" else session.difficulty_filter,
+    )
     states = _memory_map(current_user.id, items)
     pending_item_ids = {
         entry.task.item_id
@@ -600,6 +805,14 @@ def _continue_candidates(session, mode):
     new_items = [item for item in items if not states.get(item.id) or not states[item.id].total_reviews]
     weak_items = [item for item in old_items if states[item.id].is_weak]
 
+    if mode == "advanced":
+        for item in weak_items:
+            add(item)
+        for item in new_items:
+            add(item)
+        for item in old_items:
+            add(item)
+        return ordered, task_by_item
     if mode != "new":
         for item in old_items:
             if states[item.id].next_review_date <= date.today():
@@ -627,7 +840,7 @@ def continue_learning():
     if not session or session.status != "completed":
         return jsonify({"ok": False, "message": "请先完成今日基础任务"}), 409
     mode = data.get("mode", "mixed")
-    if mode not in {"mixed", "review", "new"}:
+    if mode not in {"mixed", "review", "new", "advanced"}:
         mode = "mixed"
     count = _clamp_int(data.get("count"), 5, 1, 50)
     pending = _pending_entries(session)
@@ -671,17 +884,21 @@ def create_library():
     if duplicate:
         flash("你已经有同名知识库", "info")
         return redirect(url_for("study", library=duplicate.id))
-    has_active = next((library for library in _private_libraries(current_user.id) if library.is_active), None)
+    for existing_library in UserKnowledgeLibrary.query.filter_by(user_id=current_user.id, is_archived=False).all():
+        existing_library.is_active = False
     library = UserKnowledgeLibrary(
         user_id=current_user.id,
         name=name[:120],
         description=(request.form.get("description") or "").strip(),
         daily_new_count=BASE_DAILY_TARGET,
-        is_active=has_active is None,
+        is_active=True,
     )
     db.session.add(library)
-    db.session.commit()
-    flash("知识库已创建；新内容会从明日固定任务开始参与排序", "success")
+    db.session.flush()
+    rebuilt = _rebuild_unstarted_session(library.id)
+    if not rebuilt:
+        db.session.commit()
+    flash("知识库已创建并设为当前；请添加或上传知识内容", "success")
     return redirect(url_for("study", library=library.id))
 
 
@@ -701,15 +918,17 @@ def upload_library():
     library = _owned_library(library_id) if library_id else None
     if library and _is_course_library(library):
         return jsonify({"ok": False, "message": "课程知识库不可直接修改"}), 403
-    if not library:
+    created_new = library is None
+    if created_new:
         proposed_name = (request.form.get("library_name") or Path(filename).stem or "我的知识库").strip()
-        has_active = next((row for row in _private_libraries(current_user.id) if row.is_active), None)
+        for existing_library in UserKnowledgeLibrary.query.filter_by(user_id=current_user.id, is_archived=False).all():
+            existing_library.is_active = False
         library = UserKnowledgeLibrary(
             user_id=current_user.id,
             name=proposed_name[:120],
             source_filename=filename,
             daily_new_count=BASE_DAILY_TARGET,
-            is_active=has_active is None,
+            is_active=True,
         )
         db.session.add(library)
         db.session.flush()
@@ -726,8 +945,11 @@ def upload_library():
             source_ref=f"{filename}:{offset}",
         ))
     library.source_filename = filename
-    db.session.commit()
-    flash(f"已导入 {len(items)} 条知识内容；今日任务保持不变", "success")
+    db.session.flush()
+    rebuilt = library.is_active and _rebuild_unstarted_session(library.id)
+    if not rebuilt:
+        db.session.commit()
+    flash(f"已导入 {len(items)} 条知识内容；{'今日未开始任务已更新' if rebuilt else '已开始的今日任务保持不变'}", "success")
     return redirect(url_for("study", library=library.id))
 
 
@@ -752,8 +974,11 @@ def add_library_item(library_id):
         difficulty=request.form.get("difficulty") if request.form.get("difficulty") in {"beginner", "intermediate", "advanced"} else "intermediate",
         position=position,
     ))
-    db.session.commit()
-    flash("知识条目已保存；今日固定任务不会被重置", "success")
+    db.session.flush()
+    rebuilt = library.is_active and _rebuild_unstarted_session(library.id)
+    if not rebuilt:
+        db.session.commit()
+    flash("知识条目已保存；" + ("今日未开始任务已更新" if rebuilt else "已开始的今日任务保持不变"), "success")
     return redirect(url_for("study", library=library.id))
 
 
@@ -761,12 +986,16 @@ def add_library_item(library_id):
 @login_required
 def activate_library(library_id):
     library = _owned_library(library_id)
-    if _is_course_library(library):
-        return jsonify({"ok": False}), 403
-    for row in _private_libraries(current_user.id):
+    for row in UserKnowledgeLibrary.query.filter_by(user_id=current_user.id, is_archived=False).all():
         row.is_active = row.id == library.id
-    db.session.commit()
-    flash(f"已切换到“{library.name}”；今天已生成的任务保持不变", "success")
+    db.session.flush()
+    rebuilt = _rebuild_unstarted_session(library.id)
+    if not rebuilt:
+        db.session.commit()
+    flash(
+        f"已切换到“{library.name}”；" + ("今日未开始任务已重新生成" if rebuilt else "已开始的今日任务保持不变，明日生效"),
+        "success",
+    )
     return redirect(url_for("study", library=library.id))
 
 
@@ -774,11 +1003,22 @@ def activate_library(library_id):
 @login_required
 def update_library_settings(library_id):
     library = _owned_library(library_id)
-    if _is_course_library(library):
-        return jsonify({"ok": False}), 403
-    library.description = (request.form.get("description") or library.description or "").strip()
-    db.session.commit()
-    flash("知识库说明已更新；每日基础任务固定为 10 个不同知识点", "success")
+    if not _is_course_library(library):
+        library.description = (request.form.get("description") or library.description or "").strip()
+    library.daily_new_count = _clamp_int(request.form.get("daily_count"), library.daily_new_count or BASE_DAILY_TARGET, 1, MAX_DAILY_TARGET)
+    study_mode = request.form.get("study_mode") or "mixed"
+    difficulty_filter = request.form.get("difficulty_filter") or "all"
+    library.study_mode = study_mode if study_mode in VALID_STUDY_MODES else "mixed"
+    library.difficulty_filter = difficulty_filter if difficulty_filter in VALID_DIFFICULTIES else "all"
+    library.content_filter = (request.form.get("content_filter") or "").strip()[:200]
+    db.session.flush()
+    rebuilt = library.is_active and _rebuild_unstarted_session(library.id)
+    if not rebuilt:
+        db.session.commit()
+    flash(
+        "学习计划已更新；" + ("今日尚未开始，任务已按新设置生成" if rebuilt else "当前任务已开始，设置将在明日生效"),
+        "success",
+    )
     return redirect(url_for("study", library=library.id))
 
 
@@ -790,9 +1030,14 @@ def archive_library(library_id):
         return jsonify({"ok": False}), 403
     library.is_archived = True
     library.is_active = False
-    replacement = next((row for row in _private_libraries(current_user.id) if row.id != library.id), None)
+    course_slug, course_name = _current_course()
+    libraries, course_library = _available_libraries(current_user.id, course_slug, course_name)
+    replacement = next((row for row in libraries if row.id != library.id), course_library)
     if replacement:
         replacement.is_active = True
-    db.session.commit()
+    db.session.flush()
+    rebuilt = _rebuild_unstarted_session(replacement.id if replacement else None)
+    if not rebuilt:
+        db.session.commit()
     flash("知识库已归档，历史学习记录仍然保留", "success")
     return redirect(url_for("study"))

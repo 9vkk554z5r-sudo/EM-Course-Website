@@ -1284,8 +1284,8 @@ def agent_presentation():
         paper_doi = request.form.get("paper_doi", "")
         template_id = request.form.get("template_id", "")
 
+        from agent_skills import skill_presentation_assist
         if action == "generate":
-            from agent_skills import skill_presentation_assist
             result, ok = skill_presentation_assist(db, current_user.id, paper_title, paper_doi, template_id)
         elif action == "analyze":
             student_paper_title = request.form.get("student_paper_title", "")
@@ -2064,8 +2064,18 @@ def literature_weekly():
         from openalex_client import recent_works_by_topic, extract_work_info
         works = recent_works_by_topic(keyword, days=days, per_page=15)
         results = []
+        from datetime import date
+        today_year = date.today().year
         for w in works:
-            results.append(extract_work_info(w))
+            info = extract_work_info(w)
+            pub_date = info.get("publication_date", "")
+            if pub_date and len(pub_date) >= 4:
+                try:
+                    if int(pub_date[:4]) > today_year:
+                        continue
+                except:
+                    pass
+            results.append(info)
         result = {"keyword": keyword, "days": days, "results": results}
     planets = LiteraturePlanet.query.filter_by(user_id=current_user.id).all()
     return render_template("literature_weekly.html", result=result, keyword=keyword, planets=planets)
@@ -2247,7 +2257,20 @@ def _ensure_schema_updates():
         },
         "protocol_collections": {
             "category": "VARCHAR(100) DEFAULT 'general'",
-            "flowchart_steps": "TEXT DEFAULT '""'",
+            "flowchart_steps": "TEXT DEFAULT ''",
+        },
+        "daily_learning_sessions": {
+            "requested_target": "INTEGER DEFAULT 0",
+            "study_mode": "VARCHAR(20) DEFAULT 'mixed'",
+            "difficulty_filter": "VARCHAR(20) DEFAULT 'all'",
+            "content_filter": "VARCHAR(200) DEFAULT ''",
+            "library_id": "INTEGER DEFAULT 0",
+        },
+        "daily_learning_queue_entries": {
+            "answered_at": "DATETIME",
+        },
+        "knowledge_memory_states": {
+            "answered_at": "DATETIME",
         },
     }
     with db.engine.begin() as connection:
@@ -2338,3 +2361,4 @@ if __name__ == "__main__":
     print("  http://127.0.0.1:5001")
     print("=" * 50)
     app.run(host="0.0.0.0", port=5001, debug=True)
+

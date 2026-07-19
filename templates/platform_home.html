@@ -1,6 +1,61 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}{{ platform_name }}{% endblock %}
+
+<style>
+.hero-shell { display: flex !important; flex-direction: column !important; align-items: center !important; text-align: center !important; max-width: 1200px; margin: 0 auto; padding: 0 16px; width: 100%; box-sizing: border-box; }
+.hero-content { flex: none !important; width: 100% !important; max-width: 800px !important; margin: 0 auto !important; padding-right: 0 !important; position: relative; z-index: 2; }
+.hero-content h1 { text-align: center !important; color: #fff !important; }
+.hero-content .section-kicker { text-align: center !important; }
+.hero-copy { text-align: center !important; max-width: 100% !important; }
+.hero-actions { justify-content: center !important; }
+.hero-galaxy-note { text-align: center !important; }
+.life-visual { position: absolute !important; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%; max-width: 700px; opacity: 0.15; z-index: 1; pointer-events: none; }
+.life-visual svg { width: 100%; height: auto; }
+.platform-hero.education-hero { display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; background: #080c1a !important; color: #fff !important; padding: 40px 20px 60px !important; min-height: 80vh !important; position: relative; overflow: hidden; }
+.platform-hero.education-hero .hero-content h1 { color: #fff !important; }
+.platform-hero.education-hero .hero-copy { color: #94a3b8 !important; }
+.home-science-bg { display: none !important; }
+.hero-instrument-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; max-width: 1200px; margin: 40px auto 0; padding: 0 16px; width: 100%; box-sizing: border-box; position: relative; z-index: 2; }
+.science-feature-card { background: linear-gradient(145deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); border: 1px solid rgba(100,220,255,0.15); border-radius: 14px; padding: 24px 20px; text-align: center; transition: all 0.3s ease; backdrop-filter: blur(12px); display: flex; flex-direction: column; align-items: center; position: relative; }
+.science-feature-card:hover { border-color: rgba(100,220,255,0.35); transform: translateY(-3px); }
+.science-feature-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, #00e5ff, transparent); opacity: 0.3; }
+.science-feature-card strong { font-size: 1.05rem; color: #fff; margin: 8px 0 6px; display: block; }
+.capability-workflow { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.workflow-step { background: linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.01)); border: 1px solid rgba(100,220,255,0.1); border-radius: 12px; padding: 20px 14px; text-align: center; transition: all 0.3s ease; }
+.workflow-step:hover { border-color: rgba(100,220,255,0.28); transform: translateY(-2px); }
+.platform-hero .hero-slogan { font-size: 1.6rem; font-weight: 700; color: #fff; }
+.platform-hero .hero-sub-slogan { font-size: 1.05rem; color: #93c5fd; font-style: italic; }
+.platform-capabilities { max-width: 1200px; margin: 60px auto 40px; padding: 0 16px; width: 100%; box-sizing: border-box; }
+.capability-copy { text-align: center; margin-bottom: 36px; }
+.capability-copy h2 { font-size: 1.6rem; color: #fff; }
+@media (max-width: 600px) { .hero-instrument-panel { grid-template-columns: 1fr; } .capability-workflow { grid-template-columns: 1fr; } }
+</style>
 {% block body_class %}public-platform life-product-theme{% endblock %}
+
+<style>
+.hero-instrument-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; max-width: 1200px; margin: 40px auto 0; padding: 0 16px; width: 100%; box-sizing: border-box; }
+.science-feature-card { background: linear-gradient(145deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); border: 1px solid rgba(100,220,255,0.15); border-radius: 14px; padding: 24px 20px; text-align: center; transition: all 0.3s ease; backdrop-filter: blur(12px); display: flex; flex-direction: column; align-items: center; }
+.science-feature-card:hover { border-color: rgba(100,220,255,0.35); transform: translateY(-3px); }
+.science-feature-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, #00e5ff, transparent); opacity: 0.3; }
+.science-feature-card strong { font-size: 1.05rem; color: #fff; margin: 8px 0 6px; display: block; }
+.capability-workflow { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.workflow-step { background: linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.01)); border: 1px solid rgba(100,220,255,0.1); border-radius: 12px; padding: 20px 14px; text-align: center; transition: all 0.3s ease; }
+.workflow-step:hover { border-color: rgba(100,220,255,0.28); transform: translateY(-2px); }
+.platform-hero .hero-slogan { font-size: 1.6rem; font-weight: 700; color: #fff; }
+.platform-hero .hero-sub-slogan { font-size: 1.05rem; color: #93c5fd; font-style: italic; }
+.hero-shell { display: flex; flex-direction: column; align-items: center; text-align: center; max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+.hero-content { flex: none; width: 100%; max-width: 800px; margin: 0 auto; }
+.life-visual { position: relative; width: 100%; max-width: 600px; margin: 20px auto 0; }
+.hero-content .section-kicker { text-align: center; }
+.hero-content h1 { text-align: center; }
+.hero-actions { justify-content: center; }
+.hero-galaxy-note { text-align: center; }
+@media (max-width: 600px) { .hero-shell { padding: 0 12px; } .life-visual { max-width: 100%; } }
+.platform-capabilities { max-width: 1200px; margin: 60px auto 40px; padding: 0 16px; width: 100%; box-sizing: border-box; }
+.capability-copy { text-align: center; margin-bottom: 36px; }
+.capability-copy h2 { font-size: 1.6rem; color: #fff; }
+@media (max-width: 600px) { .hero-instrument-panel { grid-template-columns: 1fr; } .capability-workflow { grid-template-columns: 1fr; } }
+</style>
 {% block content %}
 <section class="platform-hero education-hero">
     <div class="home-science-bg" aria-hidden="true">
@@ -10,9 +65,11 @@
 
     <div class="hero-shell">
         <div class="hero-content">
-            <p class="section-kicker">{{ _('生命科学学习平台', 'Life Science Learning Platform') }}</p>
-            <h1>{{ _('生命科学课程助手', 'Life Science Course Assistant') }}</h1>
-            <p class="hero-copy phrase-lines hero-slogan"><span>{{ _('面向生命科学学习与科研训练的智能课程工作台', 'Intelligent course workspace for life science learning and research training') }}</span><span>{{ _('整合课程学习、文献追踪、实验方法与科研知识图谱', 'Integrates courses, literature tracking, experimental methods and research knowledge graphs') }}</span></p>
+            <p class="section-kicker">{{ _('生命科学科研AI助手', 'Life Science AI Research Assistant') }}</p>
+            <h1>{{ _('Life Astra 生命星穹', 'Life Astra') }}</h1>
+            <p class="hero-slogan" style="font-size:1.5rem;font-weight:700;color:#fff;margin:0">'探生命之微，瞰星穹之广。'</p>
+            <p class="hero-sub-slogan" style="font-size:1rem;color:#93c5fd;font-style:italic;margin:6px 0 0">'Exploring the micro-life, envisioning the stellar vault.'</p>
+            <p class="hero-copy" style="margin-top:12px"><span>{{ _('整合课程学习、文献追踪、实验方法与科研知识图谱', 'Integrates courses, literature tracking, experimental methods and research knowledge graphs') }}</span></p>
             <div class="hero-actions">
                 <a href="{{ url_for('courses') }}" class="btn btn-primary btn-large">{{ _('选择学科星系', 'Choose Galaxy') }}</a>
                 <a href="{{ url_for('dashboard') if current_user.is_authenticated else url_for('courses') }}" class="btn btn-outline btn-large">{{ _('进入我的课程', 'Enter My Courses') }}</a>
@@ -68,7 +125,7 @@
                         <circle r="34"/><path d="M-16 -10h32a7 7 0 0 1 7 7v12a7 7 0 0 1-7 7h-11l-10 8v-8h-11a7 7 0 0 1-7-7v-12a7 7 0 0 1 7-7z"/><path d="M-9 3h7M5 3h8"/><text y="54" text-anchor="middle">{{ _('科研问答', 'Research Q&A') }}</text>
                     </g>
                 </svg>
-                <div class="system-center-label">{{ _('生命科学课程助手', 'Life Science Course Assistant') }}</div>
+                <div class="system-center-label">{{ _('Life Astra 生命星穹', 'Life Science Course Assistant') }}</div>
                 <div class="system-caption-row" aria-hidden="true"><span>{{ _('课程', 'Course') }}</span><i></i><span>{{ _('文献星云', 'Literature Nebula') }}</span><i></i><span>{{ _('实验方法', 'Methods') }}</span><i></i><span>{{ _('AI助手', 'AI Assistant') }}</span></div>
             </div>
         </div>
@@ -177,3 +234,29 @@
     </div>
 </section>
 {% endblock %}
+
+<style>
+.hero-instrument-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; max-width: 1200px; margin: 40px auto 0; padding: 0 16px; width: 100%; box-sizing: border-box; }
+.science-feature-card { background: linear-gradient(145deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); border: 1px solid rgba(100,220,255,0.15); border-radius: 14px; padding: 24px 20px; text-align: center; transition: all 0.3s ease; backdrop-filter: blur(12px); display: flex; flex-direction: column; align-items: center; }
+.science-feature-card:hover { border-color: rgba(100,220,255,0.35); transform: translateY(-3px); }
+.science-feature-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, #00e5ff, transparent); opacity: 0.3; }
+.science-feature-card strong { font-size: 1.05rem; color: #fff; margin: 8px 0 6px; display: block; }
+.capability-workflow { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.workflow-step { background: linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.01)); border: 1px solid rgba(100,220,255,0.1); border-radius: 12px; padding: 20px 14px; text-align: center; transition: all 0.3s ease; }
+.workflow-step:hover { border-color: rgba(100,220,255,0.28); transform: translateY(-2px); }
+.platform-hero .hero-slogan { font-size: 1.6rem; font-weight: 700; color: #fff; }
+.platform-hero .hero-sub-slogan { font-size: 1.05rem; color: #93c5fd; font-style: italic; }
+.hero-shell { display: flex; flex-direction: column; align-items: center; text-align: center; max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+.hero-content { flex: none; width: 100%; max-width: 800px; margin: 0 auto; }
+.life-visual { position: relative; width: 100%; max-width: 600px; margin: 20px auto 0; }
+.hero-content .section-kicker { text-align: center; }
+.hero-content h1 { text-align: center; }
+.hero-actions { justify-content: center; }
+.hero-galaxy-note { text-align: center; }
+@media (max-width: 600px) { .hero-shell { padding: 0 12px; } .life-visual { max-width: 100%; } }
+.platform-capabilities { max-width: 1200px; margin: 60px auto 40px; padding: 0 16px; width: 100%; box-sizing: border-box; }
+.capability-copy { text-align: center; margin-bottom: 36px; }
+.capability-copy h2 { font-size: 1.6rem; color: #fff; }
+@media (max-width: 600px) { .hero-instrument-panel { grid-template-columns: 1fr; } .capability-workflow { grid-template-columns: 1fr; } }
+</style>
+

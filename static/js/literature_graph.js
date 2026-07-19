@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     var root = document.querySelector('.graph-workbench');
     if (!root) return;
 
@@ -20,6 +20,16 @@
         view: root.getAttribute('data-initial-view') || 'overview',
         selected: null,
         readIds: JSON.parse(localStorage.getItem('lifeScience.graphReadIds.v1') || '[]'),
+        rotationX: -0.2,
+        rotationY: 0,
+        dragging: false,
+        dragDistance: 0,
+        pointerX: 0,
+        pointerY: 0,
+        animationFrame: null,
+        renderModel: null,
+        lastFrameTime: 0,
+        reduceMotion: window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     };
 
     var nodeStyles = {
@@ -62,8 +72,10 @@
 
     function rebuildGraph() {
         var papers = window.LiteratureStore ? LiteratureStore.getAll() : [];
-        if (!papers.length && window.LiteratureParsers && root.classList.contains('graph-workbench-compact')) {
+        var usingSample = false;
+        if (!papers.length && window.LiteratureParsers && window.LiteratureStore) {
             papers = LiteratureParsers.samplePapers().map(function (p) { return LiteratureStore.normalizePaper(p, 'sample'); });
+            usingSample = true;
         }
         if (!papers.length) {
             state.graph = { nodes: [], edges: [], analysis: null, meta: { source: 'empty', query: currentQuery(), paperCount: 0 } };
@@ -73,6 +85,7 @@
             return;
         }
         state.graph = LiteratureGraphBuilder.buildGraph(papers, currentQuery());
+        if (usingSample) state.graph.meta.source = '\u52a8\u6001\u793a\u4f8b\u661f\u7403';
         state.selected = state.graph.seed;
         render();
         renderDetail(state.selected);
@@ -90,7 +103,7 @@
             if (state.view === 'citation' && ['Topic', 'Paper', 'Author'].indexOf(node.type) === -1) return false;
             if (state.view === 'keywords' && ['Topic', 'Paper', 'Keyword', 'Method'].indexOf(node.type) === -1) return false;
             return true;
-        }).slice(0, state.view === 'overview' ? 60 : 46);
+        }).slice(0, state.view === 'overview' ? 44 : 38);
         var ids = {};
         nodes.forEach(function (node) { ids[node.id] = true; });
         var edges = graph.edges.filter(function (edge) {
@@ -105,34 +118,42 @@
     function render() {
         var graph = visibleGraph();
         if (!canvas) return;
+        if (state.animationFrame) cancelAnimationFrame(state.animationFrame);
+        state.animationFrame = null;
+        state.renderModel = null;
+
         if (!graph.nodes.length) {
-            canvas.innerHTML = '<div class="graph-empty"><strong>还没有可展示的图谱</strong><span>先导入文献，或点击“载入示例数据”。</span></div>';
+            canvas.innerHTML = '<div class="graph-empty"><strong>还没有可展示的图谱</strong><span>先导入文献，或点击“载入示例数据”</span></div>';
             if (metaEl) metaEl.textContent = '0 nodes · 0 relations';
             return;
         }
 
         var width = canvas.clientWidth || 760;
         var height = Math.max(canvas.clientHeight || 580, width < 760 ? 520 : 560);
+        var sphereMode = state.view !== 'timeline';
         var layout = layoutNodes(graph.nodes, width, height);
         var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
         svg.setAttribute('class', 'knowledge-svg');
+        svg.setAttribute('aria-label', sphereMode ? '可拖动并自动旋转的三维文献星球' : '文献时间线');
+
+        var edgeLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        var nodeLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        var edgeElements = [];
+        if (sphereMode) appendPlanetBackdrop(svg, width, height);
 
         graph.edges.forEach(function (edge) {
             var a = layout[edge.from], b = layout[edge.to];
             if (!a || !b) return;
             var style = edgeStyles[edge.relation] || edgeStyles.similar_work;
             var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.setAttribute('x1', a.x);
-            line.setAttribute('y1', a.y);
-            line.setAttribute('x2', b.x);
-            line.setAttribute('y2', b.y);
             line.setAttribute('stroke', style.color);
-            line.setAttribute('stroke-width', Math.max(1, (edge.weight || 0.3) * 3));
-            line.setAttribute('stroke-opacity', state.selected && (edge.from === state.selected.id || edge.to === state.selected.id) ? '0.85' : '0.28');
+            line.setAttribute('stroke-width', Math.max(1, (edge.weight || 0.3) * 2.6));
             if (style.dash) line.setAttribute('stroke-dasharray', style.dash);
             line.setAttribute('class', 'graph-edge');
-            svg.appendChild(line);
+            line._edgeData = edge;
+            edgeElements.push(line);
+            edgeLayer.appendChild(line);
         });
 
         graph.nodes.forEach(function (node) {
@@ -140,15 +161,23 @@
             if (!p) return;
             var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
             g.setAttribute('class', 'graph-node ' + node.type.toLowerCase() + (state.selected && state.selected.id === node.id ? ' selected' : ''));
-            g.setAttribute('transform', 'translate(' + p.x + ' ' + p.y + ')');
             g.setAttribute('tabindex', '0');
             g.setAttribute('role', 'button');
+            g.setAttribute('aria-label', node.title || node.label || node.type);
             g.addEventListener('click', function () {
+                if (state.dragDistance > 5) return;
                 state.selected = node;
                 render();
                 renderDetail(node);
             });
-            g.addEventListener('mouseenter', function () { showTooltip(node, p.x, p.y); });
+            g.addEventListener('keydown', function (event) {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                state.selected = node;
+                render();
+                renderDetail(node);
+            });
+            g.addEventListener('mouseenter', function () { showTooltip(node, p.screenX || p.x, p.screenY || p.y); });
             g.addEventListener('mouseleave', hideTooltip);
             appendNodeShape(g, node, p.r);
             var label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
@@ -158,42 +187,186 @@
             label.setAttribute('class', 'node-label');
             label.textContent = trimLabel(node.label || node.title, node.type === 'Paper' ? 22 : 18);
             g.appendChild(label);
-            svg.appendChild(g);
+            p.element = g;
+            p.labelElement = label;
+            nodeLayer.appendChild(g);
         });
 
+        svg.appendChild(edgeLayer);
+        svg.appendChild(nodeLayer);
         canvas.innerHTML = '';
         canvas.appendChild(svg);
+
+        if (sphereMode) {
+            var hint = document.createElement('div');
+            hint.className = 'graph-planet-hint';
+            hint.textContent = '自动旋转 · 按住拖动可查看星球背面';
+            canvas.appendChild(hint);
+            state.renderModel = {
+                graph: graph,
+                layout: layout,
+                edges: edgeElements,
+                width: width,
+                height: height,
+                radius: Math.min(width * 0.36, height * 0.39),
+            };
+            updateSphereProjection();
+            startSphereAnimation();
+        } else {
+            graph.nodes.forEach(function (node) {
+                var point = layout[node.id];
+                if (point && point.element) point.element.setAttribute('transform', 'translate(' + point.x + ' ' + point.y + ')');
+            });
+            edgeElements.forEach(function (line) {
+                var edge = line._edgeData;
+                var a = layout[edge.from], b = layout[edge.to];
+                line.setAttribute('x1', a.x);
+                line.setAttribute('y1', a.y);
+                line.setAttribute('x2', b.x);
+                line.setAttribute('y2', b.y);
+                line.setAttribute('stroke-opacity', state.selected && (edge.from === state.selected.id || edge.to === state.selected.id) ? '0.85' : '0.28');
+            });
+        }
+
         if (metaEl) metaEl.textContent = graph.nodes.length + ' nodes · ' + graph.edges.length + ' relations';
         if (titleEl) titleEl.textContent = viewTitle(state.view);
         setStatus((state.graph.meta.paperCount || 0) + ' 篇文献 · ' + state.graph.meta.source);
     }
 
+    function appendPlanetBackdrop(svg, width, height) {
+        var centerX = width * 0.5;
+        var centerY = height * 0.5;
+        var radius = Math.min(width * 0.36, height * 0.39);
+        var defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+        var gradient = document.createElementNS('http://www.w3.org/2000/svg', 'radialGradient');
+        gradient.setAttribute('id', 'literatureSphereFill');
+        gradient.setAttribute('cx', '34%');
+        gradient.setAttribute('cy', '28%');
+        [['0%', '#164e63', '.52'], ['52%', '#082f49', '.34'], ['100%', '#020914', '.78']].forEach(function (entry) {
+            var stop = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+            stop.setAttribute('offset', entry[0]);
+            stop.setAttribute('stop-color', entry[1]);
+            stop.setAttribute('stop-opacity', entry[2]);
+            gradient.appendChild(stop);
+        });
+        defs.appendChild(gradient);
+        svg.appendChild(defs);
+
+        var halo = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        halo.setAttribute('cx', centerX);
+        halo.setAttribute('cy', centerY);
+        halo.setAttribute('r', radius + 9);
+        halo.setAttribute('class', 'literature-sphere-halo');
+        svg.appendChild(halo);
+
+        var globe = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        globe.setAttribute('cx', centerX);
+        globe.setAttribute('cy', centerY);
+        globe.setAttribute('r', radius);
+        globe.setAttribute('class', 'literature-sphere-globe');
+        svg.appendChild(globe);
+
+        [-0.54, 0, 0.54].forEach(function (offset) {
+            var latitude = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+            latitude.setAttribute('cx', centerX);
+            latitude.setAttribute('cy', centerY + radius * offset);
+            latitude.setAttribute('rx', radius * Math.sqrt(1 - offset * offset));
+            latitude.setAttribute('ry', radius * 0.16);
+            latitude.setAttribute('class', 'literature-sphere-latitude');
+            svg.appendChild(latitude);
+        });
+        [-54, 0, 54].forEach(function (angle) {
+            var longitude = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+            longitude.setAttribute('cx', centerX);
+            longitude.setAttribute('cy', centerY);
+            longitude.setAttribute('rx', radius * 0.34);
+            longitude.setAttribute('ry', radius);
+            longitude.setAttribute('transform', 'rotate(' + angle + ' ' + centerX + ' ' + centerY + ')');
+            longitude.setAttribute('class', 'literature-sphere-longitude');
+            svg.appendChild(longitude);
+        });
+    }
+
     function layoutNodes(nodes, width, height) {
         if (state.view === 'timeline') return timelineLayout(nodes, width, height);
-        var center = { x: width * 0.48, y: height * 0.5 };
-        var groups = { Topic: [], Paper: [], Keyword: [], Author: [], Method: [] };
-        nodes.forEach(function (node) { (groups[node.type] || groups.Paper).push(node); });
         var positions = {};
-        var rings = [
-            { types: ['Topic'], radius: 0, start: 0, arc: Math.PI * 2 },
-            { types: ['Paper'], radius: Math.min(width, height) * 0.25, start: -Math.PI * 0.92, arc: Math.PI * 1.84 },
-            { types: ['Keyword', 'Method'], radius: Math.min(width, height) * 0.39, start: Math.PI * 0.05, arc: Math.PI * 1.38 },
-            { types: ['Author'], radius: Math.min(width, height) * 0.43, start: Math.PI * 1.05, arc: Math.PI * 0.84 },
-        ];
-        rings.forEach(function (ring) {
-            var ringNodes = [];
-            ring.types.forEach(function (type) { ringNodes = ringNodes.concat(groups[type] || []); });
-            ringNodes.forEach(function (node, i) {
-                var angle = ring.start + (ring.arc * (i + 0.5) / Math.max(1, ringNodes.length));
-                var jitter = ((i % 3) - 1) * 14;
-                positions[node.id] = {
-                    x: center.x + Math.cos(angle) * (ring.radius + jitter),
-                    y: center.y + Math.sin(angle) * (ring.radius + jitter * 0.4),
-                    r: nodeRadius(node),
-                };
-            });
+        var count = Math.max(1, nodes.length);
+        var goldenAngle = Math.PI * (3 - Math.sqrt(5));
+        nodes.forEach(function (node, index) {
+            var vertical = 1 - (2 * (index + 0.5) / count);
+            var ringRadius = Math.sqrt(Math.max(0, 1 - vertical * vertical));
+            var angle = index * goldenAngle + (node.type === 'Topic' ? 0.45 : 0);
+            positions[node.id] = {
+                x: Math.cos(angle) * ringRadius,
+                y: vertical,
+                z: Math.sin(angle) * ringRadius,
+                r: nodeRadius(node),
+            };
         });
         return positions;
+    }
+
+    function updateSphereProjection() {
+        var model = state.renderModel;
+        if (!model) return;
+        var sinY = Math.sin(state.rotationY);
+        var cosY = Math.cos(state.rotationY);
+        var sinX = Math.sin(state.rotationX);
+        var cosX = Math.cos(state.rotationX);
+        var centerX = model.width * 0.5;
+        var centerY = model.height * 0.5;
+        var nodeById = {};
+        model.graph.nodes.forEach(function (node) { nodeById[node.id] = node; });
+
+        Object.keys(model.layout).forEach(function (id) {
+            var point = model.layout[id];
+            var x1 = point.x * cosY + point.z * sinY;
+            var z1 = -point.x * sinY + point.z * cosY;
+            var y2 = point.y * cosX - z1 * sinX;
+            var z2 = point.y * sinX + z1 * cosX;
+            var perspective = 1 + z2 * 0.12;
+            var scale = 0.72 + (z2 + 1) * 0.18;
+            point.screenX = centerX + x1 * model.radius * perspective;
+            point.screenY = centerY + y2 * model.radius * perspective;
+            point.depth = z2;
+            if (!point.element) return;
+            point.element.setAttribute('transform', 'translate(' + point.screenX.toFixed(2) + ' ' + point.screenY.toFixed(2) + ') scale(' + scale.toFixed(3) + ')');
+            point.element.style.opacity = String(Math.max(.28, .58 + z2 * .4));
+            point.element.style.pointerEvents = z2 < -.58 ? 'none' : 'auto';
+            if (point.labelElement) {
+                var node = nodeById[id];
+                var keepLabel = node && (node.type === 'Topic' || (state.selected && state.selected.id === id));
+                point.labelElement.style.opacity = keepLabel || z2 > .16 ? '1' : '0';
+            }
+        });
+
+        model.edges.forEach(function (line) {
+            var edge = line._edgeData;
+            var a = model.layout[edge.from], b = model.layout[edge.to];
+            if (!a || !b) return;
+            line.setAttribute('x1', a.screenX.toFixed(2));
+            line.setAttribute('y1', a.screenY.toFixed(2));
+            line.setAttribute('x2', b.screenX.toFixed(2));
+            line.setAttribute('y2', b.screenY.toFixed(2));
+            var depth = (a.depth + b.depth) * .5;
+            var selectedEdge = state.selected && (edge.from === state.selected.id || edge.to === state.selected.id);
+            line.setAttribute('stroke-opacity', selectedEdge ? Math.max(.38, .78 + depth * .16) : Math.max(.05, .16 + depth * .13));
+        });
+    }
+
+    function startSphereAnimation() {
+        if (!state.renderModel) return;
+        state.lastFrameTime = performance.now();
+        if (state.reduceMotion) return;
+        function tick(timestamp) {
+            if (!state.renderModel) return;
+            var delta = Math.min(34, Math.max(0, timestamp - state.lastFrameTime));
+            state.lastFrameTime = timestamp;
+            if (!state.dragging) state.rotationY += delta * 0.00022;
+            updateSphereProjection();
+            state.animationFrame = requestAnimationFrame(tick);
+        }
+        state.animationFrame = requestAnimationFrame(tick);
     }
 
     function timelineLayout(nodes, width, height) {
@@ -271,14 +444,14 @@
             node.citation_count ? '<span>' + node.citation_count + ' citations</span>' : '',
             '</div>',
             '<div class="keyword-row">' + keywords + '</div>',
-            '<p>' + escapeHtml(node.abstract || '暂无摘要。') + '</p>',
+            '<p>' + escapeHtml(node.abstract || '暂无摘要') + '</p>',
             '<div class="score-row"><span>Relevance</span><strong>' + Math.round((node.relevance || 0) * 100) + '%</strong></div>',
             '<div class="detail-actions">',
             '<button class="btn btn-sm btn-outline" type="button" data-action="favorite">加入收藏</button>',
             '<button class="btn btn-sm btn-outline" type="button" data-action="read">标记已读</button>',
-            '<button class="btn btn-sm btn-outline" type="button" data-action="note">生成阅读笔记</button>',
-            '<button class="btn btn-sm btn-outline" type="button" data-action="trace">追踪相关文献</button>',
-            '<a class="btn btn-sm btn-primary" href="/dashboard">询问科研助手</a>',
+            '<button class="btn btn-sm btn-outline" type="button" data-action="note">OBSERVATORY｜生成笔记</button>',
+            '<button class="btn btn-sm btn-outline" type="button" data-action="trace">NEXUS｜追踪星链</button>',
+            '<a class="btn btn-sm btn-primary" href="/dashboard">询问 METIS</a>',
             '</div>',
         ].join('');
         var favorite = detail.querySelector('[data-action="favorite"]');
@@ -294,17 +467,17 @@
     function renderAnalysis(analysis) {
         if (!analysisPanel) return;
         if (!analysis) {
-            analysisPanel.innerHTML = '<p class="section-kicker">Analysis</p><h2>分析摘要</h2><p>导入文献后显示核心主题、关键论文、高频关键词、主要作者和数据质量提示。</p>';
+            analysisPanel.innerHTML = '<p class="section-kicker">ATLAS · ANALYSIS</p><h2>ATLAS｜图谱洞察</h2><p>导入文献后显示核心主题、关键论文、高频关键词、主要作者和数据质量提示</p>';
             return;
         }
         analysisPanel.innerHTML = [
             '<p class="section-kicker">Analysis</p>',
-            '<h2>分析摘要</h2>',
+            '<h2>ATLAS｜图谱洞察</h2>',
             listBlock('核心主题 Top 5', analysis.themes),
             listBlock('关键论文 Top 5', analysis.papers.map(function (p) { return p.title; })),
             listBlock('高频关键词 Top 10', analysis.keywords),
             listBlock('主要作者/团队', analysis.authors),
-            listBlock('推荐下一步阅读', analysis.recommended.map(function (p) { return p.title; })),
+            listBlock('PULSAR｜下一步阅读信号', analysis.recommended.map(function (p) { return p.title; })),
             listBlock('数据质量提示', analysis.quality),
         ].join('');
     }
@@ -342,9 +515,9 @@
 
     function viewTitle(view) {
         return {
-            overview: 'Overview · 主题总览',
-            citation: 'Citation · 引用网络',
-            keywords: 'Keywords · 关键词聚类',
+            overview: 'NEPHELE｜动态文献星球',
+            citation: 'Citation Planet · 引用星球',
+            keywords: 'Cluster Planet · 关键词星球',
             timeline: 'Timeline · 时间线',
         }[view] || '主题总览';
     }
@@ -384,8 +557,49 @@
     viewButtons.forEach(function (btn) { btn.addEventListener('click', function () { switchView(btn.getAttribute('data-view')); }); });
     [yearFilter, relevanceFilter, bookmarkedFilter].forEach(function (el) { if (el) el.addEventListener('change', render); });
     if (typeContainer) typeContainer.addEventListener('change', render);
+
+    if (canvas) {
+        canvas.addEventListener('pointerdown', function (event) {
+            if (!state.renderModel) return;
+            state.dragging = true;
+            state.dragDistance = 0;
+            state.pointerX = event.clientX;
+            state.pointerY = event.clientY;
+            canvas.classList.add('is-dragging');
+            if (canvas.setPointerCapture) canvas.setPointerCapture(event.pointerId);
+        });
+        canvas.addEventListener('pointermove', function (event) {
+            if (!state.dragging || !state.renderModel) return;
+            var dx = event.clientX - state.pointerX;
+            var dy = event.clientY - state.pointerY;
+            state.dragDistance += Math.abs(dx) + Math.abs(dy);
+            state.pointerX = event.clientX;
+            state.pointerY = event.clientY;
+            state.rotationY += dx * 0.008;
+            state.rotationX = Math.max(-1.05, Math.min(1.05, state.rotationX - dy * 0.006));
+            updateSphereProjection();
+        });
+        function endPlanetDrag(event) {
+            if (!state.dragging) return;
+            state.dragging = false;
+            canvas.classList.remove('is-dragging');
+            if (canvas.releasePointerCapture && canvas.hasPointerCapture && canvas.hasPointerCapture(event.pointerId)) {
+                canvas.releasePointerCapture(event.pointerId);
+            }
+            window.setTimeout(function () { state.dragDistance = 0; }, 0);
+        }
+        canvas.addEventListener('pointerup', endPlanetDrag);
+        canvas.addEventListener('pointercancel', endPlanetDrag);
+        canvas.addEventListener('pointerleave', function (event) {
+            if (state.dragging && event.buttons === 0) endPlanetDrag(event);
+        });
+    }
+
     window.addEventListener('resize', function () { render(); });
     window.addEventListener('literature-library-updated', rebuildGraph);
+    window.addEventListener('beforeunload', function () {
+        if (state.animationFrame) cancelAnimationFrame(state.animationFrame);
+    });
 
     rebuildGraph();
 })();

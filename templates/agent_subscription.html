@@ -1,16 +1,52 @@
-{% extends "base.html" %}
-{% block title %}{{ _('文献订阅', 'Subscribe') }}{% endblock %}
+﻿{% extends "base.html" %}
+{% block title %}{{ _("BEACON｜主题信标", "BEACON | Topic Alerts") }}{% endblock %}
 {% block body_class %}life-product-theme literature-subscribe-route cosmic-task-route{% endblock %}
 {% block content %}
-<div class="page-header"><h1>📬 {{ _('文献订阅', 'Literature Subscription') }}</h1></div>
-<div class="card"><div class="card-header"><h2>{{ _('搜索近一周文献', 'Search Recent Papers') }}</h2></div><div class="card-body">
+<div class="page-header"><h1>📬 {{ _("BEACON｜主题信标", "BEACON | Topic Alerts") }}</h1><p class="text-muted">{{ _("持续接收研究主题发出的新文献信号", "Keep receiving new-paper signals from your research topics") }}</p></div>
+<div class="card"><div class="card-header"><h2>{{ _("搜索文献", "Search Papers") }}</h2></div><div class="card-body">
 <form method="POST" class="form"><div class="form-row">
-<div class="form-group flex-grow"><input type="text" name="keyword" placeholder="{{ _('输入研究关键词', 'Enter keyword') }}" value="{{ keyword }}" required></div>
+<div class="form-group flex-grow"><input type="text" name="keyword" placeholder="{{ _("输入关键词", "Enter keyword") }}" value="{{ keyword }}" required></div>
 <div class="form-group"><input type="number" name="days" value="7" min="1" max="30"></div>
-<button type="submit" class="btn btn-primary">🔍 {{ _('搜索', 'Search') }}</button>
+<button type="submit" class="btn btn-primary">🔍 {{ _("搜索", "Search") }}</button>
 </div></form></div></div>
-{% if result %}<div class="card"><div class="card-header"><h2>{{ _('结果', 'Results') }} ({{ result.results|length }})</h2></div><div class="card-body">
-{% for r in result.results %}<div class="paper-item"><span class="paper-title">{{ r.title }}</span>
-<div class="paper-meta"><span>{{ r.authors }}</span>·<span>{{ r.journal }}</span>·<span>{{ r.date }}</span></div></div>
-{% else %}<p>{{ _('未找到', 'No results') }}</p>{% endfor %}</div></div>{% endif %}
+{% if result %}
+<div class="card"><div class="card-header"><h2>{{ _("结果", "Results") }} ({{ result.results|length }})</h2></div><div class="card-body" style="padding:4px 0">
+{% for r in result.results %}
+<div class="sub-paper-card" style="margin:8px 12px;padding:14px;border-radius:10px;background:linear-gradient(135deg,rgba(59,130,246,0.08),rgba(6,182,212,0.04));border:1px solid rgba(59,130,246,0.1)">
+<div class="paper-title" style="font-size:0.95rem;font-weight:500;line-height:1.4;margin-bottom:4px">{% if r.doi %}<a href="https://doi.org/{{ r.doi }}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">{{ r.title }} <small style="color:#3b82f6">↗</small></a>{% else %}{{ r.title }}{% endif %}</div>
+<div class="paper-meta" style="font-size:0.78rem;color:#94a3b8;display:flex;flex-wrap:wrap;gap:4px;margin-top:4px"><span>{{ r.authors }}</span><span>·</span><span>{{ r.journal }}</span><span>·</span><span>{{ r.date[:10] if r.date else "" }}{% if r.cited_by_count and r.cited_by_count > 0 %}</span><span>·</span><span style="color:#6ee7b7">📄 {{ r.cited_by_count }}</span>{% endif %}{% if r.topic %}<span>·</span><span style="color:#93c5fd">{{ r.topic[:30] }}</span>{% endif %}</div>
+{% if r.abstract %}<div style="font-size:0.82rem;color:#94a3b8;margin-top:8px;line-height:1.5;padding:8px 10px;background:rgba(10,15,36,0.3);border-radius:6px;border-left:2px solid rgba(59,130,246,0.15)">{{ r.abstract[:200] }}{% if r.abstract|length > 200 %}...{% endif %}</div>{% endif %}
+<div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+<a href="https://doi.org/{{ r.doi }}" target="_blank" style="font-size:0.75rem;color:#3b82f6;padding:3px 10px;background:rgba(59,130,246,0.08);border-radius:4px;text-decoration:none">🔗 DOI ↗</a>
+<select class="bm-cat" style="font-size:0.72rem;padding:3px 6px;border-radius:4px;background:rgba(10,15,36,0.6);color:var(--text-primary);border:1px solid rgba(59,130,246,0.2)"><option value="">分类</option></select>
+<button class="btn btn-sm btn-primary bookmark-btn" style="font-size:0.7rem;padding:3px 10px" data-title="{{ r.title|e }}" data-authors="{{ r.authors|e }}" data-journal="{{ r.journal|e }}" data-year="{{ r.date[:4] if r.date else '' }}" data-doi="{{ r.doi|e }}" data-url="{{ r.url|e if r.url else '' }}" data-source="subscription">📌 {{ _("收藏", "Bookmark") }}</button>
+</div></div>
+{% else %}
+<p style="text-align:center;padding:20px;color:var(--text-muted)">{{ _("未找到相关文献", "No results found") }}</p>
+{% endfor %}
+</div></div>
+{% endif %}
+<script>
+document.addEventListener("DOMContentLoaded",function(){
+  loadCatOptions();
+  document.querySelectorAll(".bookmark-btn").forEach(function(btn){
+    btn.addEventListener("click",function(){
+      var sel=this.parentElement.querySelector(".bm-cat");
+      var catId=sel?sel.value:"";
+      var title=this.getAttribute("data-title");
+      var authors=this.getAttribute("data-authors");
+      var journal=this.getAttribute("data-journal");
+      var year=this.getAttribute("data-year");
+      var doi=this.getAttribute("data-doi");
+      var url=this.getAttribute("data-url");
+      var source=this.getAttribute("data-source");
+      fetch("/api/literature/bookmark",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({title:title,authors:authors,journal:journal,year:year,doi:doi,url:url,source:source,category_id:catId||null})})
+      .then(function(r){return r.json()}).then(function(d){if(d.ok)alert("已收藏!");else alert(d.error);});
+    });
+  });
+});
+function loadCatOptions(){fetch("/api/literature/categories").then(function(r){return r.json()}).then(function(cats){document.querySelectorAll(".bm-cat").forEach(function(sel){cats.forEach(function(c){var opt=document.createElement("option");opt.value=c.id;opt.textContent=c.name;sel.appendChild(opt);});});});}
+</script>
 {% endblock %}
+

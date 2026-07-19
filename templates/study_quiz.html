@@ -1,2 +1,51 @@
-{% extends 'base.html' %}{% block title %}Quiz{% endblock %}{% block body_class %}life-product-theme study-route cosmic-task-route{% endblock %}
-{% block content %}<h1>Quiz</h1>{% endblock %}
+{% extends 'base.html' %}
+{% block title %}知识点测验{% endblock %}
+{% block body_class %}life-product-theme study-route cosmic-task-route{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <p class="section-kicker">知识森林 · 答题测验</p>
+        <h1>{{ kp.title if kp else '知识点测验' }}</h1>
+        <p class="text-muted">回答正确后会记录今天的学习打卡。</p>
+    </div>
+    <a href="{{ url_for('study') }}" class="btn btn-outline">返回今日学习</a>
+</div>
+
+{% if kp %}
+<section class="card">
+    <div class="card-header"><h2>知识点内容</h2></div>
+    <div class="card-body"><p style="white-space:pre-wrap;line-height:1.8">{{ kp.content }}</p></div>
+</section>
+
+{% if existing %}
+<div class="flash-message flash-success"><span>今天已经完成打卡，可以继续答题巩固。</span></div>
+{% endif %}
+
+{% for quiz in quizzes %}
+{% set options = json.loads(quiz.options or '[]') %}
+<section class="card">
+    <div class="card-header"><h2>问题 {{ loop.index }}</h2></div>
+    <div class="card-body">
+        <p style="font-size:1.05rem;font-weight:650">{{ quiz.question }}</p>
+        <form method="post" action="{{ url_for('study_quiz_answer') }}" class="form">
+            <input type="hidden" name="quiz_id" value="{{ quiz.id }}">
+            <input type="hidden" name="difficulty" value="{{ kp.difficulty }}">
+            <div class="quiz-options">
+                {% for option in options %}
+                <label style="display:block;margin:8px 0;padding:10px;border:1px solid rgba(148,163,184,.18);border-radius:8px;cursor:pointer">
+                    <input type="radio" name="answer" value="{{ option.label }}" required>
+                    <strong>{{ option.label }}.</strong> {{ option.text }}
+                </label>
+                {% endfor %}
+            </div>
+            <button type="submit" class="btn btn-primary">提交答案</button>
+        </form>
+    </div>
+</section>
+{% else %}
+<section class="card"><div class="card-body empty-state"><p>这个知识点暂时没有单独测验，请返回“今日学习”完成回答任务。</p></div></section>
+{% endfor %}
+{% else %}
+<section class="card"><div class="card-body empty-state"><p>没有找到对应的知识点。</p></div></section>
+{% endif %}
+{% endblock %}

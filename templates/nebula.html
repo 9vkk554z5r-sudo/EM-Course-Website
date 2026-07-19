@@ -1,60 +1,84 @@
-{% extends "base.html" %}
-{% block title %}文献引用星云 · 电子显微学前沿课程{% endblock %}
+﻿{% extends "base.html" %}
+{% block title %}NEXUS｜引用星链 · {{ platform_name }}{% endblock %}
+{% block body_class %}life-product-theme nebula-route literature-workspace-route{% endblock %}
 {% block content %}
 <div class="nebula-page">
-    <div class="page-header">
+    <section class="nebula-hero" aria-labelledby="nebula-title">
         <div>
-            <h1>🌌 文献引用关系星云图</h1>
-            <p class="text-muted">从 OpenAlex 检索真实文献，并按论文明确列出的参考文献生成有向引用关系。</p>
+            <span class="section-kicker">NEXUS · LITERATURE CITATION MAP</span>
+            <h1 id="nebula-title">NEXUS｜引用星链</h1>
+            <p>从 OpenAlex 检索真实文献，让论文之间的引用引力形成可探索的动态星链</p>
         </div>
-    </div>
-
-    <div class="card nebula-search-card">
-        <div class="card-body">
-            <form id="nebula-search-form" class="form">
-                <div class="form-row">
-                    <div class="form-group flex-grow">
-                        <input id="nebula-query" type="text" placeholder="输入关键词，例如：cryo electron microscopy；或输入 DOI" required>
-                    </div>
-                    <div class="form-group">
-                        <select id="nebula-query-type">
-                            <option value="keyword">关键词</option>
-                            <option value="doi">DOI</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="btn btn-primary">检索并生成图谱</button>
-                </div>
-            </form>
-            <p id="nebula-status" class="text-muted">未输入查询时展示已同步到本地数据库的图谱。</p>
+        <div class="nebula-hero-guide" aria-label="图谱使用说明">
+            <span><strong>01</strong>检索文献</span>
+            <span><strong>02</strong>探索关系</span>
+            <span><strong>03</strong>双击原文</span>
         </div>
-    </div>
+    </section>
 
-    <div class="card">
-        <div class="card-body">
-            <div id="nebula-container">
+    <section class="nebula-search-panel" aria-label="文献检索">
+        <form id="nebula-search-form" class="nebula-search-form">
+            <div class="form-group nebula-query-field">
+                <label for="nebula-query">关键词或 DOI</label>
+                <input id="nebula-query" type="text" placeholder="例如：cryo electron microscopy；或输入完整 DOI" required>
+            </div>
+            <div class="form-group nebula-type-field">
+                <label for="nebula-query-type">检索方式</label>
+                <select id="nebula-query-type">
+                    <option value="keyword">关键词</option>
+                    <option value="doi">DOI</option>
+                </select>
+            </div>
+            <button id="nebula-submit" type="submit" class="btn btn-primary" data-loading-text="正在生成">检索并生成图谱</button>
+        </form>
+        <p id="nebula-status" class="nebula-status" role="status">未输入查询时展示已同步到本地数据库的图谱</p>
+    </section>
+
+    <div class="nebula-workspace">
+        <section class="nebula-graph-card" aria-label="动态引用图谱">
+            <header class="nebula-panel-head">
+                <div><span class="section-kicker">DYNAMIC NEXUS</span><h2>NEXUS｜动态星链</h2><p>拖动画布探索关系，滚轮缩放，双击节点打开论文原文</p></div>
+                <button id="nebula-fit" type="button" class="btn btn-sm btn-outline">适配画布</button>
+            </header>
+            <div id="nebula-container" class="literature-nebula-canvas">
                 <div class="nebula-loading"><div class="spinner"></div><p>加载文献数据...</p></div>
             </div>
-            <div class="nebula-legend">
-                <div class="legend-item"><span class="legend-dot" style="background:#3b82f6;"></span><span>节点大小表示被引次数</span></div>
-                <div class="legend-item"><span class="legend-line"></span><span>箭头从引用论文指向被引用论文</span></div>
-                <div class="legend-item"><span>数据来源：<strong id="nebula-source">OpenAlex</strong></span></div>
+            <div class="nebula-graph-footer">
+                <span><i class="legend-dot legend-dot-citation"></i>节点大小代表被引次数</span>
+                <span><i class="legend-line"></i>箭头指向被引用论文</span>
+                <span>数据来源：<strong id="nebula-source">OpenAlex</strong></span>
             </div>
-        </div>
-    </div>
+        </section>
 
-    <div class="card">
-        <div class="card-header"><h2>数据统计</h2></div>
-        <div class="card-body">
-            <div class="nebula-stats" id="nebula-stats">
-                <div class="stat-mini"><span class="stat-value" id="node-count">-</span><span class="stat-label">文献总数</span></div>
-                <div class="stat-mini"><span class="stat-value" id="edge-count">-</span><span class="stat-label">真实引用关系</span></div>
-                <div class="stat-mini"><span class="stat-value" id="topic-count">-</span><span class="stat-label">研究主题</span></div>
-            </div>
-        </div>
+        <aside class="nebula-side-panel" aria-label="图谱信息">
+            <section class="nebula-side-card">
+                <header><span class="section-kicker">OVERVIEW</span><h2>ATLAS｜图谱概览</h2></header>
+                <div class="nebula-metrics" id="nebula-stats">
+                    <div><span class="stat-value" id="node-count">—</span><span class="stat-label">文献总数</span></div>
+                    <div><span class="stat-value" id="edge-count">—</span><span class="stat-label">真实引用关系</span></div>
+                    <div><span class="stat-value" id="topic-count">—</span><span class="stat-label">研究主题</span></div>
+                </div>
+            </section>
+
+            <section class="nebula-side-card nebula-reading-guide">
+                <header><span class="section-kicker">HOW TO READ</span><h2>阅读图谱</h2></header>
+                <ol>
+                    <li><span>01</span><div><strong>识别核心文献</strong><p>尺寸更大的节点通常具有更高被引次数</p></div></li>
+                    <li><span>02</span><div><strong>追踪引用方向</strong><p>箭头从引用论文指向被引用论文</p></div></li>
+                    <li><span>03</span><div><strong>查看完整信息</strong><p>悬停查看详情，双击节点打开论文页面</p></div></li>
+                </ol>
+            </section>
+
+            <section class="nebula-side-card nebula-topic-guide">
+                <header><span class="section-kicker">TOPIC COLORS</span><h2>主题色标</h2></header>
+                <p>不同颜色用于区分研究主题；相同颜色的节点更可能属于同一主题分组</p>
+                <div class="nebula-color-row" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            </section>
+        </aside>
     </div>
 </div>
 {% endblock %}
 {% block scripts %}
 <script src="https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js"></script>
-<script src="{{ url_for('static', filename='js/nebula.js') }}"></script>
+<script src="{{ url_for('static', filename='js/nebula.js') }}?v=nebula-architecture-2"></script>
 {% endblock %}

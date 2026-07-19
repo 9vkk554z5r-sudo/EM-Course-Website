@@ -405,7 +405,7 @@ function loadChatHistory() {
         var area = document.getElementById('chatArea');
         if (!area) return;
         messages.forEach(function (message) {
-            area.innerHTML += '<div class="chat-msg ' + (message.role === 'user' ? 'user' : 'bot') + '">' + escapeChatText(message.message) + '</div>';
+            area.innerHTML += '<div class="chat-msg ' + (message.role === 'user' ? 'user' : 'bot') + '">' + (message.role === 'user' ? escapeChatText(message.message) : markdownToHtml(message.message)) + '</div>';
         });
         area.scrollTop = area.scrollHeight;
     });

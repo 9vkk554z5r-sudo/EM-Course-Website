@@ -1,13 +1,23 @@
 ﻿{% extends "base.html" %}
-{% block title %}{{ selected_course.name }}工作台 - {{ platform_name }}{% endblock %}
+{% block title %}OBSERVATORY｜{{ selected_course.name }}科研台 - {{ platform_name }}{% endblock %}
 {% block body_class %}course-workbench-route life-product-theme{% endblock %}
 {% block content %}
 <div class="research-dashboard">
     <section class="research-hero workbench-hero-cyber">
+<style>
+.research-hero { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+.research-identity { flex: 1 1 55%; min-width: 320px; max-width: 100%; overflow: hidden; }
+.assistant-command { flex: 1 1 38%; min-width: 320px; max-width: 100%; }
+.workbench-title { word-break: break-word !important; display: flex !important; flex-direction: column !important; align-items: flex-start !important; }
+.workbench-title span { display: block !important; width: 100% !important; }
+.research-context-row { flex-wrap: wrap; gap: 8px; }
+.metric-card { min-width: 0; flex: 0 1 auto; }
+@media (max-width: 900px) { .research-hero { flex-direction: column; } .research-identity, .assistant-command { flex: 1 1 100%; } }
+</style>
         <div class="research-identity">
             <div class="research-title-block">
             <p class="section-kicker">{{ selected_course.label }}</p>
-            <h1 class="workbench-title"><span>{{ selected_course.name }}</span><span>{{ _('课程工作台', 'Course Workspace') }}</span></h1>
+            <h1 class="workbench-title"><span>{{ selected_course.name }}</span><span>{{ _('OBSERVATORY｜科研观测台', 'OBSERVATORY | Research Workspace') }}</span></h1>
             <p class="workbench-subtitle">{{ _('围绕当前研究方向构建文献星云、总结实验方法、完成学习任务及进行科研问答', 'Build literature nebulas, summarize experimental methods, complete learning tasks and ask research questions around the current research direction') }}</p>
             </div>
             <div class="research-overview-block">
@@ -34,8 +44,8 @@
         <div class="assistant-command pixel-assistant">
             <div class="command-head pixel-command-head">
                 <div>
-                    <p class="section-kicker">{{ _('科研助手', 'Research Assistant') }}</p>
-                    <h2>{{ _('智能科研助手', 'Smart Research Assistant') }}</h2>
+                    <p class="section-kicker">METIS · RESEARCH INTELLIGENCE</p>
+                    <h2>{{ _('METIS｜科研智脑', 'METIS | Research Intelligence') }}</h2>
                 </div>
                 <button type="button" class="history-clear-btn" onclick="clearChat()">{{ _('清除历史', 'Clear History') }}</button>
             </div>
@@ -73,8 +83,8 @@
         <div class="section-column large literature-nebula-entry-card">
             <div class="section-head">
                 <div>
-                    <p class="section-kicker">文献</p>
-                    <h2>文献星云</h2>
+                    <p class="section-kicker">NEPHELE · LITERATURE NEBULA</p>
+                    <h2>NEPHELE｜文献星云</h2>
                 </div>
                 <a href="{{ url_for('literature_hub') }}" class="btn btn-sm btn-primary">进入星云</a>
             </div>
@@ -90,19 +100,20 @@
                 <span class="nebula-author node-d" aria-hidden="true"></span>
                 <span class="nebula-flow flow-a" aria-hidden="true"></span>
                 <span class="nebula-flow flow-b" aria-hidden="true"></span>
-                <span class="nebula-copy"><strong>文献星云</strong><span>从 DOI、BibTeX、RIS 或 CSV 聚合论文、关键词、作者和方法关系</span></span>
+                <span class="nebula-copy"><strong>NEPHELE｜文献星云</strong><span>从 DOI、BibTeX、RIS 或 CSV 聚合论文、关键词、作者和方法关系</span></span>
             </a>
-            <div class="nebula-entry-actions">
-                <a href="{{ url_for('literature_hub') }}"><strong>导入文献</strong><span>生成主题星云并识别中心论文</span></a>
-                <a href="{{ url_for('literature_weekly') }}"><strong>每周推荐</strong><span>把推荐文献接入星云探索</span></a>
+            <div class="nebula-entry-actions nebula-integrated-actions">
+                <a href="{{ url_for('literature_hub') }}"><strong>ORBIT｜文献入轨</strong><span>导入文献并识别中心论文</span></a>
+                <a href="{{ url_for('literature_weekly') }}"><strong>PULSAR｜前沿脉冲</strong><span>把每周推荐接入星云探索</span></a>
+                <a href="{{ url_for('agent_subscription') }}"><strong>BEACON｜主题信标</strong><span>追踪研究主题与更新提醒</span></a>
             </div>
         </div>
 
         <div class="section-column daily-task-card">
             <div class="section-head">
                 <div>
-                    <p class="section-kicker">今日</p>
-                    <h2>每日任务</h2>
+                    <p class="section-kicker">PRISM · DAILY FOCUS</p>
+                    <h2>PRISM｜今日光谱</h2>
                 </div>
             </div>
             <div class="daily-task-flow" aria-hidden="true">
@@ -128,34 +139,30 @@
         </div>
     </section>
     <section class="module-groups">
-        <div class="module-group daily-literature-entry-card">
-            <div class="section-head"><h2>每周文献推荐</h2><a href="{{ url_for('literature_weekly') }}">查看推荐</a></div>
-            <a href="{{ url_for('literature_weekly') }}" class="daily-literature-preview" aria-label="{{ _('打开每周文献推荐', 'Open Weekly Literature Recommendations') }}">
-                <span class="daily-lit-stars" aria-hidden="true"></span>
-                <span class="daily-lit-grid" aria-hidden="true"></span>
-                <span class="daily-lit-scan" aria-hidden="true"></span>
-                <span class="daily-lit-orbit orbit-a" aria-hidden="true"></span>
-                <span class="daily-lit-orbit orbit-b" aria-hidden="true"></span>
-                <span class="daily-lit-paper paper-a" aria-hidden="true"></span>
-                <span class="daily-lit-paper paper-b" aria-hidden="true"></span>
-                <span class="daily-lit-paper paper-c" aria-hidden="true"></span>
-                <span class="daily-lit-core" aria-hidden="true"></span>
-                <span class="daily-lit-copy"><strong>每周文献推荐</strong><span>围绕当前方向推送每周论文、关键词与阅读优先级</span></span>
+        <div class="module-group ai-pre-entry-card">
+            <div class="section-head"><h2>HERMES｜智能汇报</h2><a href="{{ url_for('agent_presentation') }}">进入星演室</a></div>
+            <a href="{{ url_for('agent_presentation') }}" class="ai-pre-dashboard-preview" aria-label="{{ _('打开 AI Pre 助手', 'Open AI Pre Assistant') }}">
+                <span class="ai-pre-preview-stars" aria-hidden="true"></span>
+                <span class="ai-pre-preview-grid" aria-hidden="true"></span>
+                <span class="ai-pre-preview-scan" aria-hidden="true"></span>
+                <span class="ai-pre-preview-stage" aria-hidden="true">
+                    <span class="ai-pre-slide-deck deck-back"></span>
+                    <span class="ai-pre-slide-deck deck-front"><i></i><i></i><i></i></span>
+                    <span class="ai-pre-analysis-node node-copy">AI</span>
+                    <span class="ai-pre-analysis-node node-score">98</span>
+                    <span class="ai-pre-data-flow flow-one"></span>
+                    <span class="ai-pre-data-flow flow-two"></span>
+                </span>
+                <span class="ai-pre-dashboard-copy"><strong>HERMES｜智能汇报</strong><span>生成汇报结构、分析 PPT 并按自定义模板评分</span></span>
             </a>
-            <div class="daily-literature-actions">
-                {% if recent_papers %}
-                {% for paper in recent_papers[:2] %}
-                <a href="{{ paper.url or url_for('literature_hub') }}"><strong>{{ paper.title }}</strong><span>{{ paper.journal }} · {{ paper.year or 'N/A' }}</span></a>
-                {% endfor %}
-                {% else %}
-                <a href="{{ url_for('literature_hub') }}"><strong>生成本周推荐</strong><span>先导入 DOI、BibTeX、RIS 或 CSV</span></a>
-                <a href="{{ url_for('agent_subscription') }}"><strong>订阅研究主题</strong><span>让推荐更贴近你的方向</span></a>
-                {% endif %}
+            <div class="ai-pre-entry-actions">
+                <a href="{{ url_for('agent_presentation') }}"><strong>NOVA｜汇报生成</strong><span>从论文标题或 DOI 搭建汇报框架</span></a>
+                <a href="{{ url_for('agent_presentation') }}"><strong>SPECTRUM｜文件解析</strong><span>上传文件并获取内容与表达建议</span></a>
             </div>
         </div>
 
         <div class="module-group method-lab-entry-card">
-            <div class="section-head"><h2>实验方法</h2><a href="{{ url_for('experiments_page') }}">打开</a></div>
+            <div class="section-head"><h2>FORGE｜方法星铸</h2><a href="{{ url_for('experiments_page') }}">打开工坊</a></div>
             <a href="{{ url_for('experiments_page') }}" class="method-lab-preview" aria-label="{{ _('打开实验方法', 'Open Methods') }}">
                 <span class="method-stars" aria-hidden="true"></span>
                 <span class="method-grid" aria-hidden="true"></span>
@@ -165,16 +172,16 @@
                 <span class="method-sample sample-a" aria-hidden="true"></span>
                 <span class="method-sample sample-b" aria-hidden="true"></span>
                 <span class="method-protocol-lines" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="method-core-copy"><strong>实验方法</strong><span>视频学习与个人 Protocol 收藏统一进入这里</span></span>
+                <span class="method-core-copy"><strong>FORGE｜方法星铸</strong><span>视频学习与个人 Protocol 收藏统一进入这里</span></span>
             </a>
             <div class="method-entry-actions">
-                <a href="{{ url_for('protocols') }}"><strong>实验方法视频</strong><span>观看实验操作与流程训练</span></a>
-                <a href="{{ url_for('agent_methods') }}"><strong>实验方法收藏</strong><span>整理文献提取的 Protocol</span></a>
+                <a href="{{ url_for('protocols') }}"><strong>LABCAST｜方法影像</strong><span>观看实验操作与流程训练</span></a>
+                <a href="{{ url_for('agent_methods') }}"><strong>PROTOCOL｜流程星库</strong><span>整理文献提取的实验流程</span></a>
             </div>
         </div>
 
         <div class="module-group knowledge-forest-entry-card">
-            <div class="section-head"><h2>知识森林</h2><a href="{{ url_for('knowledge_forest') }}">进入森林</a></div>
+            <div class="section-head"><h2>GAIA｜知识森域</h2><a href="{{ url_for('knowledge_forest') }}">进入森域</a></div>
             <a href="{{ url_for('knowledge_forest') }}" class="cyber-forest-preview" aria-label="{{ _('进入知识森林', 'Enter Knowledge Forest') }}">
                 <span class="forest-sky" aria-hidden="true"></span>
                 <span class="forest-grid" aria-hidden="true"></span>
@@ -183,11 +190,11 @@
                 <span class="forest-tree tree-c" aria-hidden="true"></span>
                 <span class="forest-tree tree-d" aria-hidden="true"></span>
                 <span class="forest-scan" aria-hidden="true"></span>
-                <span class="forest-core-copy"><strong>知识森林</strong><span>每日知识点、答题测验与打卡成长统一进入这里</span></span>
+                <span class="forest-core-copy"><strong>GAIA｜知识森域</strong><span>每日知识点、答题测验与打卡成长统一进入这里</span></span>
             </a>
             <div class="forest-entry-actions">
-                <a href="{{ url_for('study') }}"><strong>每日学习</strong><span>继续知识点训练</span></a>
-                <a href="{{ url_for('rewards') }}"><strong>森林成长</strong><span>查看打卡奖励</span></a>
+                <a href="{{ url_for('study') }}"><strong>PRISM｜知识棱镜</strong><span>继续每日知识点训练</span></a>
+                <a href="{{ url_for('rewards') }}"><strong>GROVE｜成长森境</strong><span>查看打卡成长与奖励</span></a>
             </div>
         </div>
     </section>

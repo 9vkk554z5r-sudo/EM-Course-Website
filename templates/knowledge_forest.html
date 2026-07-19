@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}{{ _('知识森林', 'Knowledge Forest') }}{% endblock %}
+{% block title %}{{ _('GAIA｜知识森域', 'GAIA | Knowledge Forest') }}{% endblock %}
 {% block body_class %}life-product-theme knowledge-forest-route cosmic-task-route{% endblock %}
 {% block content %}
 <div class="knowledge-forest-page">
     <section class="forest-hero-panel">
         <div class="forest-hero-copy">
-            <p class="section-kicker">{{ _('知识森林', 'Knowledge Forest') }}</p>
-            <h1>{{ _('知识森林', 'Knowledge Forest') }}</h1>
-            <p class="forest-subtitle">{{ _('把每日知识点、答题测验、连续打卡和森林成长放在一个统一入口中。', 'Daily study, quizzes, streaks and forest growth in one unified entry.') }}</p>
+            <p class="section-kicker">GAIA · KNOWLEDGE ECOSYSTEM</p>
+            <h1>{{ _('GAIA｜知识森域', 'GAIA | Knowledge Forest') }}</h1>
+            <p class="forest-subtitle">{{ _('让每日学习、测验与连续成长在同一片知识生态中生根。', 'Let daily study, quizzes, and streaks grow in one knowledge ecosystem.') }}</p>
             <div class="forest-hero-actions">
                 <a href="{{ url_for('study') }}" class="btn btn-primary">{{ _('开始今日学习', 'Start Today') }}</a>
                 <a href="{{ url_for('rewards') }}" class="btn btn-outline">{{ _('查看森林成长', 'View Growth') }}</a>
@@ -32,12 +32,12 @@
     <section class="forest-action-grid">
         <a href="{{ url_for('study') }}" class="forest-action-card">
             <span class="forest-action-index">01</span>
-            <strong>{{ _('每日知识点学习', 'Daily Study') }}</strong>
+            <strong>{{ _('PRISM｜知识棱镜', 'PRISM | Daily Study') }}</strong>
             <span>{{ _('选择难度，学习电子显微学知识并完成测验。', 'Pick a level, study EM knowledge and complete quizzes.') }}</span>
         </a>
         <a href="{{ url_for('rewards') }}" class="forest-action-card">
             <span class="forest-action-index">02</span>
-            <strong>{{ _('我的小森林', 'My Forest') }}</strong>
+            <strong>{{ _('GROVE｜成长森境', 'GROVE | My Forest') }}</strong>
             <span>{{ _('查看连续打卡、全勤奖励与已获得的森林节点。', 'View streaks, attendance rewards and forest nodes.') }}</span>
         </a>
     </section>

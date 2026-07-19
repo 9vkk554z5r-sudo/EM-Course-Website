@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """Database models scoped to Knowledge Forest -> Today Study."""
 
 from datetime import date, datetime, timezone
@@ -26,6 +26,11 @@ class DailyLearningSession(db.Model):
     started_at = db.Column(db.DateTime)
     last_activity_at = db.Column(db.DateTime)
     base_completed_at = db.Column(db.DateTime)
+    requested_target = db.Column(db.Integer, nullable=False, default=0)
+    study_mode = db.Column(db.String(20), nullable=False, default="mixed")
+    difficulty_filter = db.Column(db.String(20), nullable=False, default="all")
+    content_filter = db.Column(db.String(200), nullable=False, default="")
+    library_id = db.Column(db.Integer, db.ForeignKey('uploaded_literatures.id'), nullable=True, default=None)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=utcnow, onupdate=utcnow)
 
@@ -69,6 +74,7 @@ class DailyLearningQueueEntry(db.Model):
     shown_at = db.Column(db.DateTime)
     completed_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+    answered_at = db.Column(db.DateTime)
 
     session = db.relationship("DailyLearningSession", backref="queue_entries")
     task = db.relationship("DailyLearningTask", backref="queue_entries")
@@ -94,6 +100,7 @@ class KnowledgeMemoryState(db.Model):
     lapse_count = db.Column(db.Integer, nullable=False, default=0)
     last_reviewed_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+    answered_at = db.Column(db.DateTime)
     updated_at = db.Column(db.DateTime, nullable=False, default=utcnow, onupdate=utcnow)
 
     item = db.relationship("UserKnowledgeItem", backref="memory_states")

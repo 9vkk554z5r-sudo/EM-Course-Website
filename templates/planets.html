@@ -1,11 +1,11 @@
-{% extends "base.html" %}
-{% block title %}关键词文献星球{% endblock %}
+﻿{% extends "base.html" %}
+{% block title %}CONSTELLATION｜主题星座{% endblock %}
 {% block content %}
 <div class="page-header">
     <div>
         <p class="eyebrow">Keyword Planets</p>
-        <h1>🪐 关键词文献星球</h1>
-        <p class="text-muted">每个关键词是一组文献星系。上传 DOI 或手动创建星球后，可继续维护主题文献集合。</p>
+        <h1>🪐 CONSTELLATION｜主题星座</h1>
+        <p class="text-muted">每个关键词是一组文献星系。上传 DOI 或手动创建星球后，可继续维护主题文献集合</p>
     </div>
     <button class="btn btn-sm btn-primary" onclick="document.getElementById('createForm').style.display='block'">创建星球</button>
 </div>
@@ -13,7 +13,7 @@
 <div class="module-section">
     <div class="card">
         <div class="card-header">
-            <h2>📤 上传 DOI 生成星球</h2>
+            <h2>📤 ORBIT｜上传 DOI 生成星球</h2>
         </div>
         <div class="card-body">
             <form method="POST" action="{{ url_for("upload_dois") }}" class="form">
@@ -32,7 +32,7 @@
 
     <div class="card" id="createForm" style="display:none">
         <div class="card-header">
-            <h2>手动创建星球</h2>
+            <h2>CONSTELLATION｜手动创建星球</h2>
         </div>
         <div class="card-body">
             <form method="POST" action="{{ url_for('planet_create') }}" class="form">
@@ -52,7 +52,7 @@
 
 <div class="card">
     <div class="card-header">
-        <h2>主题星系预览</h2>
+        <h2>ATLAS｜主题星系预览</h2>
         <a href="{{ url_for('literature_hub') }}" class="btn btn-sm">返回文献知识宇宙</a>
     </div>
     <div class="card-body" style="padding:0;">
@@ -62,7 +62,7 @@
 
 {% if planets %}
 <div class="card">
-    <div class="card-header"><h2>我的星球列表</h2></div>
+    <div class="card-header"><h2>VAULT｜我的主题星球</h2></div>
     <div class="card-body">
         <div class="paper-list">
             {% for p in planets %}{% set pc = p.papers.count() %}

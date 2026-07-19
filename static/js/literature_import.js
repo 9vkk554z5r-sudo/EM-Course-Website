@@ -10,12 +10,11 @@
         status.setAttribute('data-tone', tone || 'neutral');
         var old = status.querySelector('.import-message');
         if (old) old.remove();
-        var msg = document.createElement('span');
-        msg.className = 'import-message';
-        msg.textContent = text;
-        status.appendChild(msg);
+        var message = document.createElement('span');
+        message.className = 'import-message';
+        message.textContent = text;
+        status.appendChild(message);
     }
-
 
     function syncDashboardImportMetric(added) {
         var delta = Math.max(0, parseInt(added, 10) || 0);
@@ -24,7 +23,7 @@
             var key = 'lsca.importedPapers.count';
             var current = parseInt(window.localStorage.getItem(key), 10) || 0;
             window.localStorage.setItem(key, String(current + delta));
-            window.dispatchEvent(new CustomEvent('lsca:literature-imported', { detail: { added: delta } }));
+            window.dispatchEvent(new CustomEvent('lsca:literature-imported', {detail: {added: delta}}));
         } catch (error) {}
     }
 
@@ -46,7 +45,7 @@
 
     function handleResult(papers, source) {
         if (!papers.length) {
-            setMessage('没有解析到可用文献，请检查格式。', 'error');
+            setMessage('没有解析到可用文献，请检查输入格式。', 'error');
             return;
         }
         var result = LiteratureStore.upsertMany(papers, source);
@@ -58,19 +57,23 @@
     root.querySelectorAll('[data-import-tab]').forEach(function (tab) {
         tab.addEventListener('click', function () {
             var name = tab.getAttribute('data-import-tab');
-            root.querySelectorAll('[data-import-tab]').forEach(function (item) { item.classList.toggle('active', item === tab); });
+            root.querySelectorAll('[data-import-tab]').forEach(function (item) {
+                item.classList.toggle('active', item === tab);
+            });
             root.querySelectorAll('[data-import-panel]').forEach(function (panel) {
                 panel.classList.toggle('active', panel.getAttribute('data-import-panel') === name);
             });
         });
     });
 
-    root.querySelector('[data-import-panel="doi"]').addEventListener('submit', function (event) {
+    var doiForm = root.querySelector('[data-import-panel="doi"]');
+    if (doiForm) doiForm.addEventListener('submit', function (event) {
         event.preventDefault();
         handleResult(LiteratureParsers.parseDoiText(event.currentTarget.doiText.value), 'doi');
     });
 
-    root.querySelector('[data-import-panel="bibtex"]').addEventListener('submit', function (event) {
+    var bibtexForm = root.querySelector('[data-import-panel="bibtex"]');
+    if (bibtexForm) bibtexForm.addEventListener('submit', function (event) {
         event.preventDefault();
         var form = event.currentTarget;
         fileText(form.bibFile).then(function (text) {
@@ -78,7 +81,8 @@
         }).catch(function () { setMessage('BibTeX 文件读取失败。', 'error'); });
     });
 
-    root.querySelector('[data-import-panel="ris"]').addEventListener('submit', function (event) {
+    var risForm = root.querySelector('[data-import-panel="ris"]');
+    if (risForm) risForm.addEventListener('submit', function (event) {
         event.preventDefault();
         var form = event.currentTarget;
         fileText(form.risFile).then(function (text) {
@@ -86,7 +90,8 @@
         }).catch(function () { setMessage('RIS 文件读取失败。', 'error'); });
     });
 
-    root.querySelector('[data-import-panel="csv"]').addEventListener('submit', function (event) {
+    var csvForm = root.querySelector('[data-import-panel="csv"]');
+    if (csvForm) csvForm.addEventListener('submit', function (event) {
         event.preventDefault();
         var form = event.currentTarget;
         fileText(form.csvFile).then(function (text) {
@@ -94,7 +99,8 @@
         }).catch(function () { setMessage('CSV 文件读取失败。', 'error'); });
     });
 
-    root.querySelector('[data-import-panel="manual"]').addEventListener('submit', function (event) {
+    var manualForm = root.querySelector('[data-import-panel="manual"]');
+    if (manualForm) manualForm.addEventListener('submit', function (event) {
         event.preventDefault();
         var form = event.currentTarget;
         handleResult([{
@@ -104,18 +110,18 @@
             doi: form.doi.value,
             journal: form.journal.value,
             keywords: form.keywords.value,
-            abstract: form.abstract.value,
+            abstract: form.abstract.value
         }], 'manual');
         form.reset();
     });
 
-    var sampleBtn = root.querySelector('[data-load-sample]');
-    if (sampleBtn) sampleBtn.addEventListener('click', function () {
+    var sampleButton = root.querySelector('[data-load-sample]');
+    if (sampleButton) sampleButton.addEventListener('click', function () {
         handleResult(LiteratureParsers.samplePapers(), 'sample');
     });
 
-    var clearBtn = root.querySelector('[data-clear-library]');
-    if (clearBtn) clearBtn.addEventListener('click', function () {
+    var clearButton = root.querySelector('[data-clear-library]');
+    if (clearButton) clearButton.addEventListener('click', function () {
         LiteratureStore.clear();
         try { window.localStorage.setItem('lsca.importedPapers.count', '0'); } catch (error) {}
         refreshCount();

@@ -1,1 +1,32 @@
-{% extends 'admin_base.html' %}{% block title %}Quiz Admin{% endblock %}{% block admin_content %}<h1>Quiz Admin</h1>{% endblock %}
+{% extends 'admin_base.html' %}
+{% block title %}测验管理{% endblock %}
+{% block admin_content %}
+<div class="page-header"><h1>📝 测验管理</h1></div>
+<div class="card">
+    <div class="card-header"><h2>添加选择题</h2></div>
+    <div class="card-body">
+        <form method="post" action="{{ url_for('admin_add_quiz') }}" class="form">
+            <div class="form-group"><label>关联知识点</label><select name="kp_id" required style="width:100%">{% for kp in kps %}<option value="{{ kp.id }}">{{ kp.title }}</option>{% endfor %}</select></div>
+            <div class="form-group"><label>问题</label><textarea name="question" rows="3" required style="width:100%"></textarea></div>
+            <div class="form-grid two">
+                <div class="form-group"><label>选项 A</label><input name="option_A" required></div>
+                <div class="form-group"><label>选项 B</label><input name="option_B" required></div>
+                <div class="form-group"><label>选项 C</label><input name="option_C"></div>
+                <div class="form-group"><label>选项 D</label><input name="option_D"></div>
+            </div>
+            <div class="form-group"><label>正确答案</label><select name="correct_answer"><option>A</option><option>B</option><option>C</option><option>D</option></select></div>
+            <button type="submit" class="btn btn-primary">保存测验</button>
+        </form>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header"><h2>已有测验</h2></div>
+    <div class="card-body">
+        <div class="paper-list">
+            {% for quiz in quizzes %}
+            <div class="paper-item"><div class="paper-title">{{ quiz.question }}</div><div class="paper-meta">知识点：{{ quiz.knowledge_point.title }} · 正确答案：{{ quiz.correct_answer }}</div></div>
+            {% else %}<div class="empty-state"><p>还没有测验。</p></div>{% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

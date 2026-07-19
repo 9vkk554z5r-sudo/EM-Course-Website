@@ -6,7 +6,9 @@ LLM-inferred relationship is presented as a citation.
 """
 from collections import Counter
 from datetime import datetime, timedelta, timezone
+import html
 import os
+import re
 import time
 
 import requests
@@ -102,6 +104,11 @@ def _abstract_from_index(index):
     return " ".join(word for _, word in positions)
 
 
+def _plain_text(value):
+    text = re.sub(r"<[^>]+>", " ", str(value or ""))
+    return " ".join(html.unescape(text).split())
+
+
 def search_works(query, n=10):
     query = (query or "").strip()
     if not query:
@@ -115,6 +122,83 @@ def search_works(query, n=10):
         },
     )
     return response.json().get("results", []) if response else []
+
+
+def _search_entities(path, query, n=8):
+    query = (query or "").strip()
+    if not query:
+        return []
+    response = _safe_get(
+        path,
+        params={
+            "search": query,
+            "per_page": min(max(int(n), 1), 50),
+        },
+    )
+    return response.json().get("results", []) if response else []
+
+
+def _best_entity(results, query):
+    results = list(results or [])
+    if not results:
+        return None
+    def significant_tokens(value):
+        tokens = re.findall(r"[\w]+", (value or "").casefold(), flags=re.UNICODE)
+        significant = [token for token in tokens if len(token) > 1]
+        return significant or tokens
+
+    query_tokens = significant_tokens(query)
+    for item in results:
+        if significant_tokens(item.get("display_name") or "") == query_tokens:
+            return item
+    return results[0]
+
+
+def _works_by_filter(filter_value, n=20, sort="cited_by_count:desc"):
+    response = _safe_get(
+        "/works",
+        params={
+            "filter": filter_value,
+            "per_page": min(max(int(n), 1), 100),
+            "sort": sort,
+        },
+    )
+    return response.json().get("results", []) if response else []
+
+
+def search_works_by_title(title, n=20):
+    title = (title or "").strip()
+    if not title:
+        return []
+    return _works_by_filter("title.search:" + title, n=n, sort="relevance_score:desc")
+
+
+def search_works_by_author(author, n=20):
+    author = (author or "").strip()
+    if not author:
+        return []
+    if author.upper().startswith("A") and author[1:].isdigit():
+        author_id = author.upper()
+    else:
+        match = _best_entity(_search_entities("/authors", author, n=10), author)
+        author_id = normalize_openalex_id(match.get("id")) if match else ""
+    if not author_id:
+        return []
+    return _works_by_filter("authorships.author.id:" + author_id, n=n)
+
+
+def search_works_by_source(source, n=20):
+    source = (source or "").strip()
+    if not source:
+        return []
+    if source.upper().startswith("S") and source[1:].isdigit():
+        source_id = source.upper()
+    else:
+        match = _best_entity(_search_entities("/sources", source, n=10), source)
+        source_id = normalize_openalex_id(match.get("id")) if match else ""
+    if not source_id:
+        return []
+    return _works_by_filter("primary_location.source.id:" + source_id, n=n)
 
 
 def get_work_by_doi(doi):
@@ -191,18 +275,18 @@ def extract_work_info(work):
     doi = normalize_doi(work.get("doi"))
     openalex_id = normalize_openalex_id(work.get("id"))
     return {
-        "title": work.get("title") or work.get("display_name") or "",
+        "title": _plain_text(work.get("title") or work.get("display_name") or ""),
         "doi": doi,
         "openalex_id": openalex_id,
         "publication_date": work.get("publication_date") or "",
         "date": work.get("publication_date") or "",
         "year": work.get("publication_year"),
-        "journal": source.get("display_name") or "",
+        "journal": _plain_text(source.get("display_name") or ""),
         "cited_by_count": work.get("cited_by_count") or 0,
         "authors": ", ".join(author_names),
         "first_author": author_names[0] if author_names else "",
         "corresponding_author": corresponding or (author_names[-1] if author_names else ""),
-        "topic": topic_name,
+        "topic": _plain_text(topic_name),
         "concepts": [
             item.get("display_name", "")
             for item in (work.get("topics") or work.get("concepts") or [])[:5]
@@ -273,17 +357,44 @@ def works_to_citation_graph(works):
     return {"nodes": nodes, "edges": edges, "source": "OpenAlex"}
 
 
+def _citation_graph_from_root(root, max_nodes):
+    if not root:
+        return {"nodes": [], "edges": [], "source": "OpenAlex"}
+    root_id = normalize_openalex_id(root.get("id"))
+    remaining = max(0, int(max_nodes) - 1)
+    citing_limit = min(50, max(0, remaining // 3))
+    reference_limit = max(0, remaining - citing_limit)
+    reference_ids = (root.get("referenced_works") or [])[:reference_limit]
+    works = (
+        [root]
+        + get_works_by_ids(reference_ids, limit=reference_limit)
+        + get_citing_works(root_id, n=citing_limit)
+    )
+    return works_to_citation_graph(works[:max_nodes])
+
+
 def citation_graph(query, query_type="keyword", max_nodes=35):
-    if query_type == "doi":
-        root = get_work_by_doi(query)
+    query_type = (query_type or "keyword").strip().lower()
+    if query_type in {"doi", "openalex"}:
+        root = get_work_by_doi(query) if query_type == "doi" else get_work_by_id(query)
         if not root:
             return {"nodes": [], "edges": [], "source": "OpenAlex"}
-        root_id = normalize_openalex_id(root.get("id"))
-        reference_ids = (root.get("referenced_works") or [])[:12]
-        works = [root] + get_works_by_ids(reference_ids, limit=12) + get_citing_works(root_id, n=12)
-        return works_to_citation_graph(works[:max_nodes])
+        return _citation_graph_from_root(root, max_nodes)
 
-    seeds = search_works(query, min(20, max_nodes))
+    if max_nodes <= 45:
+        seed_limit = min(20, max_nodes)
+    elif max_nodes <= 100:
+        seed_limit = min(40, max_nodes)
+    else:
+        seed_limit = min(75, max_nodes)
+    if query_type == "title":
+        seeds = search_works_by_title(query, seed_limit)
+    elif query_type == "author":
+        seeds = search_works_by_author(query, seed_limit)
+    elif query_type in {"journal", "source"}:
+        seeds = search_works_by_source(query, seed_limit)
+    else:
+        seeds = search_works(query, seed_limit)
     reference_frequency = Counter()
     seed_ids = {normalize_openalex_id(work.get("id")) for work in seeds}
     for work in seeds:

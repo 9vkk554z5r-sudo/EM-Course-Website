@@ -27,6 +27,12 @@
 .study-knowledge-page .memory-meta span { font-size:.74rem; color:#9fb7c5; border:1px solid rgba(148,163,184,.18); border-radius:999px; padding:4px 8px; }
 .study-knowledge-page .memory-question h2 { margin:0 0 12px; font-size:1.55rem; }
 .study-knowledge-page .memory-hint { color:#aebfce !important; line-height:1.7; letter-spacing:.015em; }
+.study-knowledge-page .answer-composer { margin-top:20px; padding:16px; border:1px solid rgba(96,165,250,.22); border-radius:10px; background:rgba(30,64,175,.07); }
+.study-knowledge-page .answer-composer label { display:block; margin-bottom:8px; color:#dcecf5; font-weight:650; }
+.study-knowledge-page .answer-composer textarea { width:100%; min-height:105px; resize:vertical; }
+.study-knowledge-page .answer-submit-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px; }
+.study-knowledge-page .answer-evaluation { margin-top:14px; padding:12px 14px; border-radius:8px; background:rgba(45,212,191,.07); color:#c8e6e2; }
+.study-knowledge-page .answer-evaluation strong { color:#67e8f9; }
 .study-knowledge-page .memory-answer { margin-top:20px; padding:18px; border-left:3px solid #2dd4bf; border-radius:0 8px 8px 0; background:rgba(45,212,191,.06); line-height:1.8; }
 .study-knowledge-page .answer-section + .answer-section { margin-top:16px; padding-top:16px; border-top:1px solid rgba(148,163,184,.12); }
 .study-knowledge-page .answer-section strong { display:block; margin-bottom:6px; color:#7dd3fc; }
@@ -46,6 +52,8 @@
 .study-knowledge-page .library-row-top { display:flex; justify-content:space-between; gap:10px; align-items:center; }
 .study-knowledge-page .library-row strong { display:block; overflow-wrap:anywhere; }
 .study-knowledge-page .library-row p { color:var(--text-muted); font-size:.78rem; margin:7px 0 0; }
+.study-knowledge-page .library-plan { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.study-knowledge-page .library-plan span { padding:3px 7px; border-radius:999px; background:rgba(96,165,250,.08); color:#abc1d1; font-size:.7rem; }
 .study-knowledge-page .library-actions { display:flex; gap:7px; margin-top:10px; flex-wrap:wrap; }
 .study-knowledge-page details { border-top:1px solid rgba(148,163,184,.12); padding-top:12px; margin-top:12px; }
 .study-knowledge-page summary { cursor:pointer; color:#dcecf5 !important; font-weight:650; letter-spacing:.015em; }
@@ -80,13 +88,15 @@
 <div class="study-knowledge-page">
   <div class="page-header study-intro">
     <div>
-      <p class="section-kicker">知识森林 · DAILY REVIEW</p>
+      <p class="section-kicker">知识森林 · 每日复习</p>
       <h1>今日学习</h1>
-      <p class="text-muted">到期复习优先 · 薄弱知识巩固 · 当前课程新知识补充 · 每日 10 个不同知识点</p>
+      <p class="text-muted">选择知识库、每日数量与学习内容 · 先回答问题再完成打卡 · 基础任务后可进入进阶学习</p>
     </div>
     <div class="intro-actions">
-      {% if cs.session.status == 'not_started' %}
+      {% if cs.session.status == 'not_started' and cs.session.base_target > 0 %}
       <button type="button" class="btn btn-primary" data-start-session>开始今日学习</button>
+      {% elif cs.session.status == 'not_started' %}
+      <button type="button" class="btn btn-primary" disabled>请先调整学习计划</button>
       {% elif cs.session.status == 'in_progress' %}
       <a href="#dailyLearningCard" class="btn btn-primary">继续今日学习</a>
       {% else %}
@@ -107,8 +117,8 @@
     <section class="card" id="dailyLearningCard">
       <div class="card-header queue-head">
         <div>
-          <h2>{{ cs.course_name }} · 今日任务</h2>
-          <p class="text-muted" style="margin:5px 0 0">任务生成后全天固定，刷新、退出或重新登录不会重置。</p>
+          <h2>{{ cs.session_library.name if cs.session_library else cs.course_name }} · 今日任务</h2>
+          <p class="text-muted" style="margin:5px 0 0">计划数量 {{ cs.queue_summary.requested }} 个；当前筛选后安排 {{ cs.queue_summary.total }} 个。开始后全天固定，刷新或重新登录不会重置。</p>
         </div>
         <div class="queue-chips">
           <span class="queue-chip">薄弱 {{ cs.queue_summary.weak }}</span>
@@ -119,15 +129,20 @@
       <div class="card-body">
         <div class="study-progress" aria-label="今日任务进度"><span style="width:{{ cs.queue_summary.percent }}%"></span></div>
 
-        {% if cs.session.status == 'not_started' %}
+        {% if cs.session.status == 'not_started' and cs.session.base_target > 0 %}
         <div class="empty-study">
-          <h2>今日 10 个知识点已经准备好</h2>
-          <p>先完成到期与薄弱知识复习，再学习当前课程的新知识。每次只展示一个知识点。</p>
+          <h2>今日 {{ cs.queue_summary.total }} 个知识点已经准备好</h2>
+          <p>每个知识点都需要先写下回答，再对照答案并评价掌握程度；完成后自动打卡。</p>
           <div class="task-mix">
             <span>旧知识复习 {{ cs.queue_summary.review }}</span>
             <span>薄弱知识 {{ cs.queue_summary.weak }}</span>
             <span>新知识 {{ cs.queue_summary.new }}</span>
           </div>
+        </div>
+        {% elif cs.session.status == 'not_started' %}
+        <div class="empty-study">
+          <h2>当前学习计划没有匹配内容</h2>
+          <p>可以切换知识库，或调整每日内容类型、难度与关键词。若选择“只复习”，需要先完成一些新知识学习。</p>
         </div>
         {% elif cs.is_learning and cs.current_entry %}
         {% set entry = cs.current_entry %}
@@ -137,40 +152,53 @@
             <div class="memory-meta">
               <span>{% if task.source_type == 'new' %}新知识{% elif task.source_type == 'weak' %}薄弱巩固{% elif task.source_type == 'overdue' %}逾期复习{% elif task.source_type == 'due' %}到期复习{% elif task.source_type == 'risk' %}遗忘风险{% else %}额外学习{% endif %}</span>
               {% if entry.reason == 'repeat_again' %}<span>忘记后重复</span>{% elif entry.reason == 'repeat_hard' %}<span>模糊后重复</span>{% endif %}
-              <span>{{ task.item.difficulty }}</span>
-              {% if task.item.tags %}<span>{{ task.item.tags }}</span>{% endif %}
+              <span>{% if task.item.difficulty == 'beginner' %}入门{% elif task.item.difficulty == 'advanced' %}高级{% else %}中级{% endif %}</span>
+              {% if task.item.tags and task.item.tags != 'general' %}<span>{{ task.item.tags }}</span>{% endif %}
             </div>
             <div class="memory-question">
               <h2>{{ task.item.title }}</h2>
-              <p class="memory-hint">{% if task.item.hint %}提示：{{ task.item.hint }}{% else %}先回忆概念、原理和适用场景，再查看答案。{% endif %}</p>
+              <p class="memory-hint">{% if task.item.hint %}提示：{{ task.item.hint }}{% else %}请用自己的话说明核心概念、原理或适用场景。{% endif %}</p>
             </div>
-            <div class="memory-answer" id="memoryAnswer" hidden>
+            <div class="answer-composer" id="answerComposer">
+              <label for="learnerAnswer">我的回答</label>
+              <textarea id="learnerAnswer" maxlength="4000" placeholder="先写下你的理解；暂时不会也可以填写“暂时不会”，提交后查看标准答案。" {% if entry.answered_at %}disabled{% endif %}>{{ entry.submitted_answer or '' }}</textarea>
+              <div class="answer-submit-row">
+                <button type="button" class="btn btn-primary" id="submitAnswer" {% if entry.answered_at %}hidden{% endif %}>提交回答并查看解析</button>
+                <span class="text-muted">提交回答后才能评价掌握程度并进入下一题。</span>
+              </div>
+              <div class="answer-evaluation" id="answerEvaluation" {% if not entry.answered_at %}hidden{% endif %}>
+                匹配度 <strong id="answerScore">{{ entry.answer_score or 0 }}%</strong>
+                <span id="answerFeedback">{% if entry.answer_correct %}已覆盖主要信息，请继续对照答案补充细节。{% else %}建议认真对照标准答案后选择真实掌握程度。{% endif %}</span>
+              </div>
+            </div>
+            <div class="memory-answer" id="memoryAnswer" {% if not entry.answered_at %}hidden{% endif %}>
               <div class="answer-section"><strong>标准答案</strong><div>{{ cs.answer }}</div></div>
               <div class="answer-section"><strong>详细解释</strong><div>{{ cs.explanation }}</div></div>
             </div>
           </div>
           <div class="memory-actions">
-            <button type="button" class="btn btn-primary" id="revealAnswer">查看答案</button>
-            <div class="rating-grid" id="ratingGrid" hidden>
+            <div class="rating-grid" id="ratingGrid" {% if not entry.answered_at %}hidden{% endif %}>
               <button type="button" class="rating-btn" data-rating="again">忘记了<small>1 · 当天再次出现</small></button>
               <button type="button" class="rating-btn" data-rating="hard">有点模糊<small>2 · 稍后再次巩固</small></button>
               <button type="button" class="rating-btn" data-rating="good">基本掌握<small>3 · 正常间隔复习</small></button>
               <button type="button" class="rating-btn" data-rating="easy">非常熟悉<small>4 · 延长复习间隔</small></button>
             </div>
-            <p class="keyboard-hint">快捷键：空格查看答案 · 1 / 2 / 3 / 4 选择掌握情况</p>
+            <p class="keyboard-hint">快捷键：Ctrl（Windows）或 Command（Mac）+ 回车提交回答 · 数字 1 / 2 / 3 / 4 选择掌握情况</p>
             <div class="review-status" id="reviewStatus" role="status"></div>
           </div>
         </article>
         {% elif cs.is_complete %}
         <div class="completion-panel">
           <h2>今日基础学习已完成</h2>
-          <p class="text-muted">10 个不同知识点已经完成；当天重复出现只计入实际复习次数，不重复增加任务进度。</p>
+          <p class="text-muted">{{ cs.queue_summary.total }} 个不同知识点均已回答并完成；当天重复出现只计入实际复习次数，不重复增加任务进度。</p>
           <div class="completion-grid">
             <div class="completion-metric"><span>完成知识点</span><strong>{{ cs.queue_summary.completed }}</strong></div>
             <div class="completion-metric"><span>新学习</span><strong>{{ cs.result.new_completed }}</strong></div>
             <div class="completion-metric"><span>旧知识复习</span><strong>{{ cs.result.old_completed }}</strong></div>
             <div class="completion-metric"><span>薄弱知识巩固</span><strong>{{ cs.result.weak_completed }}</strong></div>
             <div class="completion-metric"><span>实际复习次数</span><strong>{{ cs.result.actual_reviews }}</strong></div>
+            <div class="completion-metric"><span>已回答问题</span><strong>{{ cs.result.answered }}</strong></div>
+            <div class="completion-metric"><span>回答平均匹配度</span><strong>{{ cs.result.answer_score }}%</strong></div>
             <div class="completion-metric"><span>今日掌握率</span><strong>{{ cs.result.mastery_rate }}%</strong></div>
             <div class="completion-metric"><span>今日学习时长</span><strong data-study-timer>{{ cs.result.duration }}</strong></div>
             <div class="completion-metric"><span>连续学习</span><strong>{{ streak }} 天</strong></div>
@@ -183,9 +211,10 @@
               <button class="btn btn-outline btn-sm" type="button" data-continue-mode="mixed" data-continue-count="10">再学习 10 个</button>
               <button class="btn btn-outline btn-sm" type="button" data-continue-mode="review" data-continue-count="10">只复习旧知识</button>
               <button class="btn btn-outline btn-sm" type="button" data-continue-mode="new" data-continue-count="10">只学习新知识</button>
+              <button class="btn btn-outline btn-sm" type="button" data-continue-mode="advanced" data-continue-count="10">进阶学习 · 高级知识</button>
             </div>
             <form class="continue-custom" id="customContinueForm">
-              <label>内容类型<select name="mode"><option value="mixed">新旧混合</option><option value="review">只复习旧知识</option><option value="new">只学习新知识</option></select></label>
+              <label>内容类型<select name="mode"><option value="mixed">新旧混合</option><option value="review">只复习旧知识</option><option value="new">只学习新知识</option><option value="advanced">进阶高级知识</option></select></label>
               <label>自定义数量<input name="count" type="number" min="1" max="50" value="5"></label>
               <button class="btn btn-primary btn-sm">开始额外学习</button>
             </form>
@@ -206,11 +235,15 @@
           {% for row in cs.libraries %}
           {% set library = row.library %}
           <div class="library-row {% if cs.active_library and library.id == cs.active_library.id %}is-active{% endif %}">
-            <div class="library-row-top"><strong>{{ library.name }}</strong>{% if library.is_active %}<span class="badge badge-success">学习中</span>{% endif %}</div>
+            <div class="library-row-top"><strong>{{ library.name }}</strong>{% if library.is_active %}<span class="badge badge-success">当前知识库</span>{% elif row.is_course %}<span class="badge">课程库</span>{% endif %}</div>
             <p>{{ row.item_count }} 条内容 · {{ row.mastered }} 条已掌握</p>
+            <div class="library-plan">
+              <span>每日 {{ library.daily_new_count or 10 }} 个</span>
+              <span>{% if library.study_mode == 'new' %}只学新知识{% elif library.study_mode == 'review' %}只复习{% elif library.study_mode == 'advanced' %}进阶知识{% else %}新旧混合{% endif %}</span>
+              <span>{% if library.difficulty_filter == 'beginner' %}入门{% elif library.difficulty_filter == 'intermediate' %}中级{% elif library.difficulty_filter == 'advanced' %}高级{% else %}全部难度{% endif %}</span>
+            </div>
             <div class="library-actions">
               {% if not library.is_active %}<form method="post" action="{{ url_for('knowledge_study.activate_library', library_id=library.id) }}"><button class="btn btn-sm btn-outline">设为当前</button></form>{% endif %}
-              <a class="btn btn-sm btn-outline" href="{{ url_for('study', library=library.id) }}">查看</a>
             </div>
           </div>
           {% endfor %}
@@ -222,7 +255,7 @@
         <details>
           <summary>上传知识库</summary>
           <form class="compact-form" method="post" enctype="multipart/form-data" action="{{ url_for('knowledge_study.upload_library') }}" data-upload-form>
-            <label>导入到<select name="library_id"><option value="">创建新知识库</option>{% for row in cs.libraries %}<option value="{{ row.library.id }}" {% if cs.active_library and row.library.id == cs.active_library.id %}selected{% endif %}>{{ row.library.name }}</option>{% endfor %}</select></label>
+            <label>导入到<select name="library_id"><option value="">创建新知识库</option>{% for row in cs.libraries %}{% if not row.is_course %}<option value="{{ row.library.id }}" {% if cs.active_library and row.library.id == cs.active_library.id %}selected{% endif %}>{{ row.library.name }}</option>{% endif %}{% endfor %}</select></label>
             <label>文件<input type="file" name="knowledge_file" accept=".csv,.json,.txt,.md" required></label>
             <p class="text-muted" style="font-size:.75rem;margin:0">支持 CSV、JSON、TXT、Markdown，最大 2 MB。今日任务生成后不会因上传而重置。</p>
             <button class="btn btn-primary btn-sm">上传并导入</button>
@@ -238,7 +271,7 @@
           </form>
         </details>
 
-        {% if cs.active_library %}
+        {% if cs.active_library and not (cs.active_library.source_filename or '').startswith('__course__:') %}
         <details>
           <summary>手动添加内容</summary>
           <form class="compact-form" method="post" action="{{ url_for('knowledge_study.add_library_item', library_id=cs.active_library.id) }}">
@@ -253,10 +286,35 @@
         <details>
           <summary>知识库设置</summary>
           <form class="compact-form" method="post" action="{{ url_for('knowledge_study.update_library_settings', library_id=cs.active_library.id) }}">
-            <label>说明<textarea name="description" rows="2">{{ cs.active_library.description }}</textarea></label>
-            <button class="btn btn-primary btn-sm">保存说明</button>
+            <label>每日学习量<input name="daily_count" type="number" min="1" max="50" value="{{ cs.active_library.daily_new_count or 10 }}" required></label>
+            <label>每天学习的内容<select name="study_mode">
+              <option value="mixed" {% if cs.active_library.study_mode == 'mixed' %}selected{% endif %}>新知识 + 到期复习</option>
+              <option value="new" {% if cs.active_library.study_mode == 'new' %}selected{% endif %}>只学习新知识</option>
+              <option value="review" {% if cs.active_library.study_mode == 'review' %}selected{% endif %}>只复习已学内容</option>
+              <option value="advanced" {% if cs.active_library.study_mode == 'advanced' %}selected{% endif %}>进阶学习（高级知识）</option>
+            </select></label>
+            <label>难度范围<select name="difficulty_filter">
+              <option value="all" {% if cs.active_library.difficulty_filter == 'all' %}selected{% endif %}>全部难度</option>
+              <option value="beginner" {% if cs.active_library.difficulty_filter == 'beginner' %}selected{% endif %}>入门</option>
+              <option value="intermediate" {% if cs.active_library.difficulty_filter == 'intermediate' %}selected{% endif %}>中级</option>
+              <option value="advanced" {% if cs.active_library.difficulty_filter == 'advanced' %}selected{% endif %}>高级</option>
+            </select></label>
+            <label>内容关键词（可选）<input name="content_filter" maxlength="200" value="{{ cs.active_library.content_filter or '' }}" placeholder="例如：冷冻制样, CTF"></label>
+            {% if not (cs.active_library.source_filename or '').startswith('__course__:') %}<label>说明<textarea name="description" rows="2">{{ cs.active_library.description }}</textarea></label>{% endif %}
+            <button class="btn btn-primary btn-sm">保存学习计划</button>
           </form>
-          <form method="post" action="{{ url_for('knowledge_study.archive_library', library_id=cs.active_library.id) }}" style="margin-top:10px" onsubmit="return confirm('归档后不会删除内容和学习记录，确定继续吗？')"><button class="btn btn-sm btn-outline">归档知识库</button></form>
+          {% if not (cs.active_library.source_filename or '').startswith('__course__:') %}<form method="post" action="{{ url_for('knowledge_study.archive_library', library_id=cs.active_library.id) }}" style="margin-top:10px" onsubmit="return confirm('归档后不会删除内容和学习记录，确定继续吗？')"><button class="btn btn-sm btn-outline">归档知识库</button></form>{% endif %}
+        </details>
+        {% else %}
+        <details open>
+          <summary>当前知识库学习计划</summary>
+          <form class="compact-form" method="post" action="{{ url_for('knowledge_study.update_library_settings', library_id=cs.active_library.id) }}">
+            <label>每日学习量<input name="daily_count" type="number" min="1" max="50" value="{{ cs.active_library.daily_new_count or 10 }}" required></label>
+            <label>每天学习的内容<select name="study_mode"><option value="mixed" {% if cs.active_library.study_mode == 'mixed' %}selected{% endif %}>新知识 + 到期复习</option><option value="new" {% if cs.active_library.study_mode == 'new' %}selected{% endif %}>只学习新知识</option><option value="review" {% if cs.active_library.study_mode == 'review' %}selected{% endif %}>只复习已学内容</option><option value="advanced" {% if cs.active_library.study_mode == 'advanced' %}selected{% endif %}>进阶学习（高级知识）</option></select></label>
+            <label>难度范围<select name="difficulty_filter"><option value="all" {% if cs.active_library.difficulty_filter == 'all' %}selected{% endif %}>全部难度</option><option value="beginner" {% if cs.active_library.difficulty_filter == 'beginner' %}selected{% endif %}>入门</option><option value="intermediate" {% if cs.active_library.difficulty_filter == 'intermediate' %}selected{% endif %}>中级</option><option value="advanced" {% if cs.active_library.difficulty_filter == 'advanced' %}selected{% endif %}>高级</option></select></label>
+            <label>内容关键词（可选）<input name="content_filter" maxlength="200" value="{{ cs.active_library.content_filter or '' }}" placeholder="例如：冷冻制样, CTF"></label>
+            <button class="btn btn-primary btn-sm">保存学习计划</button>
+          </form>
         </details>
         {% endif %}
       </div>
@@ -269,6 +327,8 @@
       <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
         <div class="stat-card"><div class="stat-info"><span class="stat-value">{{ cs.queue_summary.completed }}</span><span class="stat-label">完成不同知识点</span></div></div>
         <div class="stat-card"><div class="stat-info"><span class="stat-value">{{ cs.queue_summary.actual_reviews }}</span><span class="stat-label">实际复习次数</span></div></div>
+        <div class="stat-card"><div class="stat-info"><span class="stat-value">{{ cs.result.answered }}</span><span class="stat-label">已回答问题</span></div></div>
+        <div class="stat-card"><div class="stat-info"><span class="stat-value">{{ cs.result.answer_score }}%</span><span class="stat-label">回答平均匹配度</span></div></div>
         <div class="stat-card"><div class="stat-info"><span class="stat-value">{{ cs.result.mastery_rate }}%</span><span class="stat-label">今日掌握率</span></div></div>
         <div class="stat-card"><div class="stat-info"><span class="stat-value" data-study-timer>{{ cs.result.duration }}</span><span class="stat-label">今日学习时长</span></div></div>
       </div>
@@ -332,14 +392,31 @@
     });
   });
 
-  var revealButton = document.getElementById('revealAnswer');
+  var submitAnswerButton = document.getElementById('submitAnswer');
+  var learnerAnswer = document.getElementById('learnerAnswer');
   var answer = document.getElementById('memoryAnswer');
   var ratingGrid = document.getElementById('ratingGrid');
-  if (revealButton) {
-    revealButton.addEventListener('click', function () {
-      answer.hidden = false;
-      ratingGrid.hidden = false;
-      revealButton.hidden = true;
+  var answerEvaluation = document.getElementById('answerEvaluation');
+  if (submitAnswerButton) {
+    submitAnswerButton.addEventListener('click', function () {
+      var submitted = (learnerAnswer.value || '').trim();
+      if (!submitted) { learnerAnswer.focus(); alert('请先写下你的回答；不会时也可以填写“暂时不会”。'); return; }
+      submitAnswerButton.disabled = true;
+      if (statusNode) statusNode.textContent = '正在保存回答并生成对照结果…';
+      postJson('{{ url_for("knowledge_study.submit_answer") }}', {entry_id:{{ custom_study.current_entry.id if custom_study.current_entry else 'null' }},answer:submitted})
+        .then(function (data) {
+          learnerAnswer.disabled = true;
+          submitAnswerButton.hidden = true;
+          answer.hidden = false;
+          ratingGrid.hidden = false;
+          answerEvaluation.hidden = false;
+          document.getElementById('answerScore').textContent = data.score + '%';
+          document.getElementById('answerFeedback').textContent = data.feedback;
+          var recommended = document.querySelector('.rating-btn[data-rating="' + data.recommended_rating + '"]');
+          if (recommended) recommended.style.boxShadow = '0 0 0 2px rgba(103,232,249,.45)';
+          if (statusNode) statusNode.textContent = '回答已保存，请对照答案后选择真实掌握程度。';
+        })
+        .catch(function (error) { submitAnswerButton.disabled = false; if (statusNode) statusNode.textContent = error.message; });
     });
   }
   document.querySelectorAll('.rating-btn').forEach(function (button) {
@@ -381,8 +458,8 @@
 
   document.addEventListener('keydown', function (event) {
     var tag = (event.target.tagName || '').toLowerCase();
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && submitAnswerButton && !submitAnswerButton.hidden) { event.preventDefault(); submitAnswerButton.click(); return; }
     if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
-    if (event.code === 'Space' && revealButton && !revealButton.hidden) { event.preventDefault(); revealButton.click(); return; }
     var ratingMap = {'1':'again','2':'hard','3':'good','4':'easy'};
     if (ratingMap[event.key] && ratingGrid && !ratingGrid.hidden) {
       var ratingButton = document.querySelector('.rating-btn[data-rating="' + ratingMap[event.key] + '"]');

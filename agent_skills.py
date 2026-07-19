@@ -42,7 +42,9 @@ def skill_literature_subscription(db, user_id, keyword, days=7):
         results = []
         for w in works:
             info = extract_work_info(w)
-            results.append({'title': info.get('title', ''), 'authors': info.get('first_author', ''), 'journal': info.get('journal', ''), 'date': info.get('publication_date', ''), 'doi': info.get('doi', '')})
+            results.append({'title': info.get('title', ''), 'authors': info.get('first_author', ''), 'journal': info.get('journal', ''), 'date': info.get('publication_date', ''), 'doi': info.get('doi', ''), 'url': info.get('url', ''), 'abstract': info.get('abstract', '')[:300] if info.get('abstract') else '', 'topic': info.get('topic', ''), 'concepts': ', '.join(info.get('concepts', [])[:3]), 'cited_by_count': info.get('cited_by_count', 0)})
+        log_activity(db, user_id, 'subscription', f'Keyword: {keyword}', f'Found {len(results)}')
+        return {'keyword': keyword, 'days': days, 'results': results}, True
     except Exception as e:
         log_activity(db, user_id, 'subscription', f'Keyword: {keyword}', status='error')
         return {'error': str(e)}, False

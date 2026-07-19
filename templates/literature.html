@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}文献中心 — 电子显微学课程{% endblock %}
+{% block title %}PULSAR｜前沿追踪 — {{ platform_name }}{% endblock %}
 {% block body_class %}life-product-theme literature-subscribe-route cosmic-task-route{% endblock %}
 {% block content %}
 <div class="literature-page">
     <div class="page-header">
-        <h1>📰 文献中心</h1>
+        <h1>📰 PULSAR｜前沿追踪</h1>
         <div class="header-actions">
             <a href="{{ url_for('my_subscriptions') }}" class="btn btn-outline">我的订阅</a>
             <a href="{{ url_for('refresh_literature') }}" class="btn">刷新文献</a>
@@ -14,7 +14,7 @@
     <!-- Subscribe Form -->
     <div class="card">
         <div class="card-header">
-            <h2>订阅新主题</h2>
+            <h2>BEACON｜订阅主题信标</h2>
         </div>
         <div class="card-body">
             <form method="POST" action="{{ url_for('subscribe') }}" class="subscribe-form">
@@ -43,7 +43,7 @@
     <!-- Paper List -->
     <div class="card">
         <div class="card-header">
-            <h2>文献列表</h2>
+            <h2>ORBIT｜最新文献轨道</h2>
             <span class="badge">{{ pagination.total }} 篇</span>
         </div>
         <div class="card-body">

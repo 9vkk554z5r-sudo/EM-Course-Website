@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}{{ _('我的小森林', 'My Forest') }}{% endblock %}
+{% block title %}{{ _('GROVE｜成长森境', 'GROVE | Growth Forest') }}{% endblock %}
 {% block body_class %}life-product-theme knowledge-forest-route reward-forest-route cosmic-task-route{% endblock %}
 {% block content %}
 <div class="reward-forest-page">
     <section class="reward-forest-hero">
         <div class="reward-forest-copy">
-            <p class="section-kicker">{{ _('知识森林', 'Knowledge Forest') }}</p>
-            <h1>{{ _('我的小森林', 'My Forest') }}</h1>
-            <p>{{ _('连续学习会点亮森林节点。周全勤生成幼芽，月全勤成长为主树。', 'Consistent study lights up forest nodes. Weekly attendance grows sprouts; monthly attendance grows main trees.') }}</p>
+            <p class="section-kicker">GROVE · GROWTH FOREST</p>
+            <h1>{{ _('GROVE｜成长森境', 'GROVE | Growth Forest') }}</h1>
+            <p>{{ _('每一次学习都会留下生长年轮：周全勤萌芽，月全勤长成主树。', 'Every study session leaves a growth ring: weekly attendance sprouts, monthly attendance becomes a full tree.') }}</p>
             <div class="forest-hero-actions">
                 <a href="{{ url_for('study') }}" class="btn btn-primary">{{ _('开始学习打卡', 'Start Check-in') }}</a>
                 <a href="{{ url_for('knowledge_forest') }}" class="btn btn-outline">{{ _('返回知识森林', 'Back to Forest') }}</a>
@@ -38,8 +38,8 @@
     <section class="reward-forest-panel">
         <div class="section-head">
             <div>
-                <p class="section-kicker">{{ _('成长记录', 'Growth Log') }}</p>
-                <h2>{{ _('森林节点', 'Forest Nodes') }}</h2>
+                <p class="section-kicker">GROVE · GROWTH LOG</p>
+                <h2>{{ _('GROVE｜成长节点', 'GROVE | Growth Nodes') }}</h2>
             </div>
             <div class="reward-panel-links">
                 <a href="#my-farm">{{ _('我的林场', 'My Farm') }}</a>
@@ -85,8 +85,8 @@
     <section class="cyber-farm-panel" id="my-farm">
         <div class="section-head">
             <div>
-                <p class="section-kicker">{{ _('我的林场', 'My Farm') }}</p>
-                <h2>{{ _('大树林场', 'Cyber Tree Farm') }}</h2>
+                <p class="section-kicker">GAIA · MY GROVE</p>
+                <h2>{{ _('GAIA｜个人林场', 'GAIA | Personal Grove') }}</h2>
             </div>
             {% if farm_preview %}
             <div class="farm-preview-controls" aria-label="{{ _('管理员林场预览控制', 'Admin farm preview controls') }}">

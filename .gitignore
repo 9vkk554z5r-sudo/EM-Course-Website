@@ -1,4 +1,4 @@
-.env
+﻿.env
 .env.*
 !.env.example
 __pycache__/
@@ -14,3 +14,22 @@ cloudflared*.exe
 public_runtime/
 public_share/
 static/uploads/
+
+# Temporary / extracted directories
+zip-ui-v6/
+zip-new/
+EM-Course-Website/
+outputs/
+docs/
+work/
+
+# Uploaded files
+uploads/
+
+# Agent files
+.agents/
+.codex/
+
+# IDE
+.vscode/
+.idea/
