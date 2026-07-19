@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """OpenAlex client and citation-graph builder.
 
 All graph edges come from OpenAlex ``referenced_works`` records. No topical or
@@ -410,13 +410,15 @@ def citation_graph(query, query_type="keyword", max_nodes=35):
 
 def recent_works_by_topic(topic, days=7, per_page=20):
     from_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    to_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     response = _safe_get(
         "/works",
         params={
             "search": topic,
-            "filter": "from_publication_date:" + from_date,
+            "filter": "from_publication_date:" + from_date + ",to_publication_date:" + to_date,
             "per_page": min(max(int(per_page), 1), 100),
             "sort": "publication_date:desc",
         },
     )
     return response.json().get("results", []) if response else []
+
