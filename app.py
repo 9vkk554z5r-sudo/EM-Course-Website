@@ -15,7 +15,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from config import SECRET_KEY, SQLALCHEMY_DATABASE_URI, SQLALCHEMY_TRACK_MODIFICATIONS
 from config import WEEKLY_LITERATURE_HOUR, WEEKLY_LITERATURE_MINUTE
-from models import db, User, LiteratureSubscription, LiteratureItem, CitationLink, KnowledgePoint, DailyCheckin, ProtocolVideo, UploadedLiterature, AttendanceReward, Quiz, QuizAttempt, ProtocolCollection, PresentationTemplate, AgentLog, ApiKey, LiteraturePlanet, PlanetPaper, ChatHistory, LiteratureCategory, BookmarkedLiterature, KnowledgeFile, UserStudyPlan, ReadingListFile, ReadingListItem, ReadingSelection, ReadingScore, FinalReview
+from models import db, User, LiteratureSubscription, LiteratureItem, CitationLink, KnowledgePoint, DailyCheckin, ProtocolVideo, UploadedLiterature, AttendanceReward, Quiz, QuizAttempt, ProtocolCollection, PresentationTemplate, AgentLog, ApiKey, LiteraturePlanet, PlanetPaper, ChatHistory, LiteratureCategory, BookmarkedLiterature, KnowledgeFile, UserStudyPlan, UserKnowledgeLibrary, UserKnowledgeItem, KnowledgeReviewLog, ReadingListFile, ReadingListItem, ReadingSelection, ReadingScore, FinalReview
 from knowledge_points import DIFFICULTY_LABELS, DIFFICULTY_COLORS
 from knowledge_study_v2 import knowledge_study_bp, build_custom_study_context
 import json
@@ -1877,6 +1877,7 @@ def study_quiz_answer():
 
 @app.route("/admin/quizzes")
 @login_required
+@admin_required
 def admin_quizzes():
     from models import Quiz, KnowledgePoint
     kps = KnowledgePoint.query.order_by(KnowledgePoint.created_at.desc()).all()
@@ -1887,6 +1888,7 @@ def admin_quizzes():
 
 @app.route("/admin/quizzes/add", methods=["POST"])
 @login_required
+@admin_required
 def admin_add_quiz():
     from models import Quiz
     import json
@@ -2580,6 +2582,80 @@ def profile():
     )
 
 
+def _teacher_class_overview():
+    """Aggregate student literature and knowledge-forest metrics for teachers."""
+    if not current_user.is_admin:
+        return []
+    rows = []
+    students = User.query.filter_by(is_admin=False).order_by(User.student_id).all()
+    for user in students:
+        planets = LiteraturePlanet.query.filter_by(user_id=user.id).all()
+        planet_paper_count = sum(planet.papers.count() for planet in planets)
+        bookmark_count = BookmarkedLiterature.query.filter_by(user_id=user.id).count()
+        subscription_count = LiteratureSubscription.query.filter_by(
+            user_id=user.id, active=True
+        ).count()
+        upload_count = UploadedLiterature.query.filter_by(user_id=user.id).count()
+        checkin_count = DailyCheckin.query.filter_by(user_id=user.id).count()
+        total_score = (
+            db.session.query(
+                db.func.coalesce(db.func.sum(DailyCheckin.score), 0)
+            )
+            .filter_by(user_id=user.id)
+            .scalar()
+            or 0
+        )
+        library_count = UserKnowledgeLibrary.query.filter_by(user_id=user.id).count()
+        knowledge_item_count = (
+            db.session.query(db.func.count(UserKnowledgeItem.id))
+            .join(
+                UserKnowledgeLibrary,
+                UserKnowledgeItem.library_id == UserKnowledgeLibrary.id,
+            )
+            .filter(UserKnowledgeLibrary.user_id == user.id)
+            .scalar()
+            or 0
+        )
+        review_count = KnowledgeReviewLog.query.filter_by(user_id=user.id).count()
+        reward_count = AttendanceReward.query.filter_by(user_id=user.id).count()
+        last_checkin = (
+            DailyCheckin.query.filter_by(user_id=user.id)
+            .order_by(DailyCheckin.completed_at.desc())
+            .first()
+        )
+        selection_count = ReadingSelection.query.filter_by(user_id=user.id).count()
+        final_review = FinalReview.query.filter_by(user_id=user.id).first()
+        rows.append(
+            {
+                "student_id": user.student_id,
+                "name": user.name,
+                "planet_count": len(planets),
+                "planet_paper_count": planet_paper_count,
+                "planet_names": "；".join(
+                    planet.name for planet in planets[:3]
+                )
+                + (" 等" if len(planets) > 3 else ""),
+                "bookmark_count": bookmark_count,
+                "subscription_count": subscription_count,
+                "upload_count": upload_count,
+                "checkin_count": checkin_count,
+                "total_score": total_score,
+                "streak": _calc_streak(user.id),
+                "max_streak": _calc_max_streak(user.id),
+                "library_count": library_count,
+                "knowledge_item_count": knowledge_item_count,
+                "review_count": review_count,
+                "reward_count": reward_count,
+                "last_checkin_at": (
+                    last_checkin.completed_at if last_checkin else None
+                ),
+                "selection_count": selection_count,
+                "final_review_title": final_review.title if final_review else "",
+            }
+        )
+    return rows
+
+
 @app.route("/reading")
 @login_required
 def reading_dashboard():
@@ -2677,6 +2753,7 @@ def reading_dashboard():
         my_scores=my_scores,
         score_stats=score_stats,
         final_reviews=final_reviews,
+        student_overview=_teacher_class_overview(),
         score_criteria=READING_SCORE_CRITERIA,
         max_students_per_theme=READING_MAX_STUDENTS_PER_THEME,
         max_papers_per_theme=READING_MAX_PAPERS_PER_THEME,

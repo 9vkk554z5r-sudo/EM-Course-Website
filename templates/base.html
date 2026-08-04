@@ -41,7 +41,7 @@
                     智能汇报
                 </a>
                 {% if current_user.is_admin %}
-                <a href="{{ url_for('admin_dashboard') }}" class="nav-link {% if request.endpoint and 'admin' in request.endpoint %}active{% endif %}">星舵</a>
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-link {% if request.endpoint and 'admin' in request.endpoint %}active{% endif %}">管理后台</a>
                 {% endif %}
                 {% endif %}
             </div>
