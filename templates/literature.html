@@ -4,7 +4,7 @@
 {% block content %}
 <div class="literature-page">
     <div class="page-header">
-        <h1>📰 PULSAR｜前沿追踪</h1>
+        <h1>前沿追踪</h1>
         <div class="header-actions">
             <a href="{{ url_for('my_subscriptions') }}" class="btn btn-outline">我的订阅</a>
             <a href="{{ url_for('refresh_literature') }}" class="btn">刷新文献</a>
@@ -14,7 +14,7 @@
     <!-- Subscribe Form -->
     <div class="card">
         <div class="card-header">
-            <h2>BEACON｜订阅主题信标</h2>
+            <h2>订阅主题信标</h2>
         </div>
         <div class="card-body">
             <form method="POST" action="{{ url_for('subscribe') }}" class="subscribe-form">
@@ -43,7 +43,7 @@
     <!-- Paper List -->
     <div class="card">
         <div class="card-header">
-            <h2>ORBIT｜最新文献轨道</h2>
+            <h2>最新文献轨道</h2>
             <span class="badge">{{ pagination.total }} 篇</span>
         </div>
         <div class="card-body">

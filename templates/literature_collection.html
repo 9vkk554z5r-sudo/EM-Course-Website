@@ -1,7 +1,7 @@
 ﻿{% extends "base.html" %}
 {% block title %}文献星库{% endblock %}
 {% block content %}
-<div class="page-header"><h1>{{ _("VAULT｜我的文献星库", "VAULT | My Paper Library") }}</h1>
+<div class="page-header"><h1>我的文献星库</h1>
 <p class="text-muted">{{ _("创建分类，收藏文献", "Create categories and bookmark papers") }}</p></div>
 
 <div class="stats-grid" style="margin-bottom:16px">
@@ -10,7 +10,7 @@
 </div>
 
 <div class="card">
-<div class="card-header"><h2>{{ _("CONSTELLATION｜星座分类", "CONSTELLATION | Categories") }}</h2></div>
+<div class="card-header"><h2>星座分类</h2></div>
 <div class="card-body">
 <div class="form-row">
 <div class="form-group flex-grow"><input type="text" id="catName" placeholder="{{ _("新分类名称", "New category name") }}" style="width:100%"></div>
@@ -26,7 +26,7 @@
 </div></div></div>
 
 <div class="card">
-<div class="card-header"><h2>{{ _("VAULT｜收藏轨道", "VAULT | Saved Papers") }}</h2>
+<div class="card-header"><h2>收藏轨道</h2>
 <select id="filterCat" onchange="filterByCategory(this.value)" style="margin-left:auto;padding:4px 8px;border-radius:6px;background:rgba(10,15,36,0.6);color:var(--text-primary);border:1px solid rgba(59,130,246,0.2)">
 <option value="">{{ _("全部", "All") }}</option>
 {% for c in categories or [] %}

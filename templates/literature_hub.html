@@ -5,8 +5,8 @@
 <div class="literature-workspace graph-workbench literature-hub-page" data-initial-view="overview">
     <header class="literature-head literature-hub-hero">
         <div class="literature-hero-copy">
-            <p class="section-kicker">NEPHELE · LITERATURE UNIVERSE</p>
-            <h1>NEPHELE｜文献星云</h1>
+            <p class="section-kicker">文献星云</p>
+            <h1>文献星云</h1>
             <p>让散落论文在同一片星云中形成轨道、星链与主题星座，并给出下一步阅读建议</p>
         </div>
         <form class="graph-seed-form" data-graph-search>
@@ -23,15 +23,15 @@
             <button type="button" class="btn btn-sm btn-outline" data-example-query="exoplanet atmosphere" style="margin:2px">天体物理</button>
         </div>
         <nav class="literature-service-links" aria-label="文献服务">
-            <a href="{{ url_for('literature_weekly') }}"><span class="service-index">01</span><span><strong>PULSAR｜前沿脉冲</strong><small>围绕当前方向整理论文与阅读优先级</small></span><i>进入</i></a>
-            <a href="{{ url_for('agent_subscription') }}"><span class="service-index">02</span><span><strong>BEACON｜主题信标</strong><small>追踪研究主题并接收文献更新提醒</small></span><i>管理</i></a>
-            <a href="{{ url_for('nebula') }}"><span class="service-index">03</span><span><strong>NEXUS｜引用星链</strong><small>查看真实引用关系与论文连接</small></span><i>打开</i></a>
+            <a href="{{ url_for('literature_weekly') }}"><span class="service-index">01</span><span><strong>前沿脉冲</strong><small>围绕当前方向整理论文与阅读优先级</small></span><i>进入</i></a>
+            <a href="{{ url_for('agent_subscription') }}"><span class="service-index">02</span><span><strong>主题信标</strong><small>追踪研究主题并接收文献更新提醒</small></span><i>管理</i></a>
+            <a href="{{ url_for('nebula') }}"><span class="service-index">03</span><span><strong>引用星链</strong><small>查看真实引用关系与论文连接</small></span><i>打开</i></a>
         </nav>
     </header>
 
     <section class="import-console literature-import-console" data-import-console>
         <header class="literature-panel-heading">
-            <div><p class="section-kicker">ORBIT · IMPORT LIBRARY</p><h2>ORBIT｜文献入轨</h2><span>选择一种方式建立本地文献库</span></div>
+            <div><p class="section-kicker">文献入轨</p><h2>文献入轨</h2><span>选择一种方式建立本地文献库</span></div>
             <div class="import-status" data-import-status><strong>本地文献库</strong><span data-paper-count>0 篇文献</span><button type="button" class="btn btn-sm btn-outline" data-load-sample>载入示例数据</button><button type="button" class="btn btn-sm btn-outline" data-clear-library>清空本地导入</button></div>
         </header>
 
@@ -90,8 +90,8 @@
     <section class="graph-layout literature-graph-layout">
         <aside class="graph-sidebar literature-filter-sidebar">
             <section class="filter-block">
-                <p class="section-kicker">FILTERS</p>
-                <h2>ORBIT｜轨道筛选</h2>
+                <p class="section-kicker">筛选条件</p>
+                <h2>轨道筛选</h2>
                 <label for="filter-year">年份</label>
                 <select id="filter-year" data-filter-year><option value="all">全部年份</option><option value="2020">2020+</option><option value="2015">2015+</option><option value="2010">2010+</option></select>
                 <label for="filter-relevance">相关度</label>
@@ -107,13 +107,13 @@
                 <label><input type="checkbox" value="Topic" checked><span><i class="legend-dot topic"></i>主题</span></label>
             </section>
             <section class="legend-block">
-                <h2>NEXUS｜星链图例</h2>
+                <h2>星链图例</h2>
                 <div class="legend-grid"><span><i class="legend-line cites"></i>引用</span><span><i class="legend-line similar"></i>相似</span><span><i class="legend-line keyword-link"></i>共享关键词</span><span><i class="legend-line author-link"></i>同一作者</span></div>
             </section>
         </aside>
 
         <main class="graph-stage literature-graph-stage">
-            <header class="graph-stage-heading"><div><p class="section-kicker">CONSTELLATION · KNOWLEDGE MAP</p><h2 data-graph-title>CONSTELLATION｜主题星座</h2></div><span data-graph-meta>0 nodes · 0 relations</span></header>
+            <header class="graph-stage-heading"><div><p class="section-kicker">主题星座</p><h2 data-graph-title>主题星座</h2></div><span data-graph-meta>0 nodes · 0 relations</span></header>
         <div class="graph-metrics" style="display:flex;gap:16px;padding:8px 16px;font-size:13px;color:#8899aa">
 
             <span><strong id="node-count" style="color:#e8eef2">-</strong> 文献</span>
@@ -128,13 +128,13 @@
 
         <aside class="graph-insight-column literature-insight-column">
             <section class="node-detail" data-node-detail>
-                <p class="section-kicker">SELECTED NODE</p>
+                <p class="section-kicker">选中节点</p>
                 <h2>选择一个节点</h2>
                 <p>点击论文、作者、关键词或方法节点，查看摘要、关系和下一步操作</p>
             </section>
             <section class="hub-papers" data-hub-papers>
-                <p class="section-kicker">HUB PAPERS</p>
-                <h2>NEXUS｜枢纽论文 Top 5</h2>
+                <p class="section-kicker">枢纽论文</p>
+                <h2>枢纽论文前 5 篇</h2>
                 <p>综合网络连接数与被引次数排序</p>
 
                 <ol class="hub-list" data-hub-list style="padding-left:20px;margin-top:8px">
@@ -142,8 +142,8 @@
                 </ol>
             </section>
             <section class="analysis-panel" data-analysis-panel>
-                <p class="section-kicker">ANALYSIS</p>
-                <h2>ATLAS｜图谱洞察</h2>
+                <p class="section-kicker">图谱洞察</p>
+                <h2>图谱洞察</h2>
                 <p>导入文献后显示核心主题、关键论文、高频关键词、主要作者和数据质量提示</p>
             </section>
         </aside>

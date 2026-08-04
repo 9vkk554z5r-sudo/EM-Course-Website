@@ -5,8 +5,8 @@
 <div class="reward-forest-page">
     <section class="reward-forest-hero">
         <div class="reward-forest-copy">
-            <p class="section-kicker">GROVE · GROWTH FOREST</p>
-            <h1>{{ _('GROVE｜成长森境', 'GROVE | Growth Forest') }}</h1>
+            <p class="section-kicker">成长森境</p>
+            <h1>成长森境</h1>
             <p>{{ _('每一次学习都会留下生长年轮：周全勤萌芽，月全勤长成主树。', 'Every study session leaves a growth ring: weekly attendance sprouts, monthly attendance becomes a full tree.') }}</p>
             <div class="forest-hero-actions">
                 <a href="{{ url_for('study') }}" class="btn btn-primary">{{ _('开始学习打卡', 'Start Check-in') }}</a>
@@ -38,8 +38,8 @@
     <section class="reward-forest-panel">
         <div class="section-head">
             <div>
-                <p class="section-kicker">GROVE · GROWTH LOG</p>
-                <h2>{{ _('GROVE｜成长节点', 'GROVE | Growth Nodes') }}</h2>
+                <p class="section-kicker">成长节点</p>
+                <h2>成长节点</h2>
             </div>
             <div class="reward-panel-links">
                 <a href="#my-farm">{{ _('我的林场', 'My Farm') }}</a>
@@ -85,8 +85,8 @@
     <section class="cyber-farm-panel" id="my-farm">
         <div class="section-head">
             <div>
-                <p class="section-kicker">GAIA · MY GROVE</p>
-                <h2>{{ _('GAIA｜个人林场', 'GAIA | Personal Grove') }}</h2>
+                <p class="section-kicker">个人林场</p>
+                <h2>个人林场</h2>
             </div>
             {% if farm_preview %}
             <div class="farm-preview-controls" aria-label="{{ _('管理员林场预览控制', 'Admin farm preview controls') }}">
@@ -103,7 +103,7 @@
             <span class="farm-scan" aria-hidden="true"></span>
             {% if farm_preview %}
             <div class="farm-token-usage">
-                <span>TREE TOKEN · {{ _('林场容量', 'Farm Capacity') }}</span>
+                <span>成长令牌 · {{ _('林场容量', 'Farm Capacity') }}</span>
                 <strong><b data-token-count>{{ farm_display_tree_count }}</b><small>/12</small></strong>
                 <i><em data-token-meter style="width: {{ ((farm_display_tree_count / 12) * 100)|round|int }}%"></em></i>
             </div>

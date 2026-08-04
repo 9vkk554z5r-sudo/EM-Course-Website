@@ -5,8 +5,8 @@
 <div class="ai-pre-page">
     <section class="ai-pre-hero" aria-labelledby="ai-pre-title">
         <div class="ai-pre-hero-copy">
-            <span class="section-kicker">HERMES · PRESENTATION STUDIO</span>
-            <h1 id="ai-pre-title">{{ _("HERMES｜智能汇报", "HERMES | Presentation Studio") }}</h1>
+            <span class="section-kicker">智能汇报</span>
+            <h1 id="ai-pre-title">智能汇报</h1>
             <p>{{ _("像信使传递思想一样，把文献内容转译为清晰汇报：生成结构、分析文件并用统一标准复盘", "Translate research into a clear presentation: generate structure, analyze files, and review with consistent criteria") }}</p>
         </div>
         <div class="ai-pre-hero-meta" aria-label="{{ _('支持能力', 'Supported capabilities') }}">
@@ -19,11 +19,11 @@
     <section class="ai-pre-overview" aria-label="{{ _('AI Pre 工作流程', 'AI Pre workflow') }}">
         <article>
             <span class="ai-pre-step">01</span>
-            <div><strong>{{ _('NOVA｜生成汇报方案', 'NOVA | Generate a Plan') }}</strong><p>{{ _('输入论文标题或 DOI，获得内容结构、页面设计与答辩准备建议', 'Enter a title or DOI to receive structure, slide design, and Q&A preparation guidance') }}</p></div>
+            <div><strong>生成汇报方案</strong><p>{{ _('输入论文标题或 DOI，获得内容结构、页面设计与答辩准备建议', 'Enter a title or DOI to receive structure, slide design, and Q&A preparation guidance') }}</p></div>
         </article>
         <article>
             <span class="ai-pre-step">02</span>
-            <div><strong>{{ _('SPECTRUM｜分析已有文件', 'SPECTRUM | Analyze a File') }}</strong><p>{{ _('上传 PDF、PPT 或粘贴大纲，按统一标准检查内容表达与完整度', 'Upload a PDF or PPT, or paste an outline, to review clarity and completeness') }}</p></div>
+            <div><strong>分析已有文件</strong><p>{{ _('上传 PDF、PPT 或粘贴大纲，按统一标准检查内容表达与完整度', 'Upload a PDF or PPT, or paste an outline, to review clarity and completeness') }}</p></div>
         </article>
     </section>
 
@@ -31,7 +31,7 @@
         <article class="ai-pre-tool-card">
             <header class="ai-pre-card-head">
                 <span class="ai-pre-card-index">01</span>
-                <div><span class="section-kicker">NOVA · GENERATE</span><h2>{{ _('NOVA｜汇报生成', 'NOVA | Presentation Generator') }}</h2><p>{{ _('适合从文献快速搭建第一次汇报框架', 'Build a first presentation framework from a paper') }}</p></div>
+                <div><span class="section-kicker">汇报生成</span><h2>汇报生成</h2><p>{{ _('适合从文献快速搭建第一次汇报框架', 'Build a first presentation framework from a paper') }}</p></div>
             </header>
             <form method="POST" class="form ai-pre-form" enctype="multipart/form-data">
                 <input type="hidden" name="action" value="generate">
@@ -45,7 +45,7 @@
         <article class="ai-pre-tool-card ai-pre-tool-card-featured">
             <header class="ai-pre-card-head">
                 <span class="ai-pre-card-index">02</span>
-                <div><span class="section-kicker">SPECTRUM · ANALYZE</span><h2>{{ _('SPECTRUM｜文件解析', 'SPECTRUM | File Analysis') }}</h2><p>{{ _('适合复盘已有汇报，定位内容与表达问题', 'Review an existing presentation and identify content or communication issues') }}</p></div>
+                <div><span class="section-kicker">文件解析</span><h2>文件解析</h2><p>{{ _('适合复盘已有汇报，定位内容与表达问题', 'Review an existing presentation and identify content or communication issues') }}</p></div>
             </header>
             <form method="POST" class="form ai-pre-form" enctype="multipart/form-data">
                 <input type="hidden" name="action" value="analyze">
@@ -63,7 +63,7 @@
 
     <section class="ai-pre-template-panel">
         <header class="ai-pre-section-head">
-            <div><span class="section-kicker">ASTRAEA · SCORING LIBRARY</span><h2>{{ _('ASTRAEA｜评分天平', 'ASTRAEA | Scoring Library') }}</h2><p>{{ _('用统一维度比较不同汇报，评分结果更清晰', 'Use consistent dimensions to compare presentations clearly') }}</p></div>
+            <div><span class="section-kicker">评分天平</span><h2>评分天平</h2><p>{{ _('用统一维度比较不同汇报，评分结果更清晰', 'Use consistent dimensions to compare presentations clearly') }}</p></div>
             <button id="template-toggle" type="button" class="btn btn-sm btn-outline" aria-controls="templateForm" aria-expanded="false">{{ _('创建模板', 'Create Template') }}</button>
         </header>
         <div id="templateForm" class="ai-pre-template-form" hidden>
@@ -83,7 +83,7 @@
 
     {% if result %}
     <section class="ai-pre-results" aria-label="{{ _('AI 分析结果', 'AI analysis results') }}">
-        <header class="ai-pre-section-head ai-pre-results-head"><div><span class="section-kicker">ANALYSIS OUTPUT</span><h2>{{ _('分析结果', 'Analysis Results') }}</h2><p>{{ _('按文献信息、内容建议、问答准备和评分维度归类呈现', 'Results are organized by paper information, content guidance, Q&A preparation, and scoring') }}</p></div></header>
+        <header class="ai-pre-section-head ai-pre-results-head"><div><span class="section-kicker">分析结果</span><h2>{{ _('分析结果', 'Analysis Results') }}</h2><p>{{ _('按文献信息、内容建议、问答准备和评分维度归类呈现', 'Results are organized by paper information, content guidance, Q&A preparation, and scoring') }}</p></div></header>
         {% if result.found %}
         <article class="ai-pre-result-card ai-pre-paper-summary"><span class="ai-pre-result-label">{{ _('文献信息', 'Paper Information') }}</span><h3>{{ result.info.title }}</h3><p>{{ result.info.first_author }} · {{ result.info.journal }} ({{ result.info.publication_date[:4] if result.info.publication_date else "N/A" }}) · DOI: {{ result.info.doi }}</p>{% if result.key_points %}<div class="ai-pre-key-points"><strong>{{ _('核心要点', 'Key Points') }}</strong><ul>{% for kp in result.key_points %}<li>{{ kp }}</li>{% endfor %}</ul></div>{% endif %}</article>
         <div class="ai-pre-result-grid">

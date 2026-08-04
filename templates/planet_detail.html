@@ -131,12 +131,12 @@ window.addEventListener('resize',function(){W=c.clientWidth;H=400;camera.aspect=
 </script>
 {% endblock %}
 {% block content %}
-<div class="page-header"><h1>🪐 CONSTELLATION｜{{ planet.name }}</h1>
+<div class="page-header"><h1>🪐 {{ planet.name }}</h1>
 <p class="text-muted">{{ planet.topic }} · {{ papers|length }} 篇文献</p>
 <a href="{{ url_for('planets') }}" class="btn btn-sm btn-outline">← 返回星群</a>
 </div>
 <div id="solar-system" style="height:400px;margin-bottom:20px;background:radial-gradient(ellipse at center,#0a0f24 0%,#000 100%);border-radius:12px;cursor:grab;"></div>
-<div class="card"><div class="card-header"><h2>ORBIT｜添加文献到本星球</h2></div><div class="card-body">
+<div class="card"><div class="card-header"><h2>添加文献到本星球</h2></div><div class="card-body">
 <form method="POST" action="{{ url_for('planet_add_paper', pid=planet.id) }}" class="form">
 <div class="form-group"><input type="text" name="title" placeholder="文献标题" required style="width:100%"></div>
 <div class="form-row"><div class="form-group flex-grow"><input type="text" name="authors" placeholder="作者"></div>
@@ -147,7 +147,7 @@ window.addEventListener('resize',function(){W=c.clientWidth;H=400;camera.aspect=
 <div class="form-group"><textarea name="abstract" rows="2" placeholder="摘要（可选）" style="width:100%"></textarea></div>
 <button type="submit" class="btn btn-primary">添加到星球</button>
 </form></div></div>
-<div class="card"><div class="card-header"><h2>VAULT｜星球文献列表</h2>
+<div class="card"><div class="card-header"><h2>星球文献列表</h2>
 <div class="sort-links">
 <a href="?sort=date_desc" class="btn btn-sm btn-outline {% if sort=='date_desc' %}active{% endif %}">最新</a>
 <a href="?sort=date_asc" class="btn btn-sm btn-outline {% if sort=='date_asc' %}active{% endif %}">最早</a>

@@ -278,7 +278,7 @@ function renderNebulaFallback(container, data) {
     }).join('');
 
     container.innerHTML =
-        '<svg class="nebula-fallback-svg" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="NEXUS 引用星链关系网络">' +
+        '<svg class="nebula-fallback-svg" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="引用星链关系网络">' +
         '<defs><radialGradient id="nebulaGlow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#2ef2c3" stop-opacity=".35"/><stop offset="100%" stop-color="#00e5ff" stop-opacity="0"/></radialGradient></defs>' +
         '<rect width="100%" height="100%" fill="url(#nebulaGlow)" opacity=".55" />' + edgeMarkup + nodeMarkup + '</svg>' +
         '<div class="nebula-note">交互组件未加载，当前显示基础星云图</div>';

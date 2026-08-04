@@ -51,8 +51,8 @@
 <div class="reading-page">
     <header class="reading-header">
         <div>
-            <p class="section-kicker">COURSE READING · WEEKLY ASSIGNMENT</p>
-            <h1>{{ 'READING｜课程管理' if current_user.is_admin else 'READING｜选文与互评' }}</h1>
+            <p class="section-kicker">课程阅读 · 每周选文</p>
+            <h1>{{ '课程管理' if current_user.is_admin else '选文与互评' }}</h1>
         </div>
         {% if current_user.is_admin and files %}
         <div class="reading-header-actions">{{ files|length }} 个主题文件</div>
@@ -87,7 +87,7 @@
     {% if current_user.is_admin %}
     <section class="reading-panel">
         <div class="reading-panel-head">
-            <div><p class="section-kicker">TEACHER CONSOLE</p><h2>Reading List 上传</h2></div>
+            <div><p class="section-kicker">教师控制台</p><h2>选文清单上传</h2></div>
             <span>支持 Word / txt / md / csv，可一次上传全部文件</span>
         </div>
         <form class="reading-upload-form" method="post" enctype="multipart/form-data" action="{{ url_for('reading_upload') }}">
@@ -99,7 +99,7 @@
 
     <section class="reading-panel">
         <div class="reading-panel-head">
-            <div><p class="section-kicker">WEEKLY RELEASE</p><h2>本周选文主题</h2></div>
+            <div><p class="section-kicker">每周发布</p><h2>本周选文主题</h2></div>
             {% if active and active.file %}
             <span class="reading-badge {{ 'is-open' if active.open else 'is-closed' }}">{{ '开放中' if active.open else '未开放' }}</span>
             {% endif %}
@@ -166,7 +166,7 @@
     {% if not current_user.is_admin %}
     <section class="reading-panel">
         <div class="reading-panel-head">
-            <div><p class="section-kicker">MY ASSIGNMENT</p><h2>我的选文与 PPT</h2></div>
+            <div><p class="section-kicker">我的任务</p><h2>我的选文与演示文稿</h2></div>
         </div>
         {% if selections %}
         <div class="reading-table-wrap">
@@ -218,7 +218,7 @@
 
     <section class="reading-panel">
         <div class="reading-panel-head">
-            <div><p class="section-kicker">PEER REVIEW</p><h2>同学互评</h2></div>
+            <div><p class="section-kicker">同学互评</p><h2>同学互评</h2></div>
             <span>仅教师端可查看评分结果</span>
         </div>
         {% if scoring_targets %}
@@ -266,7 +266,7 @@
     {% if not current_user.is_admin %}
     <section class="reading-panel" id="final-review">
         <div class="reading-panel-head">
-            <div><p class="section-kicker">FINAL REVIEW</p><h2>期末综述</h2></div>
+            <div><p class="section-kicker">期末综述</p><h2>期末综述</h2></div>
             <span>教师评分与反馈会显示在这里</span>
         </div>
         {% if final_reviews %}
@@ -312,7 +312,7 @@
     {% if current_user.is_admin %}
     <section class="reading-panel">
         <div class="reading-panel-head">
-            <div><p class="section-kicker">THEME ORDER</p><h2>Reading List 文件</h2></div>
+            <div><p class="section-kicker">主题排序</p><h2>选文清单文件</h2></div>
             <div class="score-actions">
                 <a class="btn btn-sm btn-primary" href="{{ url_for('reading_export') }}">导出文献分享互评表</a>
             </div>
@@ -348,7 +348,7 @@
 
     <section class="reading-panel">
         <div class="reading-panel-head">
-            <div><p class="section-kicker">STUDENT OVERVIEW</p><h2>学生选文、PPT 与评分概况</h2></div>
+            <div><p class="section-kicker">学生概览</p><h2>学生选文、演示文稿与评分概况</h2></div>
         </div>
         {% if all_selections %}
         <div class="reading-table-wrap">
@@ -384,7 +384,7 @@
     {% for week_label, week_selections in selection_groups.items() %}
     <section class="reading-panel">
         <div class="reading-panel-head">
-            <div><p class="section-kicker">SELECTION RECORDS</p><h2>选文与评分明细 · {{ week_label }}</h2></div>
+            <div><p class="section-kicker">选文记录</p><h2>选文与评分明细 · {{ week_label }}</h2></div>
             <span>{{ week_selections|length }} 位选文同学</span>
         </div>
         {% for sel in week_selections %}
@@ -457,7 +457,7 @@
     {% if final_reviews %}
     <section class="reading-panel" id="final-review">
         <div class="reading-panel-head">
-            <div><p class="section-kicker">FINAL REVIEW</p><h2>期末综述评分与反馈</h2></div>
+            <div><p class="section-kicker">期末综述</p><h2>期末综述评分与反馈</h2></div>
             <div class="score-actions">
                 <span>{{ final_reviews|length }} 份</span>
                 <a class="btn btn-sm btn-primary" href="{{ url_for('reading_export_final_reviews') }}">导出期末综述评分表</a>

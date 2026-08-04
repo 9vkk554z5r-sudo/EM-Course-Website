@@ -1,40 +1,40 @@
 {% extends "admin_base.html" %}
 {% block title %}汇报模板管理{% endblock %}
 {% block content %}
-<div class="page-header"><h1>📊 Presentation Scoring Templates</h1>
-<a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline">&larr; Back</a></div>
+<div class="page-header"><h1>汇报评分模板</h1>
+<a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline">&larr; 返回</a></div>
 
-<div class="card"><div class="card-header"><h2>Create Template</h2></div><div class="card-body">
+<div class="card"><div class="card-header"><h2>新建评分模板</h2></div><div class="card-body">
 <form method="POST" class="form" id="templateForm">
-<div class="form-group"><label>Template Title</label><input type="text" name="title" required style="width:100%"></div>
-<div class="form-group"><label>Description</label><textarea name="description" rows="2" style="width:100%"></textarea></div>
-<div class="form-group"><label>Scoring Criteria</label>
-<table class="admin-table" id="criteriaTable"><thead><tr><th>Dimension</th><th>Weight</th><th>Standard</th><th></th></tr></thead>
+<div class="form-group"><label>模板名称</label><input type="text" name="title" required style="width:100%"></div>
+<div class="form-group"><label>模板说明</label><textarea name="description" rows="2" style="width:100%"></textarea></div>
+<div class="form-group"><label>评分标准</label>
+<table class="admin-table" id="criteriaTable"><thead><tr><th>评分维度</th><th>权重</th><th>评分标准</th><th></th></tr></thead>
 <tbody>
-<tr><td><input type="text" name="dimension[]" placeholder="e.g. Content" style="width:100%"></td>
-<td><input type="text" name="weight[]" placeholder="e.g. 30%" style="width:80px"></td>
-<td><input type="text" name="standard[]" placeholder="Description" style="width:100%"></td>
+<tr><td><input type="text" name="dimension[]" placeholder="例如：内容质量" style="width:100%"></td>
+<td><input type="text" name="weight[]" placeholder="例如：30%" style="width:80px"></td>
+<td><input type="text" name="standard[]" placeholder="描述评分标准" style="width:100%"></td>
 <td><button type="button" class="btn btn-sm btn-danger" onclick="this.parentElement.parentElement.remove()">X</button></td></tr>
 </tbody></table>
-<button type="button" class="btn btn-sm" onclick="addRow()">+ Add Criteria</button></div>
-<div class="form-group"><button type="submit" class="btn btn-primary">Create Template</button></div>
+<button type="button" class="btn btn-sm" onclick="addRow()">+ 添加评分标准</button></div>
+<div class="form-group"><button type="submit" class="btn btn-primary">新建模板</button></div>
 </form></div></div>
 
-<div class="card"><div class="card-header"><h2>Existing Templates</h2></div><div class="card-body">
+<div class="card"><div class="card-header"><h2>已有评分模板</h2></div><div class="card-body">
 {% if templates %}
 <div class="paper-list">{% for t in templates %}
 <div class="paper-item"><div class="paper-title">{{ t.title }}</div>
-<div class="paper-meta">{{ t.description[:100] }} &middot; Created {{ t.created_at.strftime("%Y-%m-%d") }}
-<a href="{{ url_for('admin_delete_presentation_template', tid=t.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')">Delete</a></div></div>
+<div class="paper-meta">{{ t.description[:100] }} &middot; 创建于 {{ t.created_at.strftime("%Y-%m-%d") }}
+<a href="{{ url_for('admin_delete_presentation_template', tid=t.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('确定删除？')">删除</a></div></div>
 {% endfor %}</div>
-{% else %}<div class="empty-state"><p>No templates yet.</p></div>{% endif %}
+{% else %}<div class="empty-state"><p>还没有评分模板。</p></div>{% endif %}
 </div></div>
 
 <script>
 function addRow() {
     var tbody = document.querySelector("#criteriaTable tbody");
     var tr = document.createElement("tr");
-    tr.innerHTML = '<td><input type="text" name="dimension[]" placeholder="Dimension" style="width:100%"></td><td><input type="text" name="weight[]" placeholder="%" style="width:80px"></td><td><input type="text" name="standard[]" placeholder="Standard" style="width:100%"></td><td><button type="button" class="btn btn-sm btn-danger" onclick="this.parentElement.parentElement.remove()">X</button></td>';
+    tr.innerHTML = '<td><input type="text" name="dimension[]" placeholder="评分维度" style="width:100%"></td><td><input type="text" name="weight[]" placeholder="%" style="width:80px"></td><td><input type="text" name="standard[]" placeholder="评分标准" style="width:100%"></td><td><button type="button" class="btn btn-sm btn-danger" onclick="this.parentElement.parentElement.remove()">X</button></td>';
     tbody.appendChild(tr);
 }
 </script>

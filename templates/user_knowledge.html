@@ -6,10 +6,10 @@
 <div style="text-align:right;margin-bottom:10px"><a href="{{ url_for('knowledge_upload') }}" class="btn btn-outline" style="font-size:0.85rem">\U0001f4c1 {{ _("\u4e0a\u4f20\u77e5\u8bc6\u5e93\u6587\u4ef6", "Upload Knowledge File") }}</a></div>
 
 <!-- AI Generate -->
-<div class="card"><div class="card-header"><h2>?? {{ _("AI \u751f\u6210\u77e5\u8bc6\u70b9", "AI Generate") }}</h2></div><div class="card-body">
+<div class="card"><div class="card-header"><h2>智能生成知识点</h2></div><div class="card-body">
 <form method="POST" action="{{ url_for('user_llm_generate') }}" class="form">
 <div class="form-row"><div class="form-group flex-grow"><input type="text" name="topic" placeholder="\u8f93\u5165\u4e3b\u9898\uff0c\u5982: cryo-EM" required style="width:100%"></div>
-<button type="submit" class="btn btn-primary">?? {{ _("AI \u751f\u6210", "Generate") }}</button></div>
+<button type="submit" class="btn btn-primary">智能生成</button></div>
 <p class="text-muted">{{ _("\u4f1a\u81ea\u52a8\u68c0\u7d22\u5df2\u6709\u77e5\u8bc6\u70b9\uff0c\u907f\u514d\u91cd\u590d\u751f\u6210", "RAG: checks existing KPs to avoid duplicates") }}</p>
 </form></div></div>
 

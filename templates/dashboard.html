@@ -17,7 +17,7 @@
         <div class="research-identity">
             <div class="research-title-block">
             <p class="section-kicker">{{ selected_course.label }}</p>
-            <h1 class="workbench-title"><span>{{ selected_course.name }}</span><span>{{ _('OBSERVATORY｜科研观测台', 'OBSERVATORY | Research Workspace') }}</span></h1>
+            <h1 class="workbench-title"><span>{{ selected_course.name }}</span><span>科研观测台</span></h1>
             <p class="workbench-subtitle">{{ _('围绕当前研究方向构建文献星云、总结实验方法、完成学习任务及进行科研问答', 'Build literature nebulas, summarize experimental methods, complete learning tasks and ask research questions around the current research direction') }}</p>
             </div>
             <div class="research-overview-block">
@@ -33,10 +33,10 @@
             </div>
             <div class="topic-orbit-frame" aria-hidden="true">
                 <div class="topic-orbit-core" id="topicOrbitCore">{{ primary_topic }}</div>
-                <span class="topic-orbit-node node-a">Literature</span>
-                <span class="topic-orbit-node node-b">Protocol</span>
-                <span class="topic-orbit-node node-c">Task</span>
-                <span class="topic-orbit-node node-d">Q&amp;A</span>
+                <span class="topic-orbit-node node-a">文献</span>
+                <span class="topic-orbit-node node-b">方法</span>
+                <span class="topic-orbit-node node-c">任务</span>
+                <span class="topic-orbit-node node-d">问答</span>
             </div>
             </div>
         </div>
@@ -44,8 +44,8 @@
         <div class="assistant-command pixel-assistant">
             <div class="command-head pixel-command-head">
                 <div>
-                    <p class="section-kicker">METIS · RESEARCH INTELLIGENCE</p>
-                    <h2>{{ _('METIS｜科研智脑', 'METIS | Research Intelligence') }}</h2>
+                    <p class="section-kicker">科研智脑</p>
+                    <h2>科研智脑</h2>
                 </div>
                 <button type="button" class="history-clear-btn" onclick="clearChat()">{{ _('清除历史', 'Clear History') }}</button>
             </div>
@@ -84,8 +84,8 @@
         <div class="section-column large literature-nebula-entry-card">
             <div class="section-head">
                 <div>
-                    <p class="section-kicker">NEPHELE · LITERATURE NEBULA</p>
-                    <h2>NEPHELE｜文献星云</h2>
+                    <p class="section-kicker">文献星云</p>
+                    <h2>文献星云</h2>
                 </div>
                 <a href="{{ url_for('literature_hub') }}" class="btn btn-sm btn-primary">进入文献星云</a>
             </div>
@@ -101,29 +101,29 @@
                 <span class="nebula-author node-d" aria-hidden="true"></span>
                 <span class="nebula-flow flow-a" aria-hidden="true"></span>
                 <span class="nebula-flow flow-b" aria-hidden="true"></span>
-                <span class="nebula-copy"><strong>NEPHELE｜文献星云</strong><span>从 DOI、BibTeX、RIS 或 CSV 聚合论文、关键词、作者和方法关系</span></span>
+                <span class="nebula-copy"><strong>文献星云</strong><span>从 DOI、BibTeX、RIS 或 CSV 聚合论文、关键词、作者和方法关系</span></span>
             </a>
             <div class="nebula-entry-actions nebula-integrated-actions">
-                <a href="{{ url_for('literature_hub') }}"><strong>ORBIT｜文献入轨</strong><span>导入文献并识别中心论文</span></a>
-                <a href="{{ url_for('literature_weekly') }}"><strong>PULSAR｜前沿脉冲</strong><span>把每周推荐接入星云探索</span></a>
-                <a href="{{ url_for('agent_subscription') }}"><strong>BEACON｜主题信标</strong><span>追踪研究主题与更新提醒</span></a>
+                <a href="{{ url_for('literature_hub') }}"><strong>文献入轨</strong><span>导入文献并识别中心论文</span></a>
+                <a href="{{ url_for('literature_weekly') }}"><strong>前沿脉冲</strong><span>把每周推荐接入星云探索</span></a>
+                <a href="{{ url_for('agent_subscription') }}"><strong>主题信标</strong><span>追踪研究主题与更新提醒</span></a>
             </div>
         </div>
 
         <div class="section-column daily-task-card">
             <div class="section-head">
                 <div>
-                    <p class="section-kicker">PRISM · DAILY FOCUS</p>
-                    <h2>PRISM｜今日学习计划</h2>
+                    <p class="section-kicker">今日学习计划</p>
+                    <h2>今日学习计划</h2>
                 </div>
             </div>
             <div class="daily-task-flow" aria-hidden="true">
                 <span class="task-flow-grid"></span>
                 <span class="task-flow-scan"></span>
                 <div class="task-day-chip">
-                    <span>DAILY FLOW</span>
+                    <span>每日流程</span>
                     <strong>03</strong>
-                    <small>FOCUS TASKS</small>
+                    <small>今日任务</small>
                 </div>
                 <div class="task-flow-route">
                     <span class="task-flow-line"><i></i></span>
@@ -141,7 +141,7 @@
     </section>
     <section class="module-groups">
         <div class="module-group ai-pre-entry-card">
-            <div class="section-head"><h2>HERMES｜智能汇报</h2><a href="{{ url_for('agent_presentation') }}">进入智能汇报</a></div>
+            <div class="section-head"><h2>智能汇报</h2><a href="{{ url_for('agent_presentation') }}">进入智能汇报</a></div>
             <a href="{{ url_for('agent_presentation') }}" class="ai-pre-dashboard-preview" aria-label="{{ _('打开 AI Pre 助手', 'Open AI Pre Assistant') }}">
                 <span class="ai-pre-preview-stars" aria-hidden="true"></span>
                 <span class="ai-pre-preview-grid" aria-hidden="true"></span>
@@ -154,16 +154,16 @@
                     <span class="ai-pre-data-flow flow-one"></span>
                     <span class="ai-pre-data-flow flow-two"></span>
                 </span>
-                <span class="ai-pre-dashboard-copy"><strong>HERMES｜智能汇报</strong><span>生成汇报结构、分析 PPT 并按自定义模板评分</span></span>
+                <span class="ai-pre-dashboard-copy"><strong>智能汇报</strong><span>生成汇报结构、分析 PPT 并按自定义模板评分</span></span>
             </a>
             <div class="ai-pre-entry-actions">
-                <a href="{{ url_for('agent_presentation') }}"><strong>NOVA｜汇报生成</strong><span>从论文标题或 DOI 搭建汇报框架</span></a>
-                <a href="{{ url_for('agent_presentation') }}"><strong>SPECTRUM｜文件解析</strong><span>上传文件并获取内容与表达建议</span></a>
+                <a href="{{ url_for('agent_presentation') }}"><strong>汇报生成</strong><span>从论文标题或 DOI 搭建汇报框架</span></a>
+                <a href="{{ url_for('agent_presentation') }}"><strong>文件解析</strong><span>上传文件并获取内容与表达建议</span></a>
             </div>
         </div>
 
         <div class="module-group method-lab-entry-card">
-            <div class="section-head"><h2>FORGE｜方法工坊</h2><a href="{{ url_for('experiments_page') }}">打开工坊</a></div>
+            <div class="section-head"><h2>方法工坊</h2><a href="{{ url_for('experiments_page') }}">打开工坊</a></div>
             <a href="{{ url_for('experiments_page') }}" class="method-lab-preview" aria-label="{{ _('打开实验方法', 'Open Methods') }}">
                 <span class="method-stars" aria-hidden="true"></span>
                 <span class="method-grid" aria-hidden="true"></span>
@@ -173,16 +173,16 @@
                 <span class="method-sample sample-a" aria-hidden="true"></span>
                 <span class="method-sample sample-b" aria-hidden="true"></span>
                 <span class="method-protocol-lines" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="method-core-copy"><strong>FORGE｜方法工坊</strong><span>视频学习与个人 Protocol 收藏统一进入这里</span></span>
+                <span class="method-core-copy"><strong>方法工坊</strong><span>视频学习与个人 Protocol 收藏统一进入这里</span></span>
             </a>
             <div class="method-entry-actions">
-                <a href="{{ url_for('protocols') }}"><strong>LABCAST｜方法影像</strong><span>观看实验操作与流程训练</span></a>
-                <a href="{{ url_for('agent_methods') }}"><strong>PROTOCOL｜流程星库</strong><span>整理文献提取的实验流程</span></a>
+                <a href="{{ url_for('protocols') }}"><strong>方法影像</strong><span>观看实验操作与流程训练</span></a>
+                <a href="{{ url_for('agent_methods') }}"><strong>流程星库</strong><span>整理文献提取的实验流程</span></a>
             </div>
         </div>
 
         <div class="module-group knowledge-forest-entry-card">
-            <div class="section-head"><h2>GAIA｜知识森林</h2><a href="{{ url_for('knowledge_forest') }}">进入知识森林</a></div>
+            <div class="section-head"><h2>知识森林</h2><a href="{{ url_for('knowledge_forest') }}">进入知识森林</a></div>
             <a href="{{ url_for('knowledge_forest') }}" class="cyber-forest-preview" aria-label="{{ _('进入知识森林', 'Enter Knowledge Forest') }}">
                 <span class="forest-sky" aria-hidden="true"></span>
                 <span class="forest-grid" aria-hidden="true"></span>
@@ -191,11 +191,11 @@
                 <span class="forest-tree tree-c" aria-hidden="true"></span>
                 <span class="forest-tree tree-d" aria-hidden="true"></span>
                 <span class="forest-scan" aria-hidden="true"></span>
-                <span class="forest-core-copy"><strong>GAIA｜知识森林</strong><span>每日知识点、答题测验与打卡成长统一进入这里</span></span>
+                <span class="forest-core-copy"><strong>知识森林</strong><span>每日知识点、答题测验与打卡成长统一进入这里</span></span>
             </a>
             <div class="forest-entry-actions">
-                <a href="{{ url_for('study') }}"><strong>PRISM｜知识棱镜</strong><span>继续每日知识点训练</span></a>
-                <a href="{{ url_for('rewards') }}"><strong>GROVE｜成长森境</strong><span>查看打卡成长与奖励</span></a>
+                <a href="{{ url_for('study') }}"><strong>知识棱镜</strong><span>继续每日知识点训练</span></a>
+                <a href="{{ url_for('rewards') }}"><strong>成长森境</strong><span>查看打卡成长与奖励</span></a>
             </div>
         </div>
     </section>

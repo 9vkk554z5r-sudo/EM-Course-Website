@@ -6,7 +6,7 @@
 <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline">← {{ _("返回首页", "Back to Home") }}</a></div>
 
 <div class="card" style="border-left:4px solid #3b82f6">
-<div class="card-header"><h2>🔍 {{ _("优化1：RAG 降低文献幻觉", "Opt 1: RAG Reduces Hallucination") }}</h2>
+<div class="card-header"><h2>优化1：检索增强降低文献幻觉</h2>
 <span class="badge" style="background:#10b981">✅ {{ _("已部署", "Deployed") }}</span></div>
 <div class="card-body">
 <p><strong>{{ _("目标", "Goal") }}:</strong> {{ _("用户提问时，Agent优先检索学术文献、知识库和上传文件，基于真实数据回答，不依赖LLM内部知识", "Triple retrieval before answering") }}</p>

@@ -441,17 +441,17 @@
             '<div class="detail-meta">',
             node.year ? '<span>' + escapeHtml(node.year) + '</span>' : '',
             node.authors ? '<span>' + escapeHtml(node.authors) + '</span>' : '',
-            node.citation_count ? '<span>' + node.citation_count + ' citations</span>' : '',
+            node.citation_count ? '<span>' + node.citation_count + ' 次被引</span>' : '',
             '</div>',
             '<div class="keyword-row">' + keywords + '</div>',
             '<p>' + escapeHtml(node.abstract || '暂无摘要') + '</p>',
-            '<div class="score-row"><span>Relevance</span><strong>' + Math.round((node.relevance || 0) * 100) + '%</strong></div>',
+            '<div class="score-row"><span>相关度</span><strong>' + Math.round((node.relevance || 0) * 100) + '%</strong></div>',
             '<div class="detail-actions">',
             '<button class="btn btn-sm btn-outline" type="button" data-action="favorite">加入收藏</button>',
             '<button class="btn btn-sm btn-outline" type="button" data-action="read">标记已读</button>',
-            '<button class="btn btn-sm btn-outline" type="button" data-action="note">OBSERVATORY｜生成笔记</button>',
-            '<button class="btn btn-sm btn-outline" type="button" data-action="trace">NEXUS｜追踪星链</button>',
-            '<a class="btn btn-sm btn-primary" href="/dashboard">询问 METIS</a>',
+            '<button class="btn btn-sm btn-outline" type="button" data-action="note">生成笔记</button>',
+            '<button class="btn btn-sm btn-outline" type="button" data-action="trace">追踪星链</button>',
+            '<a class="btn btn-sm btn-primary" href="/dashboard">询问科研助手</a>',
             '</div>',
         ].join('');
         var favorite = detail.querySelector('[data-action="favorite"]');
@@ -467,17 +467,17 @@
     function renderAnalysis(analysis) {
         if (!analysisPanel) return;
         if (!analysis) {
-            analysisPanel.innerHTML = '<p class="section-kicker">ATLAS · ANALYSIS</p><h2>ATLAS｜图谱洞察</h2><p>导入文献后显示核心主题、关键论文、高频关键词、主要作者和数据质量提示</p>';
+            analysisPanel.innerHTML = '<p class="section-kicker">图谱洞察</p><h2>图谱洞察</h2><p>导入文献后显示核心主题、关键论文、高频关键词、主要作者和数据质量提示</p>';
             return;
         }
         analysisPanel.innerHTML = [
-            '<p class="section-kicker">Analysis</p>',
-            '<h2>ATLAS｜图谱洞察</h2>',
+            '<p class="section-kicker">图谱洞察</p>',
+            '<h2>图谱洞察</h2>',
             listBlock('核心主题 Top 5', analysis.themes),
             listBlock('关键论文 Top 5', analysis.papers.map(function (p) { return p.title; })),
             listBlock('高频关键词 Top 10', analysis.keywords),
             listBlock('主要作者/团队', analysis.authors),
-            listBlock('PULSAR｜下一步阅读信号', analysis.recommended.map(function (p) { return p.title; })),
+            listBlock('下一步阅读信号', analysis.recommended.map(function (p) { return p.title; })),
             listBlock('数据质量提示', analysis.quality),
         ].join('');
     }
@@ -515,10 +515,10 @@
 
     function viewTitle(view) {
         return {
-            overview: 'NEPHELE｜动态文献星球',
-            citation: 'Citation Planet · 引用星球',
-            keywords: 'Cluster Planet · 关键词星球',
-            timeline: 'Timeline · 时间线',
+            overview: '动态文献星球',
+            citation: '引用星球',
+            keywords: '关键词星球',
+            timeline: '时间线',
         }[view] || '主题总览';
     }
 
