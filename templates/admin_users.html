@@ -12,7 +12,14 @@
 <td>{% if u.is_admin %}✅{% else %}-{% endif %}</td>
 <td>{{ u.registered_at.strftime('%m-%d') }}</td>
 <td>
+<div class="score-actions">
 <a href="{{ url_for('admin_set_admin', uid=u.id) }}" class="btn btn-sm btn-outline">{% if u.is_admin %}取消教师/管理员{% else %}设为教师/管理员{% endif %}</a>
+{% if not u.is_admin %}
+<form method="post" action="{{ url_for('admin_delete_user', uid=u.id) }}" onsubmit="return confirm('确定删除该学生及其全部学习数据？此操作不可恢复。')">
+<button type="submit" class="btn btn-sm btn-danger">删除成员</button>
+</form>
+{% endif %}
+</div>
 </td>
 </tr>
 {% endfor %}

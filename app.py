@@ -15,7 +15,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from config import SECRET_KEY, SQLALCHEMY_DATABASE_URI, SQLALCHEMY_TRACK_MODIFICATIONS
 from config import WEEKLY_LITERATURE_HOUR, WEEKLY_LITERATURE_MINUTE
-from models import db, User, LiteratureSubscription, LiteratureItem, CitationLink, KnowledgePoint, DailyCheckin, ProtocolVideo, UploadedLiterature, AttendanceReward, Quiz, QuizAttempt, ProtocolCollection, PresentationTemplate, AgentLog, ApiKey, LiteraturePlanet, PlanetPaper, ChatHistory, LiteratureCategory, BookmarkedLiterature, KnowledgeFile, UserStudyPlan, UserKnowledgeLibrary, UserKnowledgeItem, KnowledgeReviewLog, ReadingListFile, ReadingListItem, ReadingSelection, ReadingScore, FinalReview
+from models import db, User, LiteratureSubscription, LiteratureItem, CitationLink, KnowledgePoint, DailyCheckin, ProtocolVideo, UploadedLiterature, AttendanceReward, Quiz, QuizAttempt, ProtocolCollection, PresentationTemplate, AgentLog, ApiKey, LiteraturePlanet, PlanetPaper, ChatHistory, LiteratureCategory, BookmarkedLiterature, KnowledgeFile, UserStudyPlan, UserKnowledgeLibrary, UserKnowledgeItem, KnowledgeReviewLog, KnowledgeReviewProgress, DailyKnowledgeTask, ReadingListFile, ReadingListItem, ReadingSelection, ReadingScore, FinalReview
 from knowledge_points import DIFFICULTY_LABELS, DIFFICULTY_COLORS
 from knowledge_study_v2 import knowledge_study_bp, build_custom_study_context
 import json
@@ -1390,6 +1390,132 @@ def admin_set_admin(uid):
     return redirect(url_for("admin_users"))
 
 
+def _remove_upload_file(file_path, subdir):
+    if not file_path:
+        return
+    upload_root = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "uploads", subdir
+    )
+    abs_file = os.path.abspath(file_path)
+    abs_root = os.path.abspath(upload_root)
+    if abs_file.startswith(abs_root + os.sep) and os.path.exists(abs_file):
+        try:
+            os.remove(abs_file)
+        except OSError:
+            pass
+
+
+def _delete_user_data(user):
+    user_id = user.id
+    for score in ReadingScore.query.filter_by(rater_id=user_id).all():
+        db.session.delete(score)
+    for selection in ReadingSelection.query.filter_by(user_id=user_id).all():
+        _remove_upload_file(selection.ppt_path, "reading_ppts")
+        db.session.delete(selection)
+    for review in FinalReview.query.filter_by(user_id=user_id).all():
+        _remove_upload_file(review.file_path, "final_reviews")
+        db.session.delete(review)
+    for planet in LiteraturePlanet.query.filter_by(user_id=user_id).all():
+        for paper in planet.papers.all():
+            db.session.delete(paper)
+        db.session.delete(planet)
+    for bookmark in BookmarkedLiterature.query.filter_by(user_id=user_id).all():
+        db.session.delete(bookmark)
+    for category in LiteratureCategory.query.filter_by(user_id=user_id).all():
+        db.session.delete(category)
+    for model in (
+        UploadedLiterature,
+        LiteratureSubscription,
+        QuizAttempt,
+        DailyCheckin,
+        AttendanceReward,
+        ProtocolCollection,
+        UserStudyPlan,
+        ApiKey,
+        ChatHistory,
+        KnowledgeFile,
+    ):
+        for row in model.query.filter_by(user_id=user_id).all():
+            db.session.delete(row)
+    for template in PresentationTemplate.query.filter_by(uploaded_by=user_id).all():
+        db.session.delete(template)
+    for reading_list in ReadingListFile.query.filter_by(uploaded_by=user_id).all():
+        db.session.delete(reading_list)
+    for video in ProtocolVideo.query.filter_by(uploaded_by=user_id).all():
+        _remove_upload_file(video.video_path, "videos")
+        _remove_upload_file(video.thumbnail, "thumbnails")
+        db.session.delete(video)
+    for log in AgentLog.query.filter_by(user_id=user_id).all():
+        log.user_id = None
+    for log in KnowledgeReviewLog.query.filter_by(user_id=user_id).all():
+        db.session.delete(log)
+    for progress in KnowledgeReviewProgress.query.filter_by(user_id=user_id).all():
+        db.session.delete(progress)
+    for library in UserKnowledgeLibrary.query.filter_by(user_id=user_id).all():
+        for item in library.items.all():
+            for progress in KnowledgeReviewProgress.query.filter_by(
+                item_id=item.id
+            ).all():
+                db.session.delete(progress)
+            for log in KnowledgeReviewLog.query.filter_by(item_id=item.id).all():
+                db.session.delete(log)
+            for task in DailyKnowledgeTask.query.filter_by(item_id=item.id).all():
+                db.session.delete(task)
+            db.session.delete(item)
+        db.session.delete(library)
+    for task in DailyKnowledgeTask.query.filter_by(user_id=user_id).all():
+        db.session.delete(task)
+
+
+@app.route("/admin/users/delete/<int:uid>", methods=["POST"])
+@login_required
+@admin_required
+def admin_delete_user(uid):
+    user = db.session.get(User, uid)
+    if not user:
+        abort(404)
+    if user.is_admin:
+        flash("不能删除教师/管理员账号", "error")
+        return redirect(request.referrer or url_for("admin_users"))
+    _delete_user_data(user)
+    db.session.delete(user)
+    db.session.commit()
+    flash(f"已删除学生 {user.name}（{user.student_id}）及其相关数据", "success")
+    return redirect(request.referrer or url_for("admin_users"))
+
+
+@app.route("/admin/users/<int:uid>/delete-ppts", methods=["POST"])
+@admin_required
+def admin_delete_student_ppts(uid):
+    user = db.session.get(User, uid)
+    if not user or user.is_admin:
+        abort(404)
+    deleted = 0
+    for selection in ReadingSelection.query.filter_by(user_id=user.id).all():
+        if selection.ppt_path:
+            _remove_upload_file(selection.ppt_path, "reading_ppts")
+            selection.ppt_filename = ""
+            selection.ppt_path = ""
+            selection.ppt_uploaded_at = None
+            deleted += 1
+    db.session.commit()
+    flash(f"已删除 {user.name} 上传的 {deleted} 份文献分享 PPT", "success")
+    return redirect(request.referrer or url_for("reading_dashboard"))
+
+
+@app.route("/final-review/<int:review_id>/delete", methods=["POST"])
+@admin_required
+def admin_delete_final_review(review_id):
+    review = db.session.get(FinalReview, review_id)
+    if not review:
+        abort(404)
+    _remove_upload_file(review.file_path, "final_reviews")
+    db.session.delete(review)
+    db.session.commit()
+    flash("已删除该学生的期末综述", "success")
+    return redirect(request.referrer or url_for("reading_dashboard"))
+
+
 @app.route("/protocols")
 @login_required
 def protocols():
@@ -2624,9 +2750,15 @@ def _teacher_class_overview():
             .first()
         )
         selection_count = ReadingSelection.query.filter_by(user_id=user.id).count()
+        ppt_count = (
+            ReadingSelection.query.filter_by(user_id=user.id)
+            .filter(ReadingSelection.ppt_path != "")
+            .count()
+        )
         final_review = FinalReview.query.filter_by(user_id=user.id).first()
         rows.append(
             {
+                "user_id": user.id,
                 "student_id": user.student_id,
                 "name": user.name,
                 "planet_count": len(planets),
@@ -2650,6 +2782,8 @@ def _teacher_class_overview():
                     last_checkin.completed_at if last_checkin else None
                 ),
                 "selection_count": selection_count,
+                "ppt_count": ppt_count,
+                "final_review_id": final_review.id if final_review else None,
                 "final_review_title": final_review.title if final_review else "",
             }
         )
@@ -2770,6 +2904,7 @@ def reading_upload():
         flash("请选择要上传的 reading list 文件", "error")
         return redirect(url_for("reading_dashboard"))
 
+    manual_theme = request.form.get("theme", "").strip()
     parsed = []
     total_items = 0
     for file_storage in uploaded:
@@ -2783,7 +2918,7 @@ def reading_upload():
         if not items:
             flash(f"{file_storage.filename}: 未识别到文献条目", "error")
             continue
-        parsed.append((filename, theme, file_type, items))
+        parsed.append((filename, manual_theme or theme, file_type, items))
         total_items += len(items)
 
     if not parsed:

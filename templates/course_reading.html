@@ -23,7 +23,7 @@
 .reading-meta-row strong { color: #fff; }
 .reading-table-wrap { overflow-x: auto; }
 .reading-table { width: 100%; min-width: 820px; border-collapse: collapse; }
-.class-overview-table { min-width: 1500px; }
+.class-overview-table { min-width: 1750px; }
 .reading-table th, .reading-table td { text-align: left; padding: 12px; border-bottom: 1px solid rgba(100,220,255,.12); vertical-align: top; word-break: break-word; }
 .reading-table th { color: #9fb3c8; font-size: .82rem; font-weight: 600; }
 .reading-meta { margin-top: 6px; color: #8fa5b8; font-size: .85rem; display: flex; gap: 10px; flex-wrap: wrap; }
@@ -112,6 +112,8 @@
                     <th>最近学习</th>
                     <th>选文数</th>
                     <th>期末综述</th>
+                    <th>分享 PPT</th>
+                    <th>操作</th>
                 </tr></thead>
                 <tbody>
                 {% for row in student_overview %}
@@ -133,6 +135,24 @@
                     <td>{{ format_dt(row.last_checkin_at) if row.last_checkin_at else '暂无' }}</td>
                     <td>{{ row.selection_count }}</td>
                     <td>{{ row.final_review_title if row.final_review_title else '未提交' }}</td>
+                    <td>{{ row.ppt_count }}</td>
+                    <td>
+                        <div class="score-actions">
+                            {% if row.ppt_count %}
+                            <form method="post" action="{{ url_for('admin_delete_student_ppts', uid=row.user_id) }}" onsubmit="return confirm('确定删除该学生上传的全部文献分享 PPT？')">
+                                <button type="submit" class="btn btn-sm btn-outline">删除 PPT</button>
+                            </form>
+                            {% endif %}
+                            {% if row.final_review_id %}
+                            <form method="post" action="{{ url_for('admin_delete_final_review', review_id=row.final_review_id) }}" onsubmit="return confirm('确定删除该学生的期末综述？')">
+                                <button type="submit" class="btn btn-sm btn-outline">删除综述</button>
+                            </form>
+                            {% endif %}
+                            <form method="post" action="{{ url_for('admin_delete_user', uid=row.user_id) }}" onsubmit="return confirm('确定删除该学生及其全部学习数据？此操作不可恢复。')">
+                                <button type="submit" class="btn btn-sm btn-danger">删除成员</button>
+                            </form>
+                        </div>
+                    </td>
                 </tr>
                 {% endfor %}
                 </tbody>
@@ -151,6 +171,7 @@
             <span>支持 Word / txt / md / csv，可一次上传全部文件</span>
         </div>
         <form class="reading-upload-form" method="post" enctype="multipart/form-data" action="{{ url_for('reading_upload') }}">
+            <input type="text" name="theme" placeholder="主题词（可选，留空自动推断）">
             <input type="file" name="reading_files" multiple accept=".docx,.doc,.txt,.md,.markdown,.csv" required>
             <button type="submit" class="btn btn-primary">上传全部文件</button>
         </form>
@@ -204,7 +225,12 @@
                     <td>
                         {% if current_user.is_admin and row.selection %}
                         <div class="score-actions">
-                            {% if row.selection.ppt_path %}<a class="btn btn-sm btn-outline" href="{{ url_for('reading_ppt', selection_id=row.selection.id) }}">下载 PPT</a>{% endif %}
+                            {% if row.selection.ppt_path %}
+                            <a class="btn btn-sm btn-outline" href="{{ url_for('reading_ppt', selection_id=row.selection.id) }}">下载 PPT</a>
+                            <form method="post" action="{{ url_for('reading_delete_ppt', selection_id=row.selection.id) }}" onsubmit="return confirm('确定删除该 PPT？')">
+                                <button type="submit" class="btn btn-sm btn-outline">删除 PPT</button>
+                            </form>
+                            {% endif %}
                             <form method="post" action="{{ url_for('reading_delete_selection', selection_id=row.selection.id) }}"><button class="btn btn-sm btn-outline">取消选文</button></form>
                         </div>
                         {% elif not current_user.is_admin and active.open and not row.taken and not row.mine %}
@@ -452,7 +478,12 @@
             <div class="reading-meta-row">
                 <span><strong>{{ sel.user.name }}</strong> / {{ sel.user.student_id }}</span>
                 <span>{{ sel.item.title }}</span>
-                {% if sel.ppt_path %}<span><a href="{{ url_for('reading_ppt', selection_id=sel.id) }}">PPT</a></span>{% else %}<span>未上传 PPT</span>{% endif %}
+                {% if sel.ppt_path %}
+                <span><a href="{{ url_for('reading_ppt', selection_id=sel.id) }}">PPT</a></span>
+                <form method="post" action="{{ url_for('reading_delete_ppt', selection_id=sel.id) }}" onsubmit="return confirm('确定删除该 PPT？')">
+                    <button type="submit" class="btn btn-sm btn-outline">删除 PPT</button>
+                </form>
+                {% else %}<span>未上传 PPT</span>{% endif %}
             </div>
             {% if sel.scores.count() %}
             <div class="reading-table-wrap">
@@ -525,7 +556,7 @@
         </div>
         <div class="reading-table-wrap">
             <table class="admin-table reading-table">
-                <thead><tr><th>学号</th><th>姓名</th><th>标题</th><th>文件</th><th>评分</th><th>提交时间</th></tr></thead>
+                <thead><tr><th>学号</th><th>姓名</th><th>标题</th><th>文件</th><th>评分</th><th>提交时间</th><th>操作</th></tr></thead>
                 <tbody>
                 {% for review in final_reviews %}
                 <tr>
@@ -535,6 +566,13 @@
                     <td><a href="{{ url_for('final_review_download', review_id=review.id) }}">{{ review.filename }}</a></td>
                     <td>{{ review.score if review.score is not none else '-' }}</td>
                     <td>{{ format_dt(review.submitted_at) }}</td>
+                    <td>
+                        {% if current_user.is_admin %}
+                        <form method="post" action="{{ url_for('admin_delete_final_review', review_id=review.id) }}" onsubmit="return confirm('确定删除该学生的期末综述？')">
+                            <button type="submit" class="btn btn-sm btn-outline">删除综述</button>
+                        </form>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
                 </tbody>
