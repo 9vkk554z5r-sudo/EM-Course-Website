@@ -436,6 +436,9 @@ class ReadingListFile(db.Model):
     file_type = db.Column(db.String(20), default="txt")
     week_order = db.Column(db.Integer, default=0, nullable=False, index=True)
     is_open = db.Column(db.Boolean, default=False, nullable=False)
+    selection_start_at = db.Column(db.DateTime)
+    selection_end_at = db.Column(db.DateTime)
+    manual_closed = db.Column(db.Boolean, default=False, nullable=False)
     uploaded_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     uploaded_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 

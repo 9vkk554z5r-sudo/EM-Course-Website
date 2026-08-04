@@ -175,6 +175,13 @@ def _format_reading_dt(value):
     return local_value.strftime("%Y-%m-%d %H:%M")
 
 
+def _format_reading_dt_iso(value):
+    local_value = _as_local(value)
+    if local_value is None:
+        return ""
+    return local_value.strftime("%Y-%m-%dT%H:%M")
+
+
 def _week_deadline(week_label):
     release_date = datetime.strptime(week_label, "%Y-%m-%d").date()
     return datetime.combine(
@@ -205,6 +212,49 @@ def _next_friday_10(after_dt):
     return release
 
 
+def _theme_selection_count(reading_list, week_label):
+    item_ids = [item.id for item in reading_list.items]
+    if not item_ids:
+        return 0
+    return ReadingSelection.query.filter(
+        ReadingSelection.week_label == week_label,
+        ReadingSelection.reading_list_item_id.in_(item_ids),
+    ).count()
+
+
+def _reading_open_state(
+    reading_list, week_label, now_local, release_start=None, release_end=None
+):
+    now_local = now_local or datetime.now(READING_TZ)
+    if now_local.tzinfo is None:
+        now_local = now_local.replace(tzinfo=READING_TZ)
+    start = _as_local(reading_list.selection_start_at)
+    end = _as_local(reading_list.selection_end_at)
+    count = _theme_selection_count(reading_list, week_label)
+
+    scheduled = True
+    if start and end:
+        scheduled = start <= now_local < end
+    elif start:
+        scheduled = now_local >= start
+    elif end:
+        scheduled = now_local < end
+    elif release_start is not None and release_end is not None:
+        scheduled = release_start <= now_local < release_end
+
+    if count >= READING_MAX_STUDENTS_PER_THEME:
+        return {"open": False, "reason": "full", "count": count}
+    if reading_list.manual_closed:
+        return {"open": False, "reason": "manual", "count": count}
+    if reading_list.is_open:
+        return {"open": True, "reason": "manual", "count": count}
+    return {
+        "open": scheduled,
+        "reason": "scheduled" if scheduled else "closed",
+        "count": count,
+    }
+
+
 def _active_reading_week(files=None, now=None):
     if files is None:
         files = ReadingListFile.query.order_by(
@@ -217,13 +267,36 @@ def _active_reading_week(files=None, now=None):
     if now_local.tzinfo is None:
         now_local = now_local.replace(tzinfo=READING_TZ)
 
+    for reading_list in files:
+        start = _as_local(reading_list.selection_start_at)
+        end = _as_local(reading_list.selection_end_at)
+        if start and end and start <= now_local < end:
+            week_label = start.date().strftime("%Y-%m-%d")
+            state = _reading_open_state(
+                reading_list, week_label, now_local, start, end
+            )
+            return {
+                "file": reading_list,
+                "open": state["open"],
+                "state": state,
+                "week_label": week_label,
+                "release_start": start,
+                "release_end": end,
+                "next_release": end,
+            }
+
     first_release = _next_friday_10(files[0].uploaded_at)
     if now_local < first_release:
-        if files[0].is_open:
+        if files[0].is_open and not files[0].manual_closed:
+            week_label = first_release.date().strftime("%Y-%m-%d")
+            state = _reading_open_state(
+                files[0], week_label, now_local, now_local, first_release
+            )
             return {
                 "file": files[0],
-                "open": True,
-                "week_label": first_release.date().strftime("%Y-%m-%d"),
+                "open": state["open"],
+                "state": state,
+                "week_label": week_label,
                 "release_start": now_local,
                 "release_end": first_release,
                 "next_release": first_release,
@@ -231,6 +304,7 @@ def _active_reading_week(files=None, now=None):
         return {
             "file": None,
             "open": False,
+            "state": {"open": False, "reason": "closed", "count": 0},
             "week_label": None,
             "release_start": first_release,
             "release_end": first_release + timedelta(days=7),
@@ -241,11 +315,17 @@ def _active_reading_week(files=None, now=None):
     index = (elapsed_days // 7) % len(files)
     release_start = first_release + timedelta(days=7 * index)
     release_end = release_start + timedelta(days=7)
+    reading_list = files[index]
+    week_label = release_start.date().strftime("%Y-%m-%d")
+    state = _reading_open_state(
+        reading_list, week_label, now_local, release_start, release_end
+    )
 
     return {
-        "file": files[index],
-        "open": release_start <= now_local < release_end,
-        "week_label": release_start.date().strftime("%Y-%m-%d"),
+        "file": reading_list,
+        "open": state["open"],
+        "state": state,
+        "week_label": week_label,
         "release_start": release_start,
         "release_end": release_end,
         "next_release": release_end,
@@ -2813,6 +2893,13 @@ def reading_dashboard():
         ReadingListFile.week_order, ReadingListFile.id
     ).all()
     active = _active_reading_week(files)
+    view_file_id = request.args.get("view_file", type=int)
+    if not view_file_id and files:
+        view_file_id = files[0].id
+    view_file = (
+        db.session.get(ReadingListFile, view_file_id) if view_file_id else None
+    )
+    view_items = list(view_file.items) if view_file else []
     all_selections = ReadingSelection.query.order_by(
         ReadingSelection.selected_at.desc()
     ).all()
@@ -2831,13 +2918,9 @@ def reading_dashboard():
     if active and active.get("file"):
         active_file = active["file"]
         week_label = active["week_label"]
-        theme_selection_count = ReadingSelection.query.filter_by(
-            week_label=week_label
-        ).filter(
-            ReadingSelection.reading_list_item_id.in_(
-                [item.id for item in active_file.items]
-            )
-        ).count()
+        theme_selection_count = active.get("state", {}).get(
+            "count", _theme_selection_count(active_file, week_label)
+        )
         theme_full = theme_selection_count >= READING_MAX_STUDENTS_PER_THEME
         for item in active_file.items:
             selection = ReadingSelection.query.filter_by(
@@ -2874,8 +2957,15 @@ def reading_dashboard():
     scoring_targets = [
         selection
         for selection in all_selections
-        if selection.ppt_path and selection.user_id != current_user.id
+        if selection.user_id != current_user.id
     ]
+    my_received_scores = {}
+    if not current_user.is_admin:
+        for selection in all_selections:
+            if selection.user_id == current_user.id:
+                my_received_scores[selection.id] = selection.scores.order_by(
+                    ReadingScore.created_at
+                ).all()
     score_stats = {}
     for selection in all_selections:
         score_stats[selection.id] = _reading_score_stats(selection)
@@ -2893,6 +2983,9 @@ def reading_dashboard():
         files=files,
         active=active,
         now_local=datetime.now(READING_TZ),
+        view_file=view_file,
+        view_file_id=view_file_id,
+        view_items=view_items,
         active_items=active_items,
         selections=selections,
         all_selections=all_selections,
@@ -2900,6 +2993,7 @@ def reading_dashboard():
         student_selection=student_selection,
         scoring_targets=scoring_targets,
         my_scores=my_scores,
+        my_received_scores=my_received_scores,
         score_stats=score_stats,
         final_reviews=final_reviews,
         student_overview=_teacher_class_overview(),
@@ -2908,6 +3002,7 @@ def reading_dashboard():
         max_papers_per_theme=READING_MAX_PAPERS_PER_THEME,
         deadline_for=_week_deadline,
         format_dt=_format_reading_dt,
+        format_dt_iso=_format_reading_dt_iso,
     )
 
 
@@ -3051,18 +3146,81 @@ def reading_delete_file(file_id):
     return redirect(url_for("reading_dashboard"))
 
 
+@app.route("/reading/schedule/<int:file_id>", methods=["POST"])
+@admin_required
+def reading_schedule_time(file_id):
+    reading_list = db.session.get(ReadingListFile, file_id)
+    if not reading_list:
+        abort(404)
+
+    def parse_local_datetime(value):
+        value = (value or "").strip()
+        if not value:
+            return None
+        return (
+            datetime.strptime(value, "%Y-%m-%dT%H:%M")
+            .replace(tzinfo=READING_TZ)
+            .astimezone(timezone.utc)
+        )
+
+    start = parse_local_datetime(request.form.get("start_time", ""))
+    end = parse_local_datetime(request.form.get("end_time", ""))
+    if (start and not end) or (end and not start):
+        flash("选文开始时间和结束时间需同时填写", "error")
+        return redirect(url_for("reading_dashboard", view_file=file_id))
+    if start and end and start >= end:
+        flash("选文结束时间必须晚于开始时间", "error")
+        return redirect(url_for("reading_dashboard", view_file=file_id))
+
+    reading_list.selection_start_at = start
+    reading_list.selection_end_at = end
+    db.session.commit()
+    flash("选文时间已保存", "success")
+    return redirect(url_for("reading_dashboard", view_file=file_id))
+
+
+@app.route("/reading/manual-open/<int:file_id>", methods=["POST"])
+@admin_required
+def reading_manual_open(file_id):
+    reading_list = db.session.get(ReadingListFile, file_id)
+    if not reading_list:
+        abort(404)
+    reading_list.is_open = True
+    reading_list.manual_closed = False
+    db.session.commit()
+    flash("已手动开放该主题选文", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/reading/manual-close/<int:file_id>", methods=["POST"])
+@admin_required
+def reading_manual_close(file_id):
+    reading_list = db.session.get(ReadingListFile, file_id)
+    if not reading_list:
+        abort(404)
+    reading_list.is_open = False
+    reading_list.manual_closed = True
+    db.session.commit()
+    flash("已手动关闭该主题选文", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
 @app.route("/reading/toggle-open/<int:file_id>", methods=["POST"])
 @admin_required
 def reading_toggle_open(file_id):
     reading_list = db.session.get(ReadingListFile, file_id)
     if not reading_list:
         abort(404)
-    reading_list.is_open = not reading_list.is_open
+    if reading_list.manual_closed:
+        reading_list.is_open = True
+        reading_list.manual_closed = False
+        message = "已手动开放该主题选文"
+    else:
+        reading_list.is_open = False
+        reading_list.manual_closed = True
+        message = "已手动关闭该主题选文"
     db.session.commit()
-    flash(
-        "已手动开放该主题选文" if reading_list.is_open else "已关闭手动开放",
-        "success",
-    )
+    flash(message, "success")
     return redirect(url_for("reading_dashboard"))
 
 
@@ -3177,8 +3335,8 @@ def reading_ppt(selection_id):
 @login_required
 def reading_score(selection_id):
     selection = db.session.get(ReadingSelection, selection_id)
-    if not selection or not selection.ppt_path:
-        flash("该同学尚未上传 PPT，暂不能评分", "error")
+    if not selection:
+        flash("未找到该选文记录，暂不能评分", "error")
         return redirect(url_for("reading_dashboard"))
     if selection.user_id == current_user.id:
         flash("不能给自己评分", "error")
@@ -3569,6 +3727,9 @@ def _ensure_schema_updates():
         },
         "reading_list_files": {
             "is_open": "BOOLEAN DEFAULT 0",
+            "selection_start_at": "DATETIME",
+            "selection_end_at": "DATETIME",
+            "manual_closed": "BOOLEAN DEFAULT 0",
         },
         "reading_scores": {
             "feedback": "TEXT DEFAULT ''",

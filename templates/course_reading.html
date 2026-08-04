@@ -36,6 +36,17 @@
 .reading-tag.taken { background: rgba(245,158,11,.15); color: #f59e0b; }
 .reading-tag.free { background: rgba(99,179,237,.14); color: #63b3ed; }
 .reading-tag.full { background: rgba(248,113,113,.15); color: #f87171; }
+.reading-schedule-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-top: 12px; }
+.reading-schedule-grid .form-group { margin: 0; }
+.reading-schedule-grid input[type="datetime-local"] { width: 100%; }
+.reading-save-time { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.reading-view-form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.reading-view-form select { min-width: 260px; }
+.reading-view-list { display: grid; gap: 10px; margin-top: 12px; }
+.reading-view-item { padding: 12px; border: 1px solid rgba(100,220,255,.12); border-radius: 8px; background: rgba(255,255,255,.03); }
+.reading-view-item strong { display: block; color: #fff; margin-bottom: 5px; }
+.reading-close-note { margin-top: 10px; padding: 10px 12px; border: 1px solid rgba(245,158,11,.25); border-radius: 8px; background: rgba(245,158,11,.08); color: #f5c268; }
+.reading-manual-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .score-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; padding-top: 12px; }
 .score-field { display: grid; grid-template-columns: 1fr 90px; gap: 8px; align-items: center; background: rgba(255,255,255,.035); border: 1px solid rgba(100,220,255,.12); border-radius: 8px; padding: 10px; }
 .score-field label { color: #c7d6e4; font-size: .86rem; }
@@ -199,7 +210,28 @@
             <span><strong>{{ active.file.theme }}</strong></span>
             <span>开放：{{ format_dt(active.release_start) }}</span>
             <span>关闭：{{ format_dt(active.release_end) }}</span>
+            <span>已选：{{ active.state.count }} / {{ max_students_per_theme }}</span>
+            <span>状态：{{ '已选满' if active.state.reason == 'full' else '手动关闭' if active.state.reason == 'manual' else '开放中' if active.open else '未开放' }}</span>
         </div>
+        {% if current_user.is_admin %}
+        <div class="reading-save-time">
+            <form class="reading-view-form" method="post" action="{{ url_for('reading_schedule_time', file_id=active.file.id) }}">
+                <label>选文开始</label>
+                <input type="datetime-local" name="start_time" value="{{ format_dt_iso(active.file.selection_start_at) }}">
+                <label>选文结束</label>
+                <input type="datetime-local" name="end_time" value="{{ format_dt_iso(active.file.selection_end_at) }}">
+                <button type="submit" class="btn btn-sm btn-primary">保存本主题选文时间</button>
+            </form>
+            <form method="post" action="{{ url_for('reading_manual_close', file_id=active.file.id) }}">
+                <button type="submit" class="btn btn-sm btn-outline">手动关闭选文</button>
+            </form>
+            {% if active.file.manual_closed %}
+            <form method="post" action="{{ url_for('reading_manual_open', file_id=active.file.id) }}">
+                <button type="submit" class="btn btn-sm btn-outline">手动重新开放</button>
+            </form>
+            {% endif %}
+        </div>
+        {% endif %}
         {% if active_items %}
         <div class="reading-table-wrap">
             <table class="admin-table reading-table">
@@ -236,6 +268,8 @@
                         {% elif not current_user.is_admin and active.open and not row.taken and not row.mine %}
                             {% if row.theme_full %}<span class="reading-tag full">该主题已满</span>
                             {% else %}<form method="post" action="{{ url_for('reading_select', item_id=row.item.id) }}"><button class="btn btn-sm btn-primary">选择</button></form>{% endif %}
+                        {% elif not current_user.is_admin and not active.open and not row.mine and not row.taken %}
+                            <span class="reading-tag full">仅查看文献</span>
                         {% endif %}
                     </td>
                 </tr>
@@ -246,6 +280,51 @@
         {% else %}
         <p class="reading-empty">本周文件还没有识别到文献</p>
         {% endif %}
+        {% endif %}
+    </section>
+
+    <section class="reading-panel">
+        <div class="reading-panel-head">
+            <div><p class="section-kicker">文献库</p><h2>按周次与主题查看文献</h2></div>
+            <span>选文结束后仍可查看全部主题文献</span>
+        </div>
+        {% if files %}
+        <form class="reading-view-form" method="get" action="{{ url_for('reading_dashboard') }}">
+            <select name="view_file">
+                {% for file in files %}
+                <option value="{{ file.id }}" {% if view_file_id == file.id %}selected{% endif %}>第 {{ file.week_order }} 周 · {{ file.theme }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm btn-primary">查看</button>
+        </form>
+        {% endif %}
+        {% if view_file %}
+        <div class="reading-meta-row">
+            <span><strong>{{ view_file.theme }}</strong></span>
+            <span>第 {{ view_file.week_order }} 周</span>
+            <span>{{ view_file.items.count() }} 篇文献</span>
+            <span>上传：{{ format_dt(view_file.uploaded_at) }}</span>
+        </div>
+        {% if view_items %}
+        <div class="reading-view-list">
+            {% for item in view_items %}
+            <div class="reading-view-item">
+                <strong>{{ item.title }}</strong>
+                <div class="reading-meta">
+                    {% if item.authors %}<span>{{ item.authors }}</span>{% endif %}
+                    {% if item.year %}<span>{{ item.year }}</span>{% endif %}
+                    {% if item.journal %}<span>{{ item.journal }}</span>{% endif %}
+                    {% if item.doi %}<span><a href="https://doi.org/{{ item.doi }}" target="_blank" rel="noopener">DOI: {{ item.doi }}</a></span>{% endif %}
+                    {% if item.url %}<span><a href="{{ item.url }}" target="_blank" rel="noopener">原文</a></span>{% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="reading-empty">该主题文件暂无文献条目</p>
+        {% endif %}
+        {% else %}
+        <p class="reading-empty">请选择要查看的主题</p>
         {% endif %}
     </section>
 
@@ -297,6 +376,34 @@
         </div>
         {% endif %}
         {% endfor %}
+        {% for sel in selections %}
+        {% if my_received_scores[sel.id] %}
+        <div class="reading-panel" style="margin-bottom:12px">
+            <div class="reading-meta-row">
+                <span><strong>我收到的同学互评</strong></span>
+                <span>{{ sel.week_label }} · {{ sel.item.title }}</span>
+                <span>{{ my_received_scores[sel.id]|length }} 位匿名同学</span>
+            </div>
+            {% for score in my_received_scores[sel.id] %}
+            <div class="reading-view-item">
+                <div class="reading-meta">
+                    <span>匿名同学 {{ loop.index }}</span>
+                    <span>内容理解 {{ score.content_understanding }}</span>
+                    <span>学习态度 {{ score.preparation_attitude }}</span>
+                    <span>讲授思路 {{ score.clarity_focus }}</span>
+                    <span>启发性 {{ score.inspiration_creativity }}</span>
+                    <span>激发听众 {{ score.audience_engagement }}</span>
+                    <span>回答问题 {{ score.question_answering }}</span>
+                    <span>总分 {{ score.total_score }}</span>
+                </div>
+                {% if score.feedback %}
+                <p class="reading-empty">{{ score.feedback }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endfor %}
         {% else %}
         <p class="reading-empty">你还没有选文记录</p>
         {% endif %}
@@ -305,7 +412,7 @@
     <section class="reading-panel">
         <div class="reading-panel-head">
             <div><p class="section-kicker">同学互评</p><h2>同学互评</h2></div>
-            <span>仅教师端可查看评分结果</span>
+            <span>学生端匿名展示，教师端实名查看</span>
         </div>
         {% if scoring_targets %}
         {% for target in scoring_targets %}
@@ -315,7 +422,11 @@
                 <span>{{ target.week_label }}</span>
                 <span>{{ target.item.reading_list.theme }}</span>
                 <span>{{ target.item.title }}</span>
+                {% if target.ppt_path %}
                 <span><a href="{{ url_for('reading_ppt', selection_id=target.id) }}">查看 PPT</a></span>
+                {% else %}
+                <span>尚未上传 PPT</span>
+                {% endif %}
             </div>
             {% if target.id in my_scores %}
             <p class="reading-empty">你已完成评分</p>
@@ -348,7 +459,7 @@
         </div>
         {% endfor %}
         {% else %}
-        <p class="reading-empty">暂无已上传 PPT 的同学可以评分</p>
+        <p class="reading-empty">暂无可评分的同学</p>
         {% endif %}
     </section>
     {% endif %}
@@ -410,7 +521,7 @@
         {% if files %}
         <div class="reading-table-wrap">
             <table class="admin-table reading-table">
-                <thead><tr><th>顺序</th><th>主题词</th><th>文件名</th><th>文献数</th><th>上传时间</th><th>选文状态</th><th>操作</th></tr></thead>
+                <thead><tr><th>顺序</th><th>主题词</th><th>文件名</th><th>文献数</th><th>上传时间</th><th>选文时间</th><th>选文状态</th><th>操作</th></tr></thead>
                 <tbody>
                 {% for file in files %}
                 <tr>
@@ -419,10 +530,24 @@
                     <td>{{ file.filename }}</td>
                     <td>{{ file.items.count() }}</td>
                     <td>{{ format_dt(file.uploaded_at) }}</td>
-                    <td>{% if file.is_open %}<span class="reading-tag mine">手动开放</span>{% else %}<span class="reading-tag free">自动/关闭</span>{% endif %}</td>
                     <td>
-                        <div class="score-actions">
-                            <form method="post" action="{{ url_for('reading_toggle_open', file_id=file.id) }}"><button class="btn btn-sm btn-outline">{{ '关闭手动开放' if file.is_open else '立即开放' }}</button></form>
+                        <form class="reading-view-form" method="post" action="{{ url_for('reading_schedule_time', file_id=file.id) }}">
+                            <input type="datetime-local" name="start_time" value="{{ format_dt_iso(file.selection_start_at) }}" style="width:150px">
+                            <input type="datetime-local" name="end_time" value="{{ format_dt_iso(file.selection_end_at) }}" style="width:150px">
+                            <button type="submit" class="btn btn-sm btn-outline">保存</button>
+                        </form>
+                    </td>
+                    <td>
+                        {% if file.manual_closed %}<span class="reading-tag full">手动关闭</span>
+                        {% elif file.is_open %}<span class="reading-tag mine">手动开放</span>
+                        {% else %}<span class="reading-tag free">自动/关闭</span>{% endif %}
+                    </td>
+                    <td>
+                        <div class="reading-manual-actions">
+                            <form method="post" action="{{ url_for('reading_manual_close', file_id=file.id) }}"><button class="btn btn-sm btn-outline">手动关闭</button></form>
+                            {% if file.manual_closed %}
+                            <form method="post" action="{{ url_for('reading_manual_open', file_id=file.id) }}"><button class="btn btn-sm btn-outline">手动开放</button></form>
+                            {% endif %}
                             <form method="post" action="{{ url_for('reading_delete_file', file_id=file.id) }}"><button class="btn btn-sm btn-outline">删除</button></form>
                         </div>
                     </td>

@@ -1,11 +1,12 @@
 ﻿# -*- coding: utf-8 -*-
 import os
 import sys
-from datetime import datetime, date, timezone
+from datetime import datetime, date, time, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from flask import (
     Flask, render_template, redirect, url_for, request,
-    flash, jsonify, abort, session as flask_session
+    flash, jsonify, abort, session as flask_session, Response, send_file
 )
 from flask_login import (
     LoginManager, login_user, logout_user, login_required, current_user
@@ -14,63 +15,45 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from config import SECRET_KEY, SQLALCHEMY_DATABASE_URI, SQLALCHEMY_TRACK_MODIFICATIONS
 from config import WEEKLY_LITERATURE_HOUR, WEEKLY_LITERATURE_MINUTE
-from models import db, User, LiteratureSubscription, LiteratureItem, CitationLink, KnowledgePoint, KnowledgeFile, DailyCheckin, ProtocolVideo, UploadedLiterature, AttendanceReward, Quiz, QuizAttempt, ProtocolCollection, PresentationTemplate, AgentLog, ApiKey, LiteraturePlanet, PlanetPaper, ChatHistory, LiteratureCategory, BookmarkedLiterature, UserStudyPlan
+from models import db, User, LiteratureSubscription, LiteratureItem, CitationLink, KnowledgePoint, DailyCheckin, ProtocolVideo, UploadedLiterature, AttendanceReward, Quiz, QuizAttempt, ProtocolCollection, PresentationTemplate, AgentLog, ApiKey, LiteraturePlanet, PlanetPaper, ChatHistory, LiteratureCategory, BookmarkedLiterature, KnowledgeFile, UserStudyPlan, UserKnowledgeLibrary, UserKnowledgeItem, KnowledgeReviewLog, KnowledgeReviewProgress, DailyKnowledgeTask, ReadingListFile, ReadingListItem, ReadingSelection, ReadingScore, FinalReview
 from knowledge_points import DIFFICULTY_LABELS, DIFFICULTY_COLORS
+from knowledge_study_v2 import knowledge_study_bp, build_custom_study_context
 import json
 import re
+import csv
+import io
+import uuid
+import zipfile
+import xml.etree.ElementTree as ET
 import datetime as dt_module
 from functools import wraps
 from werkzeug.utils import secure_filename
+from llm_client import (
+    LLMConfig,
+    call_llm as execute_llm_request,
+    config_from_environment,
+    config_from_key_record,
+)
 
 
 
-def call_llm(api_key, provider, prompt, system="You are an EM expert."):
-    import requests as req, os as _os
-    # Auto-detect proxy from environment variables
-    _proxies = {}
-    _hp = _os.environ.get("HTTP_PROXY", "") or _os.environ.get("http_proxy", "")
-    _hs = _os.environ.get("HTTPS_PROXY", "") or _os.environ.get("https_proxy", "")
-    if _hp: _proxies["http"] = _hp
-    if _hs: _proxies["https"] = _hs
-    if provider == "deepseek":
-        url = "https://api.deepseek.com/v1/chat/completions"
-        model = "deepseek-chat"
-    else:
-        url = "https://api.openai.com/v1/chat/completions"
-        model = "gpt-3.5-turbo"
-    try:
-        resp = req.post(url, headers={"Authorization": "Bearer " + api_key, "Content-Type": "application/json"},
-            json={"model": model, "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}], "max_tokens": 600}, timeout=60, proxies=_proxies if _proxies else None)
-        if resp.status_code == 200:
-            return resp.json()["choices"][0]["message"]["content"]
-        else:
-            return "API Error (" + str(resp.status_code) + "): " + resp.text[:300]
-    except Exception as e:
-        return "Request Error: " + str(e)
+def get_llm_config(provider=None):
+    """Prefer an active DB key, then fall back to environment configuration."""
+    query = ApiKey.query.filter_by(is_active=True)
+    if provider:
+        query = query.filter_by(provider=provider)
+    db_config = config_from_key_record(query.order_by(ApiKey.created_at.desc()).first())
+    if db_config:
+        return db_config
+    return config_from_environment()
 
 
+def call_configured_llm(prompt, system="You are an electron microscopy expert.", provider=None):
+    config = get_llm_config(provider=provider)
+    if not config:
+        return None, None
+    return execute_llm_request(config, prompt, system=system), config
 
-def call_llm_grounded(api_key, provider, system, prompt, temperature=0.1):
-    """Low-temp LLM call with grounding. Reduces hallucinations."""
-    import requests as req, os as _os
-    _proxies = {}
-    _hp = _os.environ.get("HTTP_PROXY", "") or _os.environ.get("http_proxy", "")
-    _hs = _os.environ.get("HTTPS_PROXY", "") or _os.environ.get("https_proxy", "")
-    if _hp: _proxies["http"] = _hp
-    if _hs: _proxies["https"] = _hs
-    url = "https://api.deepseek.com/v1/chat/completions" if provider == "deepseek" else "https://api.openai.com/v1/chat/completions"
-    model = "deepseek-chat" if provider == "deepseek" else "gpt-3.5-turbo"
-    try:
-        resp = req.post(url,
-            headers={"Authorization": "Bearer " + api_key, "Content-Type": "application/json"},
-            json={"model": model, "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
-                  "temperature": temperature, "max_tokens": 800},
-            timeout=60, proxies=_proxies if _proxies else None)
-        if resp.status_code == 200:
-            return resp.json()["choices"][0]["message"]["content"]
-        return "API Error: " + str(resp.status_code)
-    except Exception as e:
-        return "Request Error: " + str(e)
 
 def admin_required(f):
     @wraps(f)
@@ -91,6 +74,530 @@ def create_app():
 
 app = create_app()
 db.init_app(app)
+app.register_blueprint(knowledge_study_bp)
+
+PLATFORM_NAME = "生命科学课程助手"
+COURSE_REGISTRY = {
+    "electron-microscopy": {
+        "slug": "electron-microscopy",
+        "name": "冷冻电子显微学",
+        "name_en": "Cryo-Electron Microscopy",
+        "label": "Electron Microscopy",
+        "description": "聚焦冷冻电镜、冷冻电镜断层成像与体积电镜，连接结构解析、样品制备和文献追踪",
+        "description_en": "Focuses on cryo-EM, cryo-electron tomography and volume EM, connecting structure determination, sample preparation and literature tracking",
+        "status": "open",
+        "accent": "Cryo-EM / Cryo-ET / vEM",
+        "galaxy_keywords": ["Cryo-EM", "Cryo-ET", "vEM"],
+        "galaxy_keywords_en": ["Cryo-EM", "Cryo-ET", "vEM"],
+    },
+    "structural-biology": {
+        "slug": "structural-biology",
+        "name": "结构生物学",
+        "name_en": "Structural Biology",
+        "label": "Structural Biology",
+        "description": "围绕蛋白质、复合物与分子机器的结构解析，组织方法、文献与科研问题",
+        "description_en": "Organizes methods, literature and research questions around proteins, complexes and molecular machines",
+        "status": "soon",
+        "accent": "Structure / Function / Binding",
+        "galaxy_keywords": ["蛋白质结构解析", "分子机器", "构效关系"],
+        "galaxy_keywords_en": ["Protein Structure", "Molecular Machines", "Structure-Activity"],
+    },
+    "cell-biology": {
+        "slug": "cell-biology",
+        "name": "细胞生物学",
+        "name_en": "Cell Biology",
+        "label": "Cell Biology",
+        "description": "关注细胞结构、信号通路、细胞器与动态过程，辅助课程学习和实验设计",
+        "description_en": "Explores cellular structures, signaling pathways, organelles and dynamic processes for learning and experiment design",
+        "status": "soon",
+        "accent": "Imaging / Signaling / Organelles",
+        "galaxy_keywords": ["细胞器动态", "信号通路", "细胞成像"],
+        "galaxy_keywords_en": ["Organelle Dynamics", "Signaling Pathways", "Cell Imaging"],
+    },
+    "bioinformatics": {
+        "slug": "bioinformatics",
+        "name": "生物信息学",
+        "name_en": "Bioinformatics",
+        "label": "Bioinformatics",
+        "description": "面向序列、组学与结构数据分析，整理工具链、数据集和分析流程",
+        "description_en": "Structures toolchains, datasets and analysis workflows for sequences, omics and structural data",
+        "status": "soon",
+        "accent": "Omics / Sequence / Pipeline",
+        "galaxy_keywords": ["序列分析", "组学数据", "结构预测"],
+        "galaxy_keywords_en": ["Sequence Analysis", "Omics Data", "Structure Prediction"],
+    },
+    "neuroscience": {
+        "slug": "neuroscience",
+        "name": "神经科学",
+        "name_en": "Neuroscience",
+        "label": "Neuroscience",
+        "description": "围绕神经环路、突触机制与疾病模型，连接课程知识和研究文献",
+        "description_en": "Connects course knowledge and research literature around neural circuits, synaptic mechanisms and disease models",
+        "status": "soon",
+        "accent": "Circuit / Imaging / Cognition",
+        "galaxy_keywords": ["神经环路", "突触机制", "疾病模型"],
+        "galaxy_keywords_en": ["Neural Circuits", "Synaptic Mechanisms", "Disease Models"],
+    },
+}
+
+
+def _is_em_only():
+    return os.environ.get("EM_ONLY_SITE") == "1"
+
+
+READING_TZ = ZoneInfo("Asia/Shanghai")
+READING_MAX_STUDENTS_PER_THEME = 2
+READING_MAX_PAPERS_PER_THEME = 2
+READING_PPT_ALLOWED_EXT = {".ppt", ".pptx", ".pdf"}
+FINAL_REVIEW_ALLOWED_EXT = {".docx", ".pdf", ".txt", ".md", ".markdown", ".csv"}
+READING_SCORE_CRITERIA = [
+    ("content_understanding", "对文献内容理解充分"),
+    ("preparation_attitude", "学习态度良好，准备充分"),
+    ("clarity_focus", "讲授思路清晰，重点突出，难点剖析清楚"),
+    ("inspiration_creativity", "讲述有启发性，有独立思考，有创新思维"),
+    ("audience_engagement", "能激发听众同学的求知欲和热情"),
+    ("question_answering", "回答问题准确、耐心"),
+]
+
+
+def _as_local(value):
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(READING_TZ)
+
+
+def _format_reading_dt(value):
+    local_value = _as_local(value)
+    if local_value is None:
+        return ""
+    return local_value.strftime("%Y-%m-%d %H:%M")
+
+
+def _format_reading_dt_iso(value):
+    local_value = _as_local(value)
+    if local_value is None:
+        return ""
+    return local_value.strftime("%Y-%m-%dT%H:%M")
+
+
+def _week_deadline(week_label):
+    release_date = datetime.strptime(week_label, "%Y-%m-%d").date()
+    return datetime.combine(
+        release_date + timedelta(days=7),
+        time(10, 0),
+        tzinfo=READING_TZ,
+    )
+
+
+def _reading_score_stats(selection):
+    scores = selection.scores.all()
+    if not scores:
+        return {"count": 0, "average": None}
+    average = sum(score.total_score for score in scores) / len(scores)
+    return {"count": len(scores), "average": round(average, 2)}
+
+
+def _next_friday_10(after_dt):
+    after_local = _as_local(after_dt)
+    days_until_friday = (4 - after_local.weekday()) % 7
+    release = datetime.combine(
+        (after_local + timedelta(days=days_until_friday)).date(),
+        time(10, 0),
+        tzinfo=READING_TZ,
+    )
+    if after_local > release:
+        release += timedelta(days=7)
+    return release
+
+
+def _theme_selection_count(reading_list, week_label):
+    item_ids = [item.id for item in reading_list.items]
+    if not item_ids:
+        return 0
+    return ReadingSelection.query.filter(
+        ReadingSelection.week_label == week_label,
+        ReadingSelection.reading_list_item_id.in_(item_ids),
+    ).count()
+
+
+def _reading_open_state(
+    reading_list, week_label, now_local, release_start=None, release_end=None
+):
+    now_local = now_local or datetime.now(READING_TZ)
+    if now_local.tzinfo is None:
+        now_local = now_local.replace(tzinfo=READING_TZ)
+    start = _as_local(reading_list.selection_start_at)
+    end = _as_local(reading_list.selection_end_at)
+    count = _theme_selection_count(reading_list, week_label)
+
+    scheduled = True
+    if start and end:
+        scheduled = start <= now_local < end
+    elif start:
+        scheduled = now_local >= start
+    elif end:
+        scheduled = now_local < end
+    elif release_start is not None and release_end is not None:
+        scheduled = release_start <= now_local < release_end
+
+    if count >= READING_MAX_STUDENTS_PER_THEME:
+        return {"open": False, "reason": "full", "count": count}
+    if reading_list.manual_closed:
+        return {"open": False, "reason": "manual", "count": count}
+    if reading_list.is_open:
+        return {"open": True, "reason": "manual", "count": count}
+    return {
+        "open": scheduled,
+        "reason": "scheduled" if scheduled else "closed",
+        "count": count,
+    }
+
+
+def _active_reading_week(files=None, now=None):
+    if files is None:
+        files = ReadingListFile.query.order_by(
+            ReadingListFile.week_order, ReadingListFile.id
+        ).all()
+    if not files:
+        return None
+
+    now_local = now or datetime.now(READING_TZ)
+    if now_local.tzinfo is None:
+        now_local = now_local.replace(tzinfo=READING_TZ)
+
+    for reading_list in files:
+        start = _as_local(reading_list.selection_start_at)
+        end = _as_local(reading_list.selection_end_at)
+        if start and end and start <= now_local < end:
+            week_label = start.date().strftime("%Y-%m-%d")
+            state = _reading_open_state(
+                reading_list, week_label, now_local, start, end
+            )
+            return {
+                "file": reading_list,
+                "open": state["open"],
+                "state": state,
+                "week_label": week_label,
+                "release_start": start,
+                "release_end": end,
+                "next_release": end,
+            }
+
+    first_release = _next_friday_10(files[0].uploaded_at)
+    if now_local < first_release:
+        if files[0].is_open and not files[0].manual_closed:
+            week_label = first_release.date().strftime("%Y-%m-%d")
+            state = _reading_open_state(
+                files[0], week_label, now_local, now_local, first_release
+            )
+            return {
+                "file": files[0],
+                "open": state["open"],
+                "state": state,
+                "week_label": week_label,
+                "release_start": now_local,
+                "release_end": first_release,
+                "next_release": first_release,
+            }
+        return {
+            "file": None,
+            "open": False,
+            "state": {"open": False, "reason": "closed", "count": 0},
+            "week_label": None,
+            "release_start": first_release,
+            "release_end": first_release + timedelta(days=7),
+            "next_release": first_release,
+        }
+
+    elapsed_days = (now_local.date() - first_release.date()).days
+    index = (elapsed_days // 7) % len(files)
+    release_start = first_release + timedelta(days=7 * index)
+    release_end = release_start + timedelta(days=7)
+    reading_list = files[index]
+    week_label = release_start.date().strftime("%Y-%m-%d")
+    state = _reading_open_state(
+        reading_list, week_label, now_local, release_start, release_end
+    )
+
+    return {
+        "file": reading_list,
+        "open": state["open"],
+        "state": state,
+        "week_label": week_label,
+        "release_start": release_start,
+        "release_end": release_end,
+        "next_release": release_end,
+    }
+
+
+def _theme_from_filename(filename):
+    stem = os.path.splitext(os.path.basename(filename))[0]
+    stem = re.sub(r"[\s_\-]+", " ", stem).strip()
+    return stem or filename
+
+
+def _infer_theme_from_first_item(first_title):
+    title = (first_title or "").strip()
+    match = re.search(
+        r"^\s*(?:Reading\s*List|RL|Week\s*\d+|第\s*\d+\s*周)\s*\d*\s*[:：]\s*(.+)$",
+        title,
+        re.IGNORECASE,
+    )
+    if match:
+        return match.group(1).strip()
+    return ""
+
+
+def _refresh_reading_list_themes():
+    files = ReadingListFile.query.order_by(
+        ReadingListFile.week_order, ReadingListFile.id
+    ).all()
+    changed = False
+    for reading_list in files:
+        first_item = reading_list.items.order_by(
+            ReadingListItem.item_order
+        ).first()
+        if not first_item:
+            continue
+        inferred = _infer_theme_from_first_item(first_item.title)
+        if inferred and (
+            not reading_list.theme
+            or reading_list.theme == _theme_from_filename(reading_list.filename)
+        ):
+            reading_list.theme = inferred
+            changed = True
+    if changed:
+        db.session.commit()
+
+
+def _detect_reading_theme(raw, filename):
+    lines = [line.strip() for line in (raw or "").splitlines() if line.strip()]
+    if not lines:
+        return _theme_from_filename(filename)
+
+    marker_patterns = [
+        r"(?:主题词|主题|关键词)\s*[:：]\s*(.+)",
+        r"(?:Theme|Topic|Keywords?)\s*[:：]\s*(.+)",
+        r"(?:Week|第\s*\d+\s*周)\s*\d*\s*[:：\-]\s*(.+)",
+    ]
+    for line in lines[:20]:
+        for pattern in marker_patterns:
+            match = re.search(pattern, line, re.IGNORECASE)
+            if match:
+                value = match.group(1).strip().strip("[]()（）")
+                if value:
+                    return value
+
+    first = lines[0]
+    if "," in first and any(
+        key in first.lower()
+        for key in ("title", "authors", "author", "year", "doi", "标题", "作者", "年份")
+    ):
+        return _theme_from_filename(filename)
+    if (
+        len(first) <= 60
+        and not re.search(r"DOI[:：]?\s*10\.\S+|https?://", first, re.IGNORECASE)
+        and not re.match(r"^\s*(?:\d+[\.\)、]|[•*\-])", first)
+    ):
+        if not first.endswith(".") or len(first) <= 30:
+            return first
+
+    return _theme_from_filename(filename)
+
+
+def _extract_docx_text(content):
+    with zipfile.ZipFile(io.BytesIO(content)) as zf:
+        xml_bytes = zf.read("word/document.xml")
+    root = ET.fromstring(xml_bytes)
+    ns = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+    paragraphs = []
+    for paragraph in root.iter(ns + "p"):
+        text = "".join(node.text or "" for node in paragraph.iter(ns + "t"))
+        if text.strip():
+            paragraphs.append(text)
+    return "\n".join(paragraphs)
+
+
+def _csv_value(row, *keys):
+    for key in keys:
+        if key in row and row[key] is not None:
+            value = str(row[key]).strip()
+            if value:
+                return value
+    return ""
+
+
+def _parse_reading_list_text(raw):
+    raw = (raw or "").replace("\r\n", "\n").replace("\r", "\n")
+    items = []
+    first_line = next((line.strip() for line in raw.splitlines() if line.strip()), "")
+    low_header = first_line.lower()
+
+    if "," in first_line and any(
+        key in low_header for key in ("title", "标题", "doi", "authors", "作者")
+    ):
+        reader = csv.DictReader(io.StringIO(raw))
+        for row in reader:
+            title = _csv_value(row, "title", "标题", "Title")
+            if not title:
+                continue
+            year_text = _csv_value(
+                row, "year", "年份", "publication_year", "pub_year"
+            )
+            year = None
+            year_match = re.search(r"(19|20)\d{2}", year_text)
+            if year_match:
+                year = int(year_match.group())
+            items.append(
+                {
+                    "title": title,
+                    "authors": _csv_value(
+                        row, "authors", "作者", "author", "creator"
+                    ),
+                    "journal": _csv_value(
+                        row, "journal", "期刊", "container-title"
+                    ),
+                    "year": year,
+                    "doi": _csv_value(row, "doi", "DOI", "identifier"),
+                    "url": _csv_value(row, "url", "link", "URL"),
+                }
+            )
+        return items
+
+    blocks = re.split(r"\n\s*\n+", raw)
+    if len(blocks) <= 1 and re.search(
+        r"(?m)^\s*(?:\d+[\.\)、]|[•*\-])\s*", raw
+    ):
+        blocks = [
+            block
+            for block in re.split(
+                r"(?m)(?=^\s*(?:\d+[\.\)、]|[•*\-])\s*)", raw
+            )
+            if block.strip()
+        ]
+    elif len(blocks) <= 1:
+        lines = [line for line in raw.splitlines() if line.strip()]
+        entry_boundary = re.compile(
+            r"DOI[:：]?\s*10\.\S+|https?://\S+", re.IGNORECASE
+        )
+        if any(entry_boundary.search(line) for line in lines):
+            blocks = []
+            current = []
+            for line in lines:
+                current.append(line)
+                if entry_boundary.search(line):
+                    blocks.append("\n".join(current))
+                    current = []
+            if current:
+                blocks.append("\n".join(current))
+        else:
+            blocks = lines
+
+    for block in blocks:
+        lines = [line.strip() for line in block.splitlines() if line.strip()]
+        if not lines:
+            continue
+        text = " ".join(lines)
+
+        doi = ""
+        doi_match = re.search(r"DOI[:：]?\s*(10\.\S+)", text, re.IGNORECASE)
+        if doi_match:
+            doi = doi_match.group(1).rstrip(".,;")
+        if not doi:
+            doi_match = re.search(
+                r"https?://(?:dx\.)?doi\.org/(10\.\S+)", text, re.IGNORECASE
+            )
+            if doi_match:
+                doi = doi_match.group(1).rstrip(".,;")
+
+        url = ""
+        url_match = re.search(r"https?://\S+", text)
+        if url_match:
+            url = url_match.group(0).rstrip(".,;")
+
+        title = re.sub(
+            r"^\s*(?:\d+[\.\)、]|[•*\-])\s*", "", lines[0]
+        ).strip()
+        title = re.sub(r"DOI[:：]?\s*10\.\S+", "", title, flags=re.IGNORECASE)
+        title = re.sub(r"https?://\S+", "", title).strip(" .,;")
+        if not title:
+            continue
+
+        authors = lines[1] if len(lines) > 1 else ""
+        authors = re.sub(r"DOI[:：]?\s*10\.\S+", "", authors, flags=re.IGNORECASE).strip()
+
+        year = None
+        year_match = re.search(r"(19|20)\d{2}", text)
+        if year_match:
+            year = int(year_match.group())
+
+        items.append(
+            {
+                "title": title,
+                "authors": authors,
+                "journal": "",
+                "year": year,
+                "doi": doi,
+                "url": url,
+            }
+        )
+
+    return items
+
+
+def _parse_reading_file(file_storage):
+    raw_filename = (file_storage.filename or "reading.txt").replace("\\", "/")
+    filename = raw_filename.rsplit("/", 1)[-1].strip() or "reading.txt"
+    filename = re.sub(r'[\\/:*?"<>|]', "_", filename)
+    ext = os.path.splitext(filename)[1].lower()
+    content = file_storage.read()
+
+    if ext in (".txt", ".md", ".markdown", ".csv"):
+        raw = content.decode("utf-8-sig", errors="replace")
+    elif ext == ".docx":
+        raw = _extract_docx_text(content)
+    else:
+        raise ValueError("仅支持 txt / md / csv / docx 文件")
+
+    theme = _detect_reading_theme(raw, filename)
+    raw_for_items = re.sub(
+        r"(?im)^\s*(?:主题词|主题|关键词)\s*[:：].*$", "", raw
+    )
+    raw_for_items = re.sub(
+        r"(?im)^\s*(?:Theme|Topic|Keywords?)\s*[:：].*$",
+        "",
+        raw_for_items,
+    )
+    raw_for_items = re.sub(
+        r"(?im)^\s*(?:Week|第\s*\d+\s*周)\s*\d*\s*[:：\-].*$",
+        "",
+        raw_for_items,
+    )
+    items = _parse_reading_list_text(raw_for_items)
+    return filename, ext.lstrip(".") or "txt", theme, items
+
+
+def _selected_course():
+    if _is_em_only():
+        return COURSE_REGISTRY["electron-microscopy"]
+    slug = (
+        request.args.get("course")
+        or flask_session.get("selected_course")
+        or "electron-microscopy"
+    )
+    return COURSE_REGISTRY.get(slug, COURSE_REGISTRY["electron-microscopy"])
+
+
+@app.context_processor
+def inject_platform_context():
+    return {
+        "platform_name": "电子显微学课程" if _is_em_only() else PLATFORM_NAME,
+        "em_only_site": _is_em_only(),
+        "course_registry": COURSE_REGISTRY,
+        "selected_course": _selected_course(),
+    }
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -105,63 +612,112 @@ def load_user(user_id):
 
 @app.route('/')
 def index():
+    if _is_em_only():
+        if current_user.is_authenticated:
+            return redirect(url_for("dashboard"))
+        return redirect(url_for("login", course="electron-microscopy"))
+    return render_template("platform_home.html")
+
+
+@app.route('/courses')
+def courses():
+    if _is_em_only():
+        return redirect(url_for("index"))
+    return render_template("course_select.html", courses=COURSE_REGISTRY)
+
+
+@app.route('/course/<slug>')
+def course_entry(slug):
+    if _is_em_only():
+        return redirect(url_for("index"))
+    course = COURSE_REGISTRY.get(slug)
+    if not course:
+        abort(404)
+    if course["status"] != "open":
+        flash(f"{course['name']} 星系即将开放", "info")
+        return redirect(url_for("courses"))
+    flask_session["selected_course"] = slug
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
-    return redirect(url_for('login'))
+        return redirect(url_for("dashboard"))
+    return redirect(url_for("login", course=slug, next=url_for("dashboard")))
 
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
+        return redirect(request.args.get("next") or url_for('dashboard'))
+    course_slug = "electron-microscopy" if _is_em_only() else (
+        request.args.get("course") or flask_session.get("selected_course") or "electron-microscopy"
+    )
+    course = COURSE_REGISTRY.get(course_slug, COURSE_REGISTRY["electron-microscopy"])
+    flask_session["selected_course"] = course["slug"]
     if request.method == 'POST':
-        student_id = request.form.get('student_id', '').strip()
+        course_slug = "electron-microscopy" if _is_em_only() else (request.form.get("course") or course["slug"])
+        course = COURSE_REGISTRY.get(course_slug, COURSE_REGISTRY["electron-microscopy"])
+        flask_session["selected_course"] = course["slug"]
+        identifier = request.form.get('identifier', '').strip()
         password = request.form.get('password', '')
-        user = User.query.filter_by(student_id=student_id).first()
+        user = User.query.filter(
+            db.or_(
+                User.student_id == identifier,
+                User.email == identifier,
+                User.phone == identifier,
+            )
+        ).first()
         if user and user.check_password(password):
             login_user(user, remember=True)
             flash('登录成功！欢迎回来', 'success')
-            return redirect(url_for('dashboard'))
-        flash('学号或密码错误', 'error')
-    return render_template('login.html')
+            return redirect(request.form.get("next") or request.args.get("next") or url_for('dashboard'))
+        flash('账号或密码错误', 'error')
+    return render_template('login.html', course=course, next_url=request.args.get("next") or url_for("dashboard"))
 
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
+    course = _selected_course()
     if request.method == 'POST':
         student_id = request.form.get('student_id', '').strip()
         name = request.form.get('name', '').strip()
         email = request.form.get('email', '').strip()
+        phone = request.form.get('phone', '').strip()
         password = request.form.get('password', '')
         confirm = request.form.get('confirm_password', '')
 
-        if not all([student_id, name, email, password]):
+        if not all([student_id, name, password]) or not (email or phone):
             flash('请填写所有必填字段', 'error')
-            return render_template('register.html')
+            return render_template('register.html', course=course)
 
         if password != confirm:
             flash('两次输入的密码不一致', 'error')
-            return render_template('register.html')
+            return render_template('register.html', course=course)
 
         if len(password) < 6:
             flash('密码长度至少6位', 'error')
-            return render_template('register.html')
+            return render_template('register.html', course=course)
 
         if User.query.filter_by(student_id=student_id).first():
             flash('该学号已被注册', 'error')
-            return render_template('register.html')
+            return render_template('register.html', course=course)
 
-        user = User(student_id=student_id, name=name, email=email)
+        if email and User.query.filter_by(email=email).first():
+            flash('该邮箱已被注册', 'error')
+            return render_template('register.html', course=course)
+
+        if phone and User.query.filter_by(phone=phone).first():
+            flash('该手机号已被注册', 'error')
+            return render_template('register.html', course=course)
+
+        user = User(student_id=student_id, name=name, email=email, phone=phone or None)
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
 
         flash('注册成功！请登录', 'success')
-        return redirect(url_for('login'))
+        return redirect(url_for('login', course=course["slug"]))
 
-    return render_template('register.html')
+    return render_template('register.html', course=course)
 
 
 @app.route('/logout')
@@ -169,7 +725,7 @@ def register():
 def logout():
     logout_user()
     flash('已退出登录', 'info')
-    return redirect(url_for('login'))
+    return redirect(url_for('index'))
 
 
 @app.route('/dashboard')
@@ -183,6 +739,9 @@ def dashboard():
     subscription_count = LiteratureSubscription.query.filter_by(
         user_id=current_user.id, active=True
     ).count()
+    active_subscriptions = LiteratureSubscription.query.filter_by(
+        user_id=current_user.id, active=True
+    ).order_by(LiteratureSubscription.created_at.desc()).limit(4).all()
     total_checkins = DailyCheckin.query.filter_by(user_id=current_user.id).count()
     streak = _calc_streak(current_user.id)
 
@@ -205,20 +764,27 @@ def dashboard():
     total_trees = AttendanceReward.query.filter_by(user_id=current_user.id).count()
     weekly_trees = AttendanceReward.query.filter_by(user_id=current_user.id, period="weekly").count()
 
-    # Sample literature for nebula
-    from literature_agent import SAMPLE_LITERATURE
-    sample_literature = []
-    for topic, papers in SAMPLE_LITERATURE.items():
-        for p in papers:
-            p_copy = dict(p)
-            p_copy["topic"] = topic
-            sample_literature.append(p_copy)
+    # Real OpenAlex-backed literature for the dashboard nebula.
+    nebula_items = LiteratureItem.query.order_by(
+        LiteratureItem.citation_count.desc(), LiteratureItem.fetched_at.desc()
+    ).limit(60).all()
+    sample_literature = [{
+        "id": item.id,
+        "title": item.title,
+        "label": item.title[:18],
+        "topic": item.topic or "Uncategorized",
+        "citation_count": item.citation_count or 0,
+        "url": item.url or ("https://doi.org/" + item.doi if item.doi else ""),
+    } for item in nebula_items]
 
     # Knowledge points for forest
     all_kps = KnowledgePoint.query.all()
 
     # User protocols
     user_protocols_list = ProtocolCollection.query.filter_by(user_id=current_user.id).all()
+    bookmark_count = BookmarkedLiterature.query.filter_by(user_id=current_user.id).count()
+    protocol_count = ProtocolCollection.query.filter_by(user_id=current_user.id).count()
+    primary_topic = active_subscriptions[0].topic if active_subscriptions else "cryo-EM / single particle analysis"
 
     return render_template(
         "dashboard.html",
@@ -234,6 +800,10 @@ def dashboard():
         sample_literature=sample_literature,
         all_kps=all_kps,
         user_protocols=user_protocols_list,
+        active_subscriptions=active_subscriptions,
+        bookmark_count=bookmark_count,
+        protocol_count=protocol_count,
+        primary_topic=primary_topic,
     )
 
 
@@ -271,7 +841,7 @@ def subscribe():
     topic = request.form.get("topic", "").strip()
     keywords = request.form.get("keywords", "").strip()
     if not topic:
-        flash("???????", "error")
+        flash("请输入订阅主题", "error")
         return redirect(url_for("literature"))
 
     existing = LiteratureSubscription.query.filter_by(
@@ -285,7 +855,7 @@ def subscribe():
         )
         db.session.add(sub)
     db.session.commit()
-    flash(f"??????{topic}", "success")
+    flash(f"已订阅：{topic}", "success")
     return redirect(url_for("literature"))
 
 
@@ -297,40 +867,25 @@ def unsubscribe(sub_id):
         abort(403)
     sub.active = False
     db.session.commit()
-    flash("?????", "info")
+    flash("已取消订阅", "info")
     return redirect(url_for("literature"))
 
 
 @app.route("/literature/refresh")
 @login_required
 def refresh_literature():
-    from literature_agent import fetch_literature_for_topic
+    from literature_agent import sync_citation_network
     subs = LiteratureSubscription.query.filter_by(
         user_id=current_user.id, active=True
     ).all()
-    count = 0
+    nodes_added = 0
+    edges_added = 0
     for sub in subs:
-        results = fetch_literature_for_topic(sub.topic, sub.keywords)
-        for paper in results:
-            existing = LiteratureItem.query.filter_by(
-                doi=paper.get("doi")
-            ).first()
-            if not existing and paper.get("doi"):
-                item = LiteratureItem(
-                    title=paper.get("title", ""),
-                    authors=paper.get("authors", ""),
-                    journal=paper.get("journal", ""),
-                    year=paper.get("year"),
-                    doi=paper.get("doi", ""),
-                    abstract=paper.get("abstract", ""),
-                    url=paper.get("url", ""),
-                    topic=sub.topic,
-                    citation_count=paper.get("citation_count", 0),
-                )
-                db.session.add(item)
-                count += 1
-        db.session.commit()
-    flash(f"??????? {count} ???", "success")
+        query = " ".join(filter(None, [sub.topic, sub.keywords]))
+        _, stats = sync_citation_network(query, topic=sub.topic, max_nodes=35)
+        nodes_added += stats["created_nodes"]
+        edges_added += stats["created_edges"]
+    flash(f"已同步 {nodes_added} 篇新文献和 {edges_added} 条真实引用关系", "success")
     return redirect(url_for("literature"))
 
 
@@ -352,13 +907,321 @@ def nebula():
 @app.route("/api/nebula-data")
 @login_required
 def nebula_data():
+    query = request.args.get("q", "").strip()
+    query_type = request.args.get("type", "keyword")
+    if query:
+        from literature_agent import sync_citation_network
+        try:
+            graph, stats = sync_citation_network(query, query_type=query_type, topic=query, max_nodes=request.args.get("limit", default=45, type=int))
+            graph["sync"] = stats
+            graph["query"] = query
+            return jsonify(graph)
+        except Exception as exc:
+            return jsonify({"nodes": [], "edges": [], "error": str(exc), "source": "OpenAlex"}), 502
+
     items = LiteratureItem.query.all()
     if not items:
-        return jsonify({"nodes": [], "edges": []})
+        return jsonify({"nodes": [], "edges": [], "source": "OpenAlex"})
 
     from literature_agent import generate_citation_graph
     data = generate_citation_graph(items)
     return jsonify(data)
+
+
+@app.route("/api/literature-graph")
+@login_required
+def literature_graph():
+    query = request.args.get("q", "").strip() or "cryo-EM"
+    return jsonify(_build_literature_graph(current_user.id, query))
+
+
+def _build_literature_graph(user_id, query):
+    nodes = {}
+    edges = []
+
+    def add_node(node):
+        nodes[node["id"]] = node
+
+    def add_edge(source, target, relation, weight=0.5):
+        if source in nodes and target in nodes:
+            edges.append({
+                "from": source,
+                "to": target,
+                "relation": relation,
+                "weight": weight,
+            })
+
+    seed_id = "topic:" + re.sub(r"[^a-zA-Z0-9_-]+", "-", query.lower()).strip("-")
+    add_node({
+        "id": seed_id,
+        "type": "Topic",
+        "label": query,
+        "title": query,
+        "year": "",
+        "authors": "",
+        "keywords": [query],
+        "abstract": "当前文献探索的中心研究主题。",
+        "relevance": 1.0,
+        "citation_count": 0,
+        "bookmarked": False,
+        "read": False,
+        "url": "",
+        "source": "seed",
+    })
+
+    bookmarks = BookmarkedLiterature.query.filter_by(user_id=user_id).order_by(BookmarkedLiterature.added_at.desc()).limit(16).all()
+    literature_items = LiteratureItem.query.order_by(LiteratureItem.citation_count.desc()).limit(18).all()
+    planet_papers = PlanetPaper.query.join(LiteraturePlanet).filter(LiteraturePlanet.user_id == user_id).limit(14).all()
+    protocols = ProtocolCollection.query.filter_by(user_id=user_id).order_by(ProtocolCollection.created_at.desc()).limit(6).all()
+
+    paper_sources = []
+    for item in literature_items:
+        paper_sources.append(("lit", item.id, item.title, item.authors, item.journal, item.year, item.abstract, item.topic, item.citation_count, item.url, item.doi, False))
+    for item in planet_papers:
+        topic = item.planet.topic or item.planet.name if item.planet else ""
+        paper_sources.append(("planet", item.id, item.title, item.authors, item.journal, item.year, item.abstract, topic, 0, item.url, item.doi, False))
+    for item in bookmarks:
+        paper_sources.append(("bookmark", item.id, item.title, item.authors, item.journal, item.year, item.abstract, item.source, item.citation_count, item.url, item.doi, True))
+
+    seen_titles = set()
+    author_counts = {}
+    keyword_counts = {}
+    paper_ids = []
+    for source, item_id, title, authors, journal, year, abstract, topic, citations, url, doi, bookmarked in paper_sources:
+        if not title or title.lower() in seen_titles:
+            continue
+        seen_titles.add(title.lower())
+        node_id = f"paper:{source}:{item_id}"
+        keywords = _graph_keywords(topic, title, abstract)
+        add_node({
+            "id": node_id,
+            "type": "Paper",
+            "label": title[:42] + ("..." if len(title) > 42 else ""),
+            "title": title,
+            "year": year or "",
+            "authors": authors or "",
+            "journal": journal or "",
+            "keywords": keywords,
+            "abstract": abstract[:360] if abstract else "暂无摘要。可从 DOI、标题或收藏记录继续补充。",
+            "relevance": _graph_relevance(query, title, topic, citations),
+            "citation_count": citations or 0,
+            "bookmarked": bookmarked,
+            "read": False,
+            "url": url or "",
+            "doi": doi or "",
+            "source": source,
+        })
+        paper_ids.append(node_id)
+        add_edge(seed_id, node_id, "similar_work", 0.55 + min((citations or 0) / 300, 0.35))
+
+        for author in _split_authors(authors)[:2]:
+            author_counts[author] = author_counts.get(author, 0) + 1
+        for kw in keywords[:3]:
+            keyword_counts[kw] = keyword_counts.get(kw, 0) + 1
+
+    for kw, count in sorted(keyword_counts.items(), key=lambda x: x[1], reverse=True)[:10]:
+        kw_id = "keyword:" + re.sub(r"[^a-zA-Z0-9_-]+", "-", kw.lower()).strip("-")
+        add_node({
+            "id": kw_id,
+            "type": "Keyword",
+            "label": kw,
+            "title": kw,
+            "year": "",
+            "authors": "",
+            "keywords": [kw],
+            "abstract": f"在当前图谱中与 {count} 篇文献相关。",
+            "relevance": min(0.95, 0.45 + count * 0.12),
+            "citation_count": count,
+            "bookmarked": False,
+            "read": False,
+            "url": "",
+            "source": "keyword",
+        })
+        add_edge(seed_id, kw_id, "shared_keyword", 0.45 + count * 0.08)
+
+    for author, count in sorted(author_counts.items(), key=lambda x: x[1], reverse=True)[:7]:
+        author_id = "author:" + re.sub(r"[^a-zA-Z0-9_-]+", "-", author.lower()).strip("-")
+        add_node({
+            "id": author_id,
+            "type": "Author",
+            "label": author,
+            "title": author,
+            "year": "",
+            "authors": author,
+            "keywords": ["research team"],
+            "abstract": f"当前图谱中出现 {count} 次的作者或研究团队。",
+            "relevance": min(0.9, 0.4 + count * 0.15),
+            "citation_count": count,
+            "bookmarked": False,
+            "read": False,
+            "url": "",
+            "source": "author",
+        })
+        add_edge(seed_id, author_id, "same_author", 0.4 + count * 0.08)
+
+    for protocol in protocols:
+        protocol_id = f"protocol:{protocol.id}"
+        add_node({
+            "id": protocol_id,
+            "type": "Protocol",
+            "label": protocol.name[:32],
+            "title": protocol.name,
+            "year": protocol.created_at.year if protocol.created_at else "",
+            "authors": "",
+            "keywords": ["protocol", "method"],
+            "abstract": protocol.methods_summary[:360] if protocol.methods_summary else protocol.paper_title or "个人实验流程收藏。",
+            "relevance": 0.72,
+            "citation_count": 0,
+            "bookmarked": True,
+            "read": False,
+            "url": url_for("agent_methods"),
+            "source": "protocol",
+        })
+        add_edge(seed_id, protocol_id, "method_dependency", 0.7)
+
+    if len(nodes) <= 1:
+        return _sample_literature_graph(query)
+
+    keyword_nodes = [n for n in nodes.values() if n["type"] == "Keyword"]
+    author_nodes = [n for n in nodes.values() if n["type"] == "Author"]
+    for paper_id in paper_ids:
+        paper = nodes[paper_id]
+        for kw in paper["keywords"][:3]:
+            kw_id = "keyword:" + re.sub(r"[^a-zA-Z0-9_-]+", "-", kw.lower()).strip("-")
+            add_edge(paper_id, kw_id, "shared_keyword", 0.35)
+        for author in _split_authors(paper.get("authors", ""))[:2]:
+            author_id = "author:" + re.sub(r"[^a-zA-Z0-9_-]+", "-", author.lower()).strip("-")
+            add_edge(paper_id, author_id, "same_author", 0.35)
+
+    if len(paper_ids) >= 2:
+        for i in range(min(len(paper_ids) - 1, 8)):
+            add_edge(paper_ids[i], paper_ids[i + 1], "similar_work", 0.32)
+
+    return {
+        "seed": nodes[seed_id],
+        "nodes": list(nodes.values())[:42],
+        "edges": edges[:90],
+        "meta": {
+            "query": query,
+            "source": "database",
+            "node_count": len(nodes),
+            "edge_count": len(edges),
+        },
+    }
+
+
+def _split_authors(authors):
+    if not authors:
+        return []
+    parts = re.split(r",|;| and |、|，", authors)
+    return [p.strip() for p in parts if p.strip()][:6]
+
+
+def _graph_keywords(topic, title="", abstract=""):
+    seeds = []
+    if topic:
+        seeds.extend(re.split(r",|;|/|、|，", topic))
+    text = f"{title} {abstract}".lower()
+    vocab = [
+        "cryo-EM", "single particle analysis", "electron tomography",
+        "sample preparation", "image processing", "classification",
+        "resolution", "reconstruction", "protein complex", "membrane protein",
+        "focused refinement", "micrograph", "dose weighting", "CLEM",
+        "subtomogram averaging",
+    ]
+    for term in vocab:
+        if term.lower() in text:
+            seeds.append(term)
+    clean = []
+    for item in seeds:
+        item = item.strip()
+        if item and item.lower() not in [x.lower() for x in clean]:
+            clean.append(item)
+    return clean[:6] or ["electron microscopy"]
+
+
+def _graph_relevance(query, title, topic, citations):
+    score = 0.48
+    q = query.lower()
+    if q and q in (title or "").lower():
+        score += 0.24
+    if q and q in (topic or "").lower():
+        score += 0.18
+    score += min((citations or 0) / 500, 0.18)
+    return round(min(score, 0.98), 2)
+
+
+def _sample_literature_graph(query):
+    seed = {
+        "id": "topic:cryo-em",
+        "type": "Topic",
+        "label": query or "cryo-EM",
+        "title": query or "cryo-EM",
+        "year": "",
+        "authors": "",
+        "keywords": ["cryo-EM", "structure determination"],
+        "abstract": "示例图谱：以冷冻电镜单颗粒分析为中心组织论文、作者、关键词和方法。",
+        "relevance": 1,
+        "citation_count": 0,
+        "bookmarked": False,
+        "read": False,
+        "url": "",
+        "source": "sample",
+    }
+    nodes = [seed]
+    samples = [
+        ("paper:1", "Paper", "RELION: implementation of Bayesian single-particle reconstruction", 2012, "Scheres SHW", ["single particle analysis", "reconstruction", "classification"], 1850, 0.96),
+        ("paper:2", "Paper", "CryoSPARC: algorithms for rapid unsupervised cryo-EM structure determination", 2017, "Punjani A, Rubinstein JL", ["ab initio reconstruction", "heterogeneity", "GPU"], 1400, 0.93),
+        ("paper:3", "Paper", "Motion correction and dose weighting for electron cryo-microscopy", 2013, "Li X, Mooney P", ["micrograph", "motion correction", "dose weighting"], 980, 0.86),
+        ("paper:4", "Paper", "Atomic resolution cryo-EM structure determination of protein complexes", 2020, "Nakane T, Kotecha A", ["resolution", "protein complex", "refinement"], 720, 0.84),
+        ("keyword:spa", "Keyword", "single particle analysis", "", "", ["cryo-EM", "classification"], 8, 0.9),
+        ("keyword:heterogeneity", "Keyword", "conformational heterogeneity", "", "", ["3D variability", "classification"], 6, 0.76),
+        ("author:scheres", "Author", "Scheres Lab", "", "Scheres SHW", ["RELION", "Bayesian refinement"], 5, 0.82),
+        ("author:punjani", "Author", "Punjani / Rubinstein", "", "Punjani A", ["CryoSPARC", "algorithms"], 4, 0.78),
+        ("method:refinement", "Method", "Bayesian refinement", "", "", ["refinement", "alignment"], 0, 0.8),
+        ("method:motion", "Method", "Motion correction", "", "", ["micrograph", "beam-induced motion"], 0, 0.74),
+        ("protocol:vitrification", "Protocol", "Vitrification and grid screening", "", "", ["sample preparation", "grid"], 0, 0.66),
+        ("dataset:empiar", "Dataset", "EMPIAR benchmark datasets", "", "", ["dataset", "validation"], 0, 0.58),
+    ]
+    for sid, typ, title, year, authors, keywords, citations, relevance in samples:
+        nodes.append({
+            "id": sid,
+            "type": typ,
+            "label": title[:40] + ("..." if len(title) > 40 else ""),
+            "title": title,
+            "year": year,
+            "authors": authors,
+            "journal": "",
+            "keywords": keywords,
+            "abstract": "示例节点，用于展示真实文献知识图谱的数据结构和交互。接入真实 DOI / OpenAlex 数据后可替换。",
+            "relevance": relevance,
+            "citation_count": citations,
+            "bookmarked": sid in ("paper:2", "protocol:vitrification"),
+            "read": False,
+            "url": "",
+            "doi": "",
+            "source": "sample",
+        })
+    edges = [
+        ("topic:cryo-em", "paper:1", "similar_work", 0.9),
+        ("topic:cryo-em", "paper:2", "similar_work", 0.9),
+        ("topic:cryo-em", "paper:3", "similar_work", 0.75),
+        ("topic:cryo-em", "keyword:spa", "shared_keyword", 0.85),
+        ("paper:1", "author:scheres", "same_author", 0.8),
+        ("paper:2", "author:punjani", "same_author", 0.76),
+        ("paper:1", "method:refinement", "method_dependency", 0.78),
+        ("paper:3", "method:motion", "method_dependency", 0.72),
+        ("paper:1", "keyword:spa", "shared_keyword", 0.7),
+        ("paper:2", "keyword:heterogeneity", "shared_keyword", 0.68),
+        ("paper:4", "paper:1", "cited_by", 0.55),
+        ("protocol:vitrification", "dataset:empiar", "similar_work", 0.38),
+    ]
+    return {
+        "seed": seed,
+        "nodes": nodes,
+        "edges": [{"from": a, "to": b, "relation": r, "weight": w} for a, b, r, w in edges],
+        "meta": {"query": query or "cryo-EM", "source": "sample", "node_count": len(nodes), "edge_count": len(edges)},
+    }
 
 
 @app.route("/study")
@@ -404,7 +1267,7 @@ def study():
     quizzes = Quiz.query.filter_by(knowledge_point_id=point_id).all()
 
     return render_template(
-        "study.html",
+        "study_knowledge.html",
         point=today_point,
         point_id=point_id,
         difficulty=difficulty,
@@ -418,6 +1281,7 @@ def study():
         week_days=week_days,
         week_labels=week_labels,
         week_dates=week_dates,
+        custom_study=build_custom_study_context(_selected_course()),
     )
 
 
@@ -443,7 +1307,7 @@ def do_checkin():
         user_id=current_user.id, date=today
     ).first()
     if existing:
-        flash("???????????", "info")
+        flash("今天已经完成打卡", "info")
         return redirect(url_for("study", difficulty=difficulty))
 
     score = {
@@ -462,7 +1326,7 @@ def do_checkin():
     db.session.add(checkin)
     db.session.commit()
 
-    flash(f"??????? {score} ?", "success")
+    flash(f"打卡完成 获得 {score} 分", "success")
     return redirect(url_for("study", difficulty=difficulty))
 
 
@@ -504,7 +1368,7 @@ def admin_add_knowledge():
     )
     db.session.add(kp)
     db.session.commit()
-    flash("???????", "success")
+    flash("知识点已添加", "success")
     return redirect(url_for("admin_knowledge"))
 
 
@@ -521,7 +1385,7 @@ def admin_edit_knowledge(kp_id):
     kp.category = request.form.get("category", kp.category)
     kp.updated_at = dt_module.datetime.now(timezone.utc)
     db.session.commit()
-    flash("???????", "success")
+    flash("知识点已更新", "success")
     return redirect(url_for("admin_knowledge"))
 
 
@@ -533,7 +1397,7 @@ def admin_delete_knowledge(kp_id):
     if kp:
         db.session.delete(kp)
         db.session.commit()
-        flash("??????", "info")
+        flash("知识点已删除", "info")
     return redirect(url_for("admin_knowledge"))
 
 
@@ -570,7 +1434,7 @@ def admin_upload_video():
             video.video_path = f"static/uploads/videos/{fname}"
     db.session.add(video)
     db.session.commit()
-    flash("?????????", "success")
+    flash("视频已保存", "success")
     return redirect(url_for("admin_videos"))
 
 
@@ -582,7 +1446,7 @@ def admin_delete_video(vid):
     if video:
         db.session.delete(video)
         db.session.commit()
-        flash("?????", "info")
+        flash("已取消订阅", "info")
     return redirect(url_for("admin_videos"))
 
 
@@ -602,8 +1466,134 @@ def admin_set_admin(uid):
     if user and user.id != current_user.id:
         user.is_admin = not user.is_admin
         db.session.commit()
-        flash(f"?? {user.name} ?????????", "info")
+        flash(f"已更新 {user.name} 的管理员权限", "info")
     return redirect(url_for("admin_users"))
+
+
+def _remove_upload_file(file_path, subdir):
+    if not file_path:
+        return
+    upload_root = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "uploads", subdir
+    )
+    abs_file = os.path.abspath(file_path)
+    abs_root = os.path.abspath(upload_root)
+    if abs_file.startswith(abs_root + os.sep) and os.path.exists(abs_file):
+        try:
+            os.remove(abs_file)
+        except OSError:
+            pass
+
+
+def _delete_user_data(user):
+    user_id = user.id
+    for score in ReadingScore.query.filter_by(rater_id=user_id).all():
+        db.session.delete(score)
+    for selection in ReadingSelection.query.filter_by(user_id=user_id).all():
+        _remove_upload_file(selection.ppt_path, "reading_ppts")
+        db.session.delete(selection)
+    for review in FinalReview.query.filter_by(user_id=user_id).all():
+        _remove_upload_file(review.file_path, "final_reviews")
+        db.session.delete(review)
+    for planet in LiteraturePlanet.query.filter_by(user_id=user_id).all():
+        for paper in planet.papers.all():
+            db.session.delete(paper)
+        db.session.delete(planet)
+    for bookmark in BookmarkedLiterature.query.filter_by(user_id=user_id).all():
+        db.session.delete(bookmark)
+    for category in LiteratureCategory.query.filter_by(user_id=user_id).all():
+        db.session.delete(category)
+    for model in (
+        UploadedLiterature,
+        LiteratureSubscription,
+        QuizAttempt,
+        DailyCheckin,
+        AttendanceReward,
+        ProtocolCollection,
+        UserStudyPlan,
+        ApiKey,
+        ChatHistory,
+        KnowledgeFile,
+    ):
+        for row in model.query.filter_by(user_id=user_id).all():
+            db.session.delete(row)
+    for template in PresentationTemplate.query.filter_by(uploaded_by=user_id).all():
+        db.session.delete(template)
+    for reading_list in ReadingListFile.query.filter_by(uploaded_by=user_id).all():
+        db.session.delete(reading_list)
+    for video in ProtocolVideo.query.filter_by(uploaded_by=user_id).all():
+        _remove_upload_file(video.video_path, "videos")
+        _remove_upload_file(video.thumbnail, "thumbnails")
+        db.session.delete(video)
+    for log in AgentLog.query.filter_by(user_id=user_id).all():
+        log.user_id = None
+    for log in KnowledgeReviewLog.query.filter_by(user_id=user_id).all():
+        db.session.delete(log)
+    for progress in KnowledgeReviewProgress.query.filter_by(user_id=user_id).all():
+        db.session.delete(progress)
+    for library in UserKnowledgeLibrary.query.filter_by(user_id=user_id).all():
+        for item in library.items.all():
+            for progress in KnowledgeReviewProgress.query.filter_by(
+                item_id=item.id
+            ).all():
+                db.session.delete(progress)
+            for log in KnowledgeReviewLog.query.filter_by(item_id=item.id).all():
+                db.session.delete(log)
+            for task in DailyKnowledgeTask.query.filter_by(item_id=item.id).all():
+                db.session.delete(task)
+            db.session.delete(item)
+        db.session.delete(library)
+    for task in DailyKnowledgeTask.query.filter_by(user_id=user_id).all():
+        db.session.delete(task)
+
+
+@app.route("/admin/users/delete/<int:uid>", methods=["POST"])
+@login_required
+@admin_required
+def admin_delete_user(uid):
+    user = db.session.get(User, uid)
+    if not user:
+        abort(404)
+    if user.is_admin:
+        flash("不能删除教师/管理员账号", "error")
+        return redirect(request.referrer or url_for("admin_users"))
+    _delete_user_data(user)
+    db.session.delete(user)
+    db.session.commit()
+    flash(f"已删除学生 {user.name}（{user.student_id}）及其相关数据", "success")
+    return redirect(request.referrer or url_for("admin_users"))
+
+
+@app.route("/admin/users/<int:uid>/delete-ppts", methods=["POST"])
+@admin_required
+def admin_delete_student_ppts(uid):
+    user = db.session.get(User, uid)
+    if not user or user.is_admin:
+        abort(404)
+    deleted = 0
+    for selection in ReadingSelection.query.filter_by(user_id=user.id).all():
+        if selection.ppt_path:
+            _remove_upload_file(selection.ppt_path, "reading_ppts")
+            selection.ppt_filename = ""
+            selection.ppt_path = ""
+            selection.ppt_uploaded_at = None
+            deleted += 1
+    db.session.commit()
+    flash(f"已删除 {user.name} 上传的 {deleted} 份文献分享 PPT", "success")
+    return redirect(request.referrer or url_for("reading_dashboard"))
+
+
+@app.route("/final-review/<int:review_id>/delete", methods=["POST"])
+@admin_required
+def admin_delete_final_review(review_id):
+    review = db.session.get(FinalReview, review_id)
+    if not review:
+        abort(404)
+    _remove_upload_file(review.file_path, "final_reviews")
+    db.session.delete(review)
+    db.session.commit()
+    flash("已删除该学生的期末综述", "success")
+    return redirect(request.referrer or url_for("reading_dashboard"))
 
 
 @app.route("/protocols")
@@ -637,7 +1627,7 @@ def literature_upload_submit():
     keywords = request.form.get("keywords", "").strip()
 
     if not title and not doi and not url:
-        flash("?????????DOI?URL??", "error")
+        flash("请至少填写标题、DOI 或 URL", "error")
         return redirect(url_for("literature_upload_page"))
 
     upload = UploadedLiterature(
@@ -662,27 +1652,34 @@ def literature_upload_submit():
             upload.abstract = info.get("abstract", "")
             upload.citation_count = info.get("citation_count", 0)
             upload.status = "completed"
-            existing = LiteratureItem.query.filter_by(doi=info.get("doi", doi)).first()
-            if not existing and info.get("doi"):
+            resolved_doi = info.get("doi") or doi or None
+            resolved_openalex_id = info.get("openalex_id", "")
+            existing = None
+            if resolved_openalex_id:
+                existing = LiteratureItem.query.filter_by(openalex_id=resolved_openalex_id).first()
+            if not existing and resolved_doi:
+                existing = LiteratureItem.query.filter_by(doi=resolved_doi).first()
+            if not existing:
                 item = LiteratureItem(
                     title=info.get("title", title),
                     authors=info.get("authors", ""),
                     journal=info.get("journal", ""),
                     year=info.get("year"),
-                    doi=info.get("doi", doi),
+                    doi=resolved_doi,
+                    openalex_id=resolved_openalex_id or None,
                     abstract=info.get("abstract", ""),
                     url=info.get("url", url),
                     topic="user-uploaded",
                     citation_count=info.get("citation_count", 0),
                 )
                 db.session.add(item)
-            flash("Agent??????????", "success")
+            flash("Agent 已完成文献信息解析", "success")
         else:
             upload.status = "completed"
-            flash("?????", "info")
+            flash("已取消订阅", "info")
     except Exception:
         upload.status = "completed"
-        flash("?????", "info")
+        flash("已取消订阅", "info")
     db.session.commit()
     return redirect(url_for("literature_upload_page"))
 
@@ -698,10 +1695,47 @@ def rewards():
     monthly_trees = AttendanceReward.query.filter_by(user_id=current_user.id, period="monthly").count()
     current_streak = _calc_streak(current_user.id)
     max_streak = _calc_max_streak(current_user.id)
+    farm_tree_count = max(monthly_trees, max_streak // 28)
+    farm_preview = bool(current_user.is_admin)
+    farm_display_tree_count = max(3, min(12, farm_tree_count)) if farm_preview else farm_tree_count
+    reward_milestones = [
+        {
+            "day": 7,
+            "stage": "seed",
+            "title": "周奖励种子",
+            "subtitle": "连续学习 7 天",
+            "unlocked": current_streak >= 7,
+        },
+        {
+            "day": 14,
+            "stage": "sprout",
+            "title": "小树苗",
+            "subtitle": "连续学习 14 天",
+            "unlocked": current_streak >= 14,
+        },
+        {
+            "day": 21,
+            "stage": "young-tree",
+            "title": "小树 + 新种子",
+            "subtitle": "连续学习 21 天",
+            "unlocked": current_streak >= 21,
+        },
+        {
+            "day": 28,
+            "stage": "big-tree",
+            "title": "大树",
+            "subtitle": "连续学习 28 天",
+            "unlocked": current_streak >= 28,
+        },
+    ]
     return render_template("rewards.html",
         trees=trees, total_trees=total_trees,
         weekly_trees=weekly_trees, monthly_trees=monthly_trees,
-        current_streak=current_streak, max_streak=max_streak)
+        current_streak=current_streak, max_streak=max_streak,
+        reward_milestones=reward_milestones,
+        farm_tree_count=farm_tree_count,
+        farm_display_tree_count=farm_display_tree_count,
+        farm_preview=farm_preview)
 
 
 def _calc_max_streak(user_id):
@@ -740,7 +1774,7 @@ def _check_and_award_rewards():
                 reward = AttendanceReward(
                     user_id=user.id, period="weekly", period_key=week_key,
                     checkin_days=week_checkins, total_days=7, reward_type="tree",
-                    reward_data=json.dumps({"emoji": "\U0001F331", "message": "???????????"}),
+                    reward_data=json.dumps({"emoji": "\U0001F331", "message": "连续打卡一周"}),
                 )
                 db.session.add(reward)
 
@@ -761,7 +1795,7 @@ def _check_and_award_rewards():
                     reward = AttendanceReward(
                         user_id=user.id, period="monthly", period_key=month_key,
                         checkin_days=month_checkins, total_days=month_days, reward_type="tree",
-                        reward_data=json.dumps({"emoji": "\U0001F333", "message": "?????????????"}),
+                        reward_data=json.dumps({"emoji": "\U0001F333", "message": "完成本月连续学习"}),
                     )
                     db.session.add(reward)
         db.session.commit()
@@ -794,15 +1828,7 @@ def agent_literature_info():
 @app.route("/agent/subscription", methods=["GET", "POST"])
 @login_required
 def agent_subscription():
-    """Skill 2: Subscribe and fetch recent lit"""
-    result = None
-    keyword = ""
-    if request.method == "POST":
-        keyword = request.form.get("keyword", "")
-        days = int(request.form.get("days", 7))
-        from agent_skills import skill_literature_subscription
-        result, ok = skill_literature_subscription(db, current_user.id, keyword, days)
-    return render_template("agent_subscription.html", result=result, keyword=keyword)
+    return redirect(url_for("literature_collection"))
 
 
 @app.route("/agent/citation", methods=["GET", "POST"])
@@ -833,14 +1859,23 @@ def agent_presentation():
         paper_doi = request.form.get("paper_doi", "")
         template_id = request.form.get("template_id", "")
 
+        from agent_skills import skill_presentation_assist
         if action == "generate":
-            from agent_skills import skill_presentation_assist
             result, ok = skill_presentation_assist(db, current_user.id, paper_title, paper_doi, template_id)
         elif action == "analyze":
             student_paper_title = request.form.get("student_paper_title", "")
             student_paper_doi = request.form.get("student_paper_doi", "")
-            ppt_content = request.form.get("ppt_content", "")
-            from agent_skills import skill_presentation_assist
+            file_upload = request.files.get('file_upload')
+            ppt_content = request.form.get('ppt_content', '')
+            if file_upload and file_upload.filename:
+                from werkzeug.utils import secure_filename
+                import os as _os
+                fname = secure_filename(file_upload.filename)
+                fpath = _os.path.join('uploads', fname)
+                _os.makedirs('uploads', exist_ok=True)
+                file_upload.save(fpath)
+                ppt_content = f'[Uploaded: {fname}] ' + ppt_content
+                flash(f'已接收文件: {fname}', 'info')
             res, ok = skill_presentation_assist(db, current_user.id, student_paper_title or paper_title, student_paper_doi or paper_doi, template_id)
             if res.get("found"):
                 improvement_suggestions = [
@@ -888,8 +1923,6 @@ def admin_presentation_templates():
         return redirect(url_for("admin_presentation_templates"))
     templates = PresentationTemplate.query.order_by(PresentationTemplate.created_at.desc()).all()
     return render_template("admin_presentation_templates.html", templates=templates)
-
-
 @app.route("/admin/presentation-templates/delete/<int:tid>")
 @login_required
 @admin_required
@@ -901,23 +1934,88 @@ def admin_delete_presentation_template(tid):
         flash("Template deleted", "info")
     return redirect(url_for("admin_presentation_templates"))
 
+@app.route("/agent/presentation/upload-template", methods=["POST"])
+@login_required
+def user_upload_presentation_template():
+    title = request.form.get("title", "").strip()
+    if not title:
+        flash("Please enter a template name", "error")
+        return redirect(url_for("agent_presentation"))
+    dimensions = request.form.getlist("dimension[]")
+    weights = request.form.getlist("weight[]")
+    standards = request.form.getlist("standard[]")
+    import json as _json
+    criteria = []
+    for i in range(len(dimensions)):
+        if dimensions[i].strip():
+            criteria.append({"dimension": dimensions[i].strip(), "weight": weights[i].strip() if i < len(weights) else "", "standard": standards[i].strip() if i < len(standards) else ""})
+    description = request.form.get("description", "")
+    t = PresentationTemplate(title=title, description=description, criteria=_json.dumps(criteria, ensure_ascii=False), uploaded_by=current_user.id)
+    db.session.add(t)
+    db.session.commit()
+    flash("Template saved!", "success")
+    return redirect(url_for("agent_presentation"))
 
-
+@app.route("/agent/methods", methods=["GET", "POST"])
 @app.route("/agent/methods", methods=["GET", "POST"])
 @login_required
 def agent_methods():
     """Skill 5: Experimental method summary"""
     result = None
+    from models import ProtocolCollection, ProtocolVideo, LiteraturePlanet, db as model_db
+
+    # Handle category update for existing collections
     if request.method == "POST":
-        query = request.form.get("query", "")
-        qtype = request.form.get("query_type", "doi")
-        save_name = request.form.get("save_name", "")
-        from agent_skills import skill_method_summary
-        result, ok = skill_method_summary(db, current_user.id, query, qtype, save_name)
-    from models import ProtocolCollection
-    protocols = ProtocolCollection.query.filter_by(user_id=current_user.id).all()
+        action = request.form.get("action", "")
+        if action == "update_category":
+            col_id = request.form.get("collection_id")
+            category = request.form.get("category", "general")
+            if col_id:
+                col = db.session.get(ProtocolCollection, int(col_id))
+                if col and col.user_id == current_user.id:
+                    col.category = category
+                    db.session.commit()
+                    flash("Category updated", "success")
+        elif action == "delete_collection":
+            col_id = request.form.get("collection_id")
+            if col_id:
+                col = db.session.get(ProtocolCollection, int(col_id))
+                if col and col.user_id == current_user.id:
+                    db.session.delete(col)
+                    db.session.commit()
+                    flash("Collection deleted", "info")
+        elif action == "add_video_url":
+            title = request.form.get("title", "").strip()
+            video_url = request.form.get("video_url", "").strip()
+            category = request.form.get("category", "general")
+            description = request.form.get("description", "")
+            if title and video_url:
+                from models import ProtocolVideo
+                vid = ProtocolVideo(title=title, video_url=video_url, category=category, description=description, uploaded_by=current_user.id, difficulty="intermediate")
+                db.session.add(vid)
+                db.session.commit()
+                flash("Protocol video URL added", "success")
+            else:
+                flash("Title and URL required", "warning")
+        else:
+            # Default: extract methods
+            query = request.form.get("query", "")
+            qtype = request.form.get("query_type", "doi")
+            save_name = request.form.get("save_name", "")
+            from agent_skills import skill_method_summary
+            result, ok = skill_method_summary(db, current_user.id, query, qtype, save_name)
+
+    protocols = ProtocolCollection.query.filter_by(user_id=current_user.id).order_by(ProtocolCollection.created_at.desc()).all()
     planets = LiteraturePlanet.query.filter_by(user_id=current_user.id).all()
-    return render_template("agent_methods.html", result=result, protocols=protocols, planets=planets)
+    videos = ProtocolVideo.query.order_by(ProtocolVideo.uploaded_at.desc()).all()
+    categories = db.session.query(ProtocolCollection.category).filter_by(user_id=current_user.id).distinct().all()
+    categories = sorted(set([c[0] for c in categories if c[0] and c[0] != '']))
+    cat_filter = request.args.get("cat", "")
+    if cat_filter:
+        protocols = [p for p in protocols if p.category == cat_filter]
+
+
+    return render_template("agent_methods.html", result=result, protocols=protocols, planets=planets, videos=videos, categories=categories)
 
 
 @app.route("/study/quiz/<int:kp_id>")
@@ -977,6 +2075,7 @@ def study_quiz_answer():
 
 @app.route("/admin/quizzes")
 @login_required
+@admin_required
 def admin_quizzes():
     from models import Quiz, KnowledgePoint
     kps = KnowledgePoint.query.order_by(KnowledgePoint.created_at.desc()).all()
@@ -987,6 +2086,7 @@ def admin_quizzes():
 
 @app.route("/admin/quizzes/add", methods=["POST"])
 @login_required
+@admin_required
 def admin_add_quiz():
     from models import Quiz
     import json
@@ -1021,13 +2121,11 @@ def agent_chat():
     question = data.get("question", "")
     if not question:
         return jsonify({"answer": "Please ask a question"})
-    key_obj = ApiKey.query.filter_by(is_active=True).first()
-    if not key_obj:
-        return jsonify({"answer": "No LLM key configured. Add in API Keys."})
-    provider = key_obj.provider or "openai"
 
-    # RAG: Search OpenAlex for relevant papers
+    # === RAG: Build context from multiple sources ===
     rag_context = ""
+
+    # 1. OpenAlex academic papers
     try:
         from openalex_client import search_works, extract_work_info
         works = search_works(question, 5)
@@ -1042,17 +2140,14 @@ def agent_chat():
                     papers.append(f"- {t} ({j}, {a})")
             if papers:
                 rag_context = "【学术文献】\n" + "\n".join(papers)
-    except:
-        pass
+    except: pass
 
-    # RAG: Search knowledge points (prefer user-corrected versions)
+    # 2. Knowledge base (prefer user-corrected)
     try:
         from sqlalchemy import or_
         matching_kps = KnowledgePoint.query.filter(
-            or_(
-                KnowledgePoint.title.contains(question[:50]),
-                KnowledgePoint.content.contains(question[:50])
-            )
+            or_(KnowledgePoint.title.contains(question[:50]),
+                KnowledgePoint.content.contains(question[:50]))
         ).order_by(KnowledgePoint.correction_count.desc(), KnowledgePoint.updated_at.desc()).limit(5).all()
         if matching_kps:
             kp_texts = []
@@ -1060,24 +2155,21 @@ def agent_chat():
                 source_tag = "已修正" if kp.source == "user_corrected" else ("用户提供" if kp.source == "user" else "AI生成")
                 kp_texts.append(f"[{source_tag}] {kp.title}: {kp.content[:300]}")
             rag_context += "\n\n【知识库】\n" + "\n".join(kp_texts)
-    except:
-        pass
+    except: pass
 
-    # RAG: Search uploaded knowledge files
+    # 3. Uploaded knowledge files
     try:
         kfs = KnowledgeFile.query.filter_by(user_id=current_user.id).all()
         kf_matches = []
         for kf in kfs:
             q_words = [w for w in question.lower().split() if len(w) > 2]
             if any(w in kf.content.lower() for w in q_words):
-                snippet = kf.content[:500]
-                kf_matches.append(f"[{kf.filename}] {snippet}")
+                kf_matches.append(f"[{kf.filename}] {kf.content[:500]}")
         if kf_matches:
             rag_context += "\n\n【用户上传知识库】\n" + "\n".join(kf_matches[:3])
-    except:
-        pass
+    except: pass
 
-    # Chat history context (last 6 exchanges for continuity)
+    # === Chat history context ===
     chat_context = ""
     try:
         recent = ChatHistory.query.filter_by(user_id=current_user.id).order_by(ChatHistory.created_at.desc()).limit(12).all()
@@ -1088,31 +2180,44 @@ def agent_chat():
             pairs.append(f"{prefix}: {m.message[:200]}")
         if pairs:
             chat_context = "\n\n【对话历史】\n" + "\n".join(pairs[-10:])
-    except:
-        pass
+    except: pass
 
-    # Build grounded prompt with all RAG context
-    system = "你是电子显微学与结构生物学专家。规则：1.优先基于提供的文献、知识库、上传文件回答 2.不要编造数据，若信息不足请明确说明 3.回答需有依据 4.用中文回答 5.参考对话历史保持上下文连贯"
+    # === User preference learning ===
+    pref_context = ""
+    try:
+        from models import UserStudyPlan
+        plan = UserStudyPlan.query.filter_by(user_id=current_user.id).first()
+        if plan:
+            pref_context = f"\n\n【用户偏好】该用户常学习: {plan.topic}"
+    except: pass
+
+    # === Build enhanced prompt ===
+    system = "你是电子显微学与结构生物学专家。规则：1.先用你的专业知识回答用户问题 2.如果有检索到的文献，用它们来验证和补充你的回答 3.如果文献信息与你的知识冲突，以文献为准 4.不要编造不存在的文献和数据 5.用中文回答 6.参考对话历史保持上下文连贯"
+
     prompt = question
     if rag_context:
-        prompt = rag_context + "\n\n用户问题：" + question + "\n\n请基于以上文献和知识库信息回答，不要编造"
+        prompt = "请先基于你的专业知识回答以下问题，然后用检索到的文献来验证和补充你的回答。\n\n相关文献：\n" + rag_context + "\n\n用户问题：" + question
     elif chat_context:
         prompt = chat_context + "\n\n用户问题：" + question
-    else:
-        prompt = question
 
-    # Call LLM with low temperature for reliability
-    answer = call_llm_grounded(key_obj.encrypted_key, provider, system, prompt)
+    # Add preference context
+    if pref_context:
+        prompt = pref_context + "\n\n" + prompt
 
-    # Save history
+    # === Call LLM with enhanced prompt ===
+    answer, config = call_configured_llm(prompt, system=system)
+    if not config:
+        return jsonify({"answer": "未配置 LLM。请设置环境变量或在后台添加 API 配置。"}), 503
+    provider = config.provider
+
+    # === Save chat history ===
     try:
         db.session.add(ChatHistory(user_id=current_user.id, role="user", message=question))
         db.session.add(ChatHistory(user_id=current_user.id, role="assistant", message=answer))
         db.session.commit()
-    except:
-        pass
-    return jsonify({"answer": "[" + provider + "] " + answer if answer else answer, "provider": provider})
+    except: pass
 
+    return jsonify({"answer": answer, "provider": provider, "model": config.model})
 
 @app.route("/api/chat/history", methods=["GET"])
 @login_required
@@ -1265,7 +2370,21 @@ def literature_collection_view():
     planets = LiteraturePlanet.query.filter_by(user_id=current_user.id).all()
     cats = LiteratureCategory.query.filter_by(user_id=current_user.id).all()
     bookmarks = BookmarkedLiterature.query.filter_by(user_id=current_user.id).order_by(BookmarkedLiterature.added_at.desc()).all()
-    return render_template("literature_collection.html", planets=planets, categories=cats, bookmarks=bookmarks)
+    total_count = len(bookmarks)
+    category_counts = {
+        c.id: BookmarkedLiterature.query.filter_by(user_id=current_user.id, category_id=c.id).count()
+        for c in cats
+    }
+    category_names = {c.id: c.name for c in cats}
+    return render_template(
+        "literature_collection.html",
+        planets=planets,
+        categories=cats,
+        bookmarks=bookmarks,
+        total_count=total_count,
+        category_counts=category_counts,
+        category_names=category_names,
+    )
 
 
 @app.route("/planets")
@@ -1381,30 +2500,102 @@ def api_planet_data():
 
 
 @app.route("/admin/api-keys", methods=["GET", "POST"])
-@login_required
+@admin_required
 def admin_api_keys():
     if request.method == "POST":
-        provider = request.form.get("provider", "openai")
+        provider = request.form.get("provider", "custom").strip().lower()
         key_name = request.form.get("key_name", "default")
         api_key = request.form.get("api_key", "").strip()
-        if api_key:
-            key = ApiKey(user_id=current_user.id, provider=provider, key_name=key_name, encrypted_key=api_key)
+        endpoint = request.form.get("endpoint", "").strip()
+        model_name = request.form.get("model_name", "").strip()
+        deployment = request.form.get("deployment", "").strip()
+        api_style = request.form.get("api_style", "auto").strip()
+        if api_key and model_name:
+            key = ApiKey(
+                user_id=current_user.id,
+                provider=provider,
+                key_name=key_name,
+                encrypted_key=api_key,
+                endpoint=endpoint,
+                model_name=model_name,
+                deployment=deployment,
+                api_style=api_style,
+            )
             db.session.add(key)
             db.session.commit()
-            flash("API Key 已保存", "success")
+            flash("LLM API 配置已保存", "success")
+        else:
+            flash("API Key、端点地址和模型编码均为必填项", "error")
         return redirect(url_for("admin_api_keys"))
     keys = ApiKey.query.order_by(ApiKey.created_at.desc()).all()
-    return render_template("admin_api_keys.html", keys=keys)
+    return render_template("admin_api_keys.html", keys=keys, env_config=config_from_environment())
 
 
 @app.route("/admin/api-keys/delete/<int:k_id>")
 @login_required
+@admin_required
 def admin_delete_api_key(k_id):
     key = db.session.get(ApiKey, k_id)
     if key:
-        db.session.delete(key)
-        db.session.commit()
-        flash("API Key 已删除", "info")
+            db.session.delete(key)
+            db.session.commit()
+            flash("API Key 已删除", "info")
+    return redirect(url_for("admin_api_keys"))
+@app.route("/admin/api-keys/set-active/<int:k_id>")
+@login_required
+@admin_required
+def admin_set_active_api_key(k_id):
+    key = db.session.get(ApiKey, k_id)
+    if not key:
+        abort(404)
+    ApiKey.query.update({"is_active": False})
+    key.is_active = True
+    db.session.commit()
+    flash(f"已切换到配置：{key.key_name}", "success")
+    return redirect(url_for("admin_api_keys"))
+
+
+@app.route("/admin/api-keys/test-config", methods=["POST"])
+@admin_required
+def admin_test_api_config():
+    provider = request.form.get("provider", "custom").strip().lower()
+    api_key = request.form.get("api_key", "").strip()
+    endpoint = request.form.get("endpoint", "").strip()
+    model_name = request.form.get("model_name", "").strip()
+    deployment = request.form.get("deployment", "").strip()
+    api_style = request.form.get("api_style", "auto").strip().lower() or "auto"
+    if not api_key or not endpoint or not model_name:
+        flash("请先填写 API Key、端点地址和模型编码后再测试", "error")
+        return redirect(url_for("admin_api_keys"))
+    config = LLMConfig(
+        api_key=api_key,
+        endpoint=endpoint,
+        model=model_name,
+        provider=provider,
+        deployment=deployment,
+        api_style=api_style,
+    )
+    result = execute_llm_request(config, "Reply with exactly: API connected")
+    if result.startswith(("API Error", "Request Error")):
+        flash(result, "error")
+    else:
+        flash(f"测试成功：{result[:120]}", "success")
+    return redirect(url_for("admin_api_keys"))
+
+
+@app.route("/admin/api-keys/test/<int:k_id>", methods=["POST"])
+@admin_required
+def admin_test_api_key(k_id):
+    key = db.session.get(ApiKey, k_id)
+    config = config_from_key_record(key)
+    if not config:
+        flash("该 API 配置不完整", "error")
+    else:
+        result = execute_llm_request(config, "Reply with exactly: API connected")
+        if result.startswith(("API Error", "Request Error")):
+            flash(result, "error")
+        else:
+            flash(f"连接成功：{result[:120]}", "success")
     return redirect(url_for("admin_api_keys"))
 
 
@@ -1416,13 +2607,13 @@ def agent_search():
     query = ""
     if request.method == "POST":
         query = request.form.get("query", "")
-        provider = request.form.get("provider", "openai")
-        key_entry = ApiKey.query.filter_by(is_active=True, provider=provider).first()
-        if key_entry and key_entry.encrypted_key:
-            result_text = call_llm(key_entry.encrypted_key, provider, query)
-        else:
+        provider = request.form.get("provider", "").strip() or None
+        result_text, config = call_configured_llm(query, provider=provider)
+        if not config:
             result_text = "未配置 API Key，请管理员在后台添加。"
     return render_template("agent_search.html", result=result_text, query=query)
+
+
 
 @app.route("/literature-hub")
 @login_required
@@ -1464,9 +2655,18 @@ def literature_weekly():
         from openalex_client import recent_works_by_topic, extract_work_info
         works = recent_works_by_topic(keyword, days=days, per_page=15)
         results = []
+        from datetime import date
+        today_year = date.today().year
         for w in works:
             info = extract_work_info(w)
-            results.append({'title': info.get('title', ''), 'authors': info.get('first_author', ''), 'journal': info.get('journal', ''), 'date': info.get('publication_date', ''), 'doi': info.get('doi', '')})
+            pub_date = info.get("publication_date", "")
+            if pub_date and len(pub_date) >= 4:
+                try:
+                    if int(pub_date[:4]) > today_year:
+                        continue
+                except:
+                    pass
+            results.append(info)
         result = {"keyword": keyword, "days": days, "results": results}
     planets = LiteraturePlanet.query.filter_by(user_id=current_user.id).all()
     return render_template("literature_weekly.html", result=result, keyword=keyword, planets=planets)
@@ -1475,26 +2675,44 @@ def literature_weekly():
 @app.route("/literature/collection")
 @login_required
 def literature_collection():
+    cat_filter = request.args.get("cat", "")
     planets = LiteraturePlanet.query.filter_by(user_id=current_user.id).all()
     cats = LiteratureCategory.query.filter_by(user_id=current_user.id).all()
-    bookmarks = BookmarkedLiterature.query.filter_by(user_id=current_user.id).order_by(BookmarkedLiterature.added_at.desc()).all()
-    return render_template("literature_collection.html", planets=planets, categories=cats, bookmarks=bookmarks)
-
+    from models import BookmarkedLiterature
+    q = BookmarkedLiterature.query.filter_by(user_id=current_user.id)
+    if cat_filter:
+        try: q = q.filter_by(category_id=int(cat_filter))
+        except: pass
+    bookmarks = q.order_by(BookmarkedLiterature.added_at.desc()).all()
+    total_count = BookmarkedLiterature.query.filter_by(user_id=current_user.id).count()
+    category_counts = {
+        c.id: BookmarkedLiterature.query.filter_by(user_id=current_user.id, category_id=c.id).count()
+        for c in cats
+    }
+    category_names = {c.id: c.name for c in cats}
+    return render_template(
+        "literature_collection.html",
+        planets=planets,
+        categories=cats,
+        bookmarks=bookmarks,
+        total_count=total_count,
+        category_counts=category_counts,
+        category_names=category_names,
+    )
 
 @app.route("/admin/knowledge/llm-generate", methods=["POST"])
-@login_required
+@admin_required
 def admin_llm_generate():
     topic = request.form.get("topic", "").strip()
     if not topic:
         flash("请输入主题", "error")
         return redirect(url_for("admin_knowledge"))
-    key_obj = ApiKey.query.filter_by(is_active=True).first()
-    if not key_obj:
+    config = get_llm_config()
+    if not config:
         flash("请先在 API Keys 配置 LLM Key", "error")
         return redirect(url_for("admin_api_keys"))
-    provider = key_obj.provider or "openai"
     prompt = 'Generate 3 EM knowledge points about ' + topic + ' in JSON: [{"title":"...","content":"...","difficulty":"beginner/intermediate/advanced"}]'
-    text = call_llm(key_obj.encrypted_key, provider, prompt)
+    text = execute_llm_request(config, prompt)
     if not text:
         flash("API Error: No response", "error")
         return redirect(url_for("admin_knowledge"))
@@ -1513,141 +2731,6 @@ def admin_llm_generate():
         flash(f"Parse Error: {str(e)}", "error")
     return redirect(url_for("admin_knowledge"))
 
-
-@app.route("/knowledge")
-@login_required
-def knowledge_page():
-    points = KnowledgePoint.query.order_by(KnowledgePoint.created_at.desc()).all()
-    from knowledge_points import DIFFICULTY_LABELS
-    return render_template("user_knowledge.html", points=points, difficulties=DIFFICULTY_LABELS)
-
-@app.route("/knowledge/edit-form/<int:kp_id>", methods=["GET"])
-@login_required
-def edit_knowledge_form(kp_id):
-    kp = db.session.get(KnowledgePoint, kp_id)
-    if not kp: abort(404)
-    return render_template("edit_knowledge_page.html", kp=kp)
-
-
-@app.route("/knowledge/llm-generate", methods=["POST"])
-@login_required
-def user_llm_generate():
-    topic = request.form.get("topic", "").strip()
-    if not topic:
-        flash("请输入主题", "error")
-        return redirect(url_for("knowledge_page"))
-    key_obj = ApiKey.query.filter_by(is_active=True).first()
-    if not key_obj:
-        flash("请先配置 API Key", "error")
-        return redirect(url_for("knowledge_page"))
-    provider = key_obj.provider or "openai"
-    # Add context from uploaded knowledge files for consistency
-    file_context = ""
-    try:
-        all_kfs = KnowledgeFile.query.filter_by(user_id=current_user.id).all()
-        for kf in all_kfs:
-            if topic.lower() in kf.content.lower()[:1000]:
-                file_context = "\n???????????" + kf.content[:500]
-                break
-    except:
-        pass
-    prompt_prefix = file_context + "\n" if file_context else ""
-    try:
-        existing = KnowledgePoint.query.filter(
-            KnowledgePoint.title.contains(topic) | KnowledgePoint.content.contains(topic)
-        ).limit(5).all()
-        ctx = ""
-        if existing:
-            ctx = "已有知识点（请勿重复）\n" + "\n".join(["- "+kp.title for kp in existing])
-        prompt = ctx + "\n\n生成3个关于「" + topic + "」的电子显微学知识点，JSON格式：[{\"title\":\"...\",\"content\":\"...\",\"difficulty\":\"beginner/intermediate/advanced\"}]"
-        import json as _json
-        text = call_llm(key_obj.encrypted_key, provider, prompt)
-        pts = _json.loads(text.strip())
-        count = 0
-        for pt in pts:
-            exist = KnowledgePoint.query.filter_by(title=pt.get("title","")).first()
-            if not exist:
-                kp = KnowledgePoint(title=pt.get("title",""), content=pt.get("content",""),
-                    difficulty=pt.get("difficulty","intermediate"), category=topic, source="llm")
-                db.session.add(kp); count += 1
-        db.session.commit()
-        flash(f"LLM生成了{count}个知识点！", "success")
-        if count < len(pts): flash(f"{len(pts)-count}个因重复已跳过", "info")
-    except Exception as e:
-        flash(f"错误：{str(e)}", "error")
-    return redirect(url_for("knowledge_page"))
-
-@app.route("/knowledge/user-add", methods=["POST"])
-@login_required
-def user_add_knowledge():
-    kp = KnowledgePoint(title=request.form.get("title",""), content=request.form.get("content",""),
-        difficulty=request.form.get("difficulty","beginner"),
-        category=request.form.get("category","general"), source="user")
-    db.session.add(kp); db.session.commit()
-    flash("知识点已添加！", "success")
-    return redirect(url_for("knowledge_page"))
-
-@app.route("/knowledge/edit/<int:kp_id>", methods=["POST"])
-@login_required
-def user_edit_knowledge(kp_id):
-    kp = db.session.get(KnowledgePoint, kp_id)
-    if not kp: abort(404)
-    kp.title = request.form.get("title", kp.title)
-    # If user edited content differs, mark as correction
-    if kp.content != request.form.get("content", kp.content):
-        kp.correction_count = (kp.correction_count or 0) + 1
-        kp.last_corrected_at = dt_module.datetime.now(timezone.utc)
-        kp.source = "user_corrected"  # tag for RAG priority
-    kp.content = request.form.get("content", kp.content)
-    kp.difficulty = request.form.get("difficulty", kp.difficulty)
-    kp.category = request.form.get("category", kp.category)
-    db.session.commit()
-    flash("知识点已更新！", "success")
-    return redirect(url_for("knowledge_page"))
-
-
-@app.route("/knowledge/upload", methods=["GET","POST"])
-@login_required
-def knowledge_upload():
-    if request.method == "POST":
-        file = request.files.get("file")
-        if not file or file.filename == "":
-            flash("请选择文件", "error")
-            return redirect(url_for("knowledge_upload"))
-        if not file.filename.endswith(".txt"):
-            flash("只支持 .txt 文件", "error")
-            return redirect(url_for("knowledge_upload"))
-        content = file.read().decode("utf-8", errors="replace")
-        if len(content) > 100000:
-            flash("文件太大，最大100KB", "error")
-            return redirect(url_for("knowledge_upload"))
-        kf = KnowledgeFile(user_id=current_user.id, filename=file.filename, content=content)
-        db.session.add(kf)
-        db.session.commit()
-        flash(f"已上传：{file.filename}", "success")
-        return redirect(url_for("knowledge_upload"))
-    files = KnowledgeFile.query.filter_by(user_id=current_user.id).order_by(KnowledgeFile.uploaded_at.desc()).all()
-    return render_template("knowledge_upload.html", files=files)
-
-@app.route("/knowledge/file/delete/<int:fid>")
-@login_required
-def knowledge_delete_file(fid):
-    f = db.session.get(KnowledgeFile, fid)
-    if f and f.user_id == current_user.id:
-        db.session.delete(f)
-        db.session.commit()
-        flash("已删除", "info")
-    return redirect(url_for("knowledge_upload"))
-
-@app.route("/bookmark/<int:bid>")
-@login_required
-def bookmark_detail(bid):
-    bm = db.session.get(BookmarkedLiterature, bid)
-    if not bm or bm.user_id != current_user.id:
-        flash("文献未找到", "error")
-        return redirect(url_for("literature_collection_view"))
-    category = db.session.get(LiteratureCategory, bm.category_id) if bm.category_id else None
-    return render_template("bookmark_detail.html", bm=bm, category=category)
 
 
 @app.route("/paper/<int:ppid>")
@@ -1720,6 +2803,844 @@ def profile():
     )
 
 
+def _teacher_class_overview():
+    """Aggregate student literature and knowledge-forest metrics for teachers."""
+    if not current_user.is_admin:
+        return []
+    rows = []
+    students = User.query.filter_by(is_admin=False).order_by(User.student_id).all()
+    for user in students:
+        planets = LiteraturePlanet.query.filter_by(user_id=user.id).all()
+        planet_paper_count = sum(planet.papers.count() for planet in planets)
+        bookmark_count = BookmarkedLiterature.query.filter_by(user_id=user.id).count()
+        subscription_count = LiteratureSubscription.query.filter_by(
+            user_id=user.id, active=True
+        ).count()
+        upload_count = UploadedLiterature.query.filter_by(user_id=user.id).count()
+        checkin_count = DailyCheckin.query.filter_by(user_id=user.id).count()
+        total_score = (
+            db.session.query(
+                db.func.coalesce(db.func.sum(DailyCheckin.score), 0)
+            )
+            .filter_by(user_id=user.id)
+            .scalar()
+            or 0
+        )
+        library_count = UserKnowledgeLibrary.query.filter_by(user_id=user.id).count()
+        knowledge_item_count = (
+            db.session.query(db.func.count(UserKnowledgeItem.id))
+            .join(
+                UserKnowledgeLibrary,
+                UserKnowledgeItem.library_id == UserKnowledgeLibrary.id,
+            )
+            .filter(UserKnowledgeLibrary.user_id == user.id)
+            .scalar()
+            or 0
+        )
+        review_count = KnowledgeReviewLog.query.filter_by(user_id=user.id).count()
+        reward_count = AttendanceReward.query.filter_by(user_id=user.id).count()
+        last_checkin = (
+            DailyCheckin.query.filter_by(user_id=user.id)
+            .order_by(DailyCheckin.completed_at.desc())
+            .first()
+        )
+        selection_count = ReadingSelection.query.filter_by(user_id=user.id).count()
+        ppt_count = (
+            ReadingSelection.query.filter_by(user_id=user.id)
+            .filter(ReadingSelection.ppt_path != "")
+            .count()
+        )
+        final_review = FinalReview.query.filter_by(user_id=user.id).first()
+        rows.append(
+            {
+                "user_id": user.id,
+                "student_id": user.student_id,
+                "name": user.name,
+                "planet_count": len(planets),
+                "planet_paper_count": planet_paper_count,
+                "planet_names": "；".join(
+                    planet.name for planet in planets[:3]
+                )
+                + (" 等" if len(planets) > 3 else ""),
+                "bookmark_count": bookmark_count,
+                "subscription_count": subscription_count,
+                "upload_count": upload_count,
+                "checkin_count": checkin_count,
+                "total_score": total_score,
+                "streak": _calc_streak(user.id),
+                "max_streak": _calc_max_streak(user.id),
+                "library_count": library_count,
+                "knowledge_item_count": knowledge_item_count,
+                "review_count": review_count,
+                "reward_count": reward_count,
+                "last_checkin_at": (
+                    last_checkin.completed_at if last_checkin else None
+                ),
+                "selection_count": selection_count,
+                "ppt_count": ppt_count,
+                "final_review_id": final_review.id if final_review else None,
+                "final_review_title": final_review.title if final_review else "",
+            }
+        )
+    return rows
+
+
+@app.route("/reading")
+@login_required
+def reading_dashboard():
+    _refresh_reading_list_themes()
+    files = ReadingListFile.query.order_by(
+        ReadingListFile.week_order, ReadingListFile.id
+    ).all()
+    active = _active_reading_week(files)
+    view_file_id = request.args.get("view_file", type=int)
+    if not view_file_id and files:
+        view_file_id = files[0].id
+    view_file = (
+        db.session.get(ReadingListFile, view_file_id) if view_file_id else None
+    )
+    view_items = list(view_file.items) if view_file else []
+    all_selections = ReadingSelection.query.order_by(
+        ReadingSelection.selected_at.desc()
+    ).all()
+    selections = (
+        all_selections
+        if current_user.is_admin
+        else [
+            selection
+            for selection in all_selections
+            if selection.user_id == current_user.id
+        ]
+    )
+    active_items = []
+    student_selection = None
+
+    if active and active.get("file"):
+        active_file = active["file"]
+        week_label = active["week_label"]
+        theme_selection_count = active.get("state", {}).get(
+            "count", _theme_selection_count(active_file, week_label)
+        )
+        theme_full = theme_selection_count >= READING_MAX_STUDENTS_PER_THEME
+        for item in active_file.items:
+            selection = ReadingSelection.query.filter_by(
+                reading_list_item_id=item.id, week_label=week_label
+            ).first()
+            active_items.append(
+                {
+                    "item": item,
+                    "selection": selection,
+                    "taken": bool(
+                        selection and selection.user_id != current_user.id
+                    ),
+                    "mine": bool(
+                        selection and selection.user_id == current_user.id
+                    ),
+                    "theme_full": theme_full,
+                }
+            )
+        if not current_user.is_admin:
+            student_selection = ReadingSelection.query.filter_by(
+                user_id=current_user.id, week_label=week_label
+            ).first()
+
+    selection_groups = {}
+    for selection in selections:
+        selection_groups.setdefault(selection.week_label, []).append(selection)
+
+    my_scores = {
+        score.selection_id: score
+        for score in ReadingScore.query.filter_by(
+            rater_id=current_user.id
+        ).all()
+    }
+    scoring_targets = [
+        selection
+        for selection in all_selections
+        if selection.user_id != current_user.id
+    ]
+    my_received_scores = {}
+    if not current_user.is_admin:
+        for selection in all_selections:
+            if selection.user_id == current_user.id:
+                my_received_scores[selection.id] = selection.scores.order_by(
+                    ReadingScore.created_at
+                ).all()
+    score_stats = {}
+    for selection in all_selections:
+        score_stats[selection.id] = _reading_score_stats(selection)
+    if current_user.is_admin:
+        final_reviews = FinalReview.query.order_by(
+            FinalReview.submitted_at.desc()
+        ).all()
+    else:
+        final_reviews = FinalReview.query.filter_by(
+            user_id=current_user.id
+        ).all()
+
+    return render_template(
+        "course_reading.html",
+        files=files,
+        active=active,
+        now_local=datetime.now(READING_TZ),
+        view_file=view_file,
+        view_file_id=view_file_id,
+        view_items=view_items,
+        active_items=active_items,
+        selections=selections,
+        all_selections=all_selections,
+        selection_groups=selection_groups,
+        student_selection=student_selection,
+        scoring_targets=scoring_targets,
+        my_scores=my_scores,
+        my_received_scores=my_received_scores,
+        score_stats=score_stats,
+        final_reviews=final_reviews,
+        student_overview=_teacher_class_overview(),
+        score_criteria=READING_SCORE_CRITERIA,
+        max_students_per_theme=READING_MAX_STUDENTS_PER_THEME,
+        max_papers_per_theme=READING_MAX_PAPERS_PER_THEME,
+        deadline_for=_week_deadline,
+        format_dt=_format_reading_dt,
+        format_dt_iso=_format_reading_dt_iso,
+    )
+
+
+@app.route("/reading/upload", methods=["POST"])
+@admin_required
+def reading_upload():
+    uploaded = request.files.getlist("reading_files")
+    if not uploaded or all(not f.filename for f in uploaded):
+        flash("请选择要上传的 reading list 文件", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    manual_theme = request.form.get("theme", "").strip()
+    parsed = []
+    total_items = 0
+    for file_storage in uploaded:
+        if not file_storage or not file_storage.filename:
+            continue
+        try:
+            filename, file_type, theme, items = _parse_reading_file(file_storage)
+        except ValueError as exc:
+            flash(f"{file_storage.filename}: {exc}", "error")
+            continue
+        if not items:
+            flash(f"{file_storage.filename}: 未识别到文献条目", "error")
+            continue
+        parsed.append((filename, manual_theme or theme, file_type, items))
+        total_items += len(items)
+
+    if not parsed:
+        return redirect(url_for("reading_dashboard"))
+
+    max_order = (
+        db.session.query(db.func.max(ReadingListFile.week_order)).scalar() or 0
+    )
+    order = max_order
+    first_in_system = max_order == 0
+    for index, (filename, theme, file_type, items) in enumerate(parsed):
+        order += 1
+        reading_list = ReadingListFile(
+            filename=filename,
+            theme=theme,
+            file_type=file_type,
+            week_order=order,
+            uploaded_by=current_user.id,
+            is_open=first_in_system and index == 0,
+        )
+        db.session.add(reading_list)
+        db.session.flush()
+        for index, item in enumerate(items, start=1):
+            db.session.add(
+                ReadingListItem(
+                    reading_list_id=reading_list.id,
+                    title=item["title"],
+                    authors=item.get("authors", ""),
+                    journal=item.get("journal", ""),
+                    year=item.get("year"),
+                    doi=item.get("doi", ""),
+                    url=item.get("url", ""),
+                    item_order=index,
+                )
+            )
+
+    db.session.commit()
+    flash(
+        f"已上传 {len(parsed)} 个 reading list，共 {total_items} 篇文献",
+        "success",
+    )
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/reading/select/<int:item_id>", methods=["POST"])
+@login_required
+def reading_select(item_id):
+    item = db.session.get(ReadingListItem, item_id)
+    if not item:
+        abort(404)
+
+    files = ReadingListFile.query.order_by(
+        ReadingListFile.week_order, ReadingListFile.id
+    ).all()
+    active = _active_reading_week(files)
+    if not active or not active.get("open") or active.get("file") is None:
+        flash("选文通道尚未开放", "error")
+        return redirect(url_for("reading_dashboard"))
+    if active["file"].id != item.reading_list_id:
+        flash("该文献不属于本周主题", "error")
+        return redirect(url_for("reading_dashboard"))
+    if current_user.is_admin:
+        flash("教师账号无需选文", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    week_label = active["week_label"]
+    existing_user_selection = ReadingSelection.query.filter_by(
+        user_id=current_user.id, week_label=week_label
+    ).first()
+    if existing_user_selection:
+        flash("本周已选择过文献，不能重复选择", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    existing_item_selection = ReadingSelection.query.filter_by(
+        reading_list_item_id=item.id, week_label=week_label
+    ).first()
+    if existing_item_selection:
+        flash("该文献已被其他同学选择", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    theme_item_ids = [child.id for child in item.reading_list.items]
+    theme_selection_count = ReadingSelection.query.filter(
+        ReadingSelection.reading_list_item_id.in_(theme_item_ids),
+        ReadingSelection.week_label == week_label,
+    ).count()
+    if theme_selection_count >= READING_MAX_STUDENTS_PER_THEME:
+        flash("该主题已由两位同学选择两篇文献，本次选文已满", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    db.session.add(
+        ReadingSelection(
+            reading_list_item_id=item.id,
+            user_id=current_user.id,
+            week_label=week_label,
+        )
+    )
+    try:
+        db.session.commit()
+        flash("选文成功，该文献已锁定给你", "success")
+    except Exception:
+        db.session.rollback()
+        flash("选文冲突，该文献可能刚被其他同学选中", "error")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/reading/delete/<int:file_id>", methods=["POST"])
+@admin_required
+def reading_delete_file(file_id):
+    reading_list = db.session.get(ReadingListFile, file_id)
+    if not reading_list:
+        abort(404)
+    db.session.delete(reading_list)
+    db.session.commit()
+    flash("已删除该 reading list", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/reading/schedule/<int:file_id>", methods=["POST"])
+@admin_required
+def reading_schedule_time(file_id):
+    reading_list = db.session.get(ReadingListFile, file_id)
+    if not reading_list:
+        abort(404)
+
+    def parse_local_datetime(value):
+        value = (value or "").strip()
+        if not value:
+            return None
+        return (
+            datetime.strptime(value, "%Y-%m-%dT%H:%M")
+            .replace(tzinfo=READING_TZ)
+            .astimezone(timezone.utc)
+        )
+
+    start = parse_local_datetime(request.form.get("start_time", ""))
+    end = parse_local_datetime(request.form.get("end_time", ""))
+    if (start and not end) or (end and not start):
+        flash("选文开始时间和结束时间需同时填写", "error")
+        return redirect(url_for("reading_dashboard", view_file=file_id))
+    if start and end and start >= end:
+        flash("选文结束时间必须晚于开始时间", "error")
+        return redirect(url_for("reading_dashboard", view_file=file_id))
+
+    reading_list.selection_start_at = start
+    reading_list.selection_end_at = end
+    db.session.commit()
+    flash("选文时间已保存", "success")
+    return redirect(url_for("reading_dashboard", view_file=file_id))
+
+
+@app.route("/reading/manual-open/<int:file_id>", methods=["POST"])
+@admin_required
+def reading_manual_open(file_id):
+    reading_list = db.session.get(ReadingListFile, file_id)
+    if not reading_list:
+        abort(404)
+    reading_list.is_open = True
+    reading_list.manual_closed = False
+    db.session.commit()
+    flash("已手动开放该主题选文", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/reading/manual-close/<int:file_id>", methods=["POST"])
+@admin_required
+def reading_manual_close(file_id):
+    reading_list = db.session.get(ReadingListFile, file_id)
+    if not reading_list:
+        abort(404)
+    reading_list.is_open = False
+    reading_list.manual_closed = True
+    db.session.commit()
+    flash("已手动关闭该主题选文", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/reading/toggle-open/<int:file_id>", methods=["POST"])
+@admin_required
+def reading_toggle_open(file_id):
+    reading_list = db.session.get(ReadingListFile, file_id)
+    if not reading_list:
+        abort(404)
+    if reading_list.manual_closed:
+        reading_list.is_open = True
+        reading_list.manual_closed = False
+        message = "已手动开放该主题选文"
+    else:
+        reading_list.is_open = False
+        reading_list.manual_closed = True
+        message = "已手动关闭该主题选文"
+    db.session.commit()
+    flash(message, "success")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/reading/selection/<int:selection_id>/delete", methods=["POST"])
+@admin_required
+def reading_delete_selection(selection_id):
+    selection = db.session.get(ReadingSelection, selection_id)
+    if not selection:
+        abort(404)
+    db.session.delete(selection)
+    db.session.commit()
+    flash("已取消该学生的选文记录", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/reading/upload-ppt/<int:selection_id>", methods=["POST"])
+@login_required
+def reading_upload_ppt(selection_id):
+    selection = db.session.get(ReadingSelection, selection_id)
+    if not selection:
+        abort(404)
+    if selection.user_id != current_user.id and not current_user.is_admin:
+        flash("只能上传自己选文的 PPT", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    deadline = _week_deadline(selection.week_label)
+    if datetime.now(READING_TZ) > deadline:
+        flash("已超过该周 PPT 上传截止时间", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    file_storage = request.files.get("ppt_file")
+    if not file_storage or not file_storage.filename:
+        flash("请选择 PPT 文件", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    filename = secure_filename(file_storage.filename)
+    ext = os.path.splitext(filename)[1].lower()
+    if not filename or ext not in READING_PPT_ALLOWED_EXT:
+        flash("仅支持 ppt / pptx / pdf 文件", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    ppt_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "uploads", "reading_ppts"
+    )
+    os.makedirs(ppt_dir, exist_ok=True)
+    stored_name = f"{selection.id}_{uuid.uuid4().hex}{ext}"
+    stored_path = os.path.join(ppt_dir, stored_name)
+    file_storage.save(stored_path)
+
+    old_path = selection.ppt_path
+    if old_path:
+        abs_old = os.path.abspath(old_path)
+        abs_dir = os.path.abspath(ppt_dir)
+        if (
+            abs_old.startswith(abs_dir + os.sep)
+            and os.path.exists(abs_old)
+        ):
+            os.remove(abs_old)
+
+    selection.ppt_filename = filename
+    selection.ppt_path = stored_path
+    selection.ppt_uploaded_at = datetime.now(timezone.utc)
+    db.session.commit()
+    flash("PPT 上传成功", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/reading/delete-ppt/<int:selection_id>", methods=["POST"])
+@login_required
+def reading_delete_ppt(selection_id):
+    selection = db.session.get(ReadingSelection, selection_id)
+    if not selection:
+        abort(404)
+    if selection.user_id != current_user.id and not current_user.is_admin:
+        flash("只能删除自己选文的 PPT", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    old_path = selection.ppt_path
+    if old_path:
+        ppt_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "uploads", "reading_ppts"
+        )
+        abs_old = os.path.abspath(old_path)
+        abs_dir = os.path.abspath(ppt_dir)
+        if abs_old.startswith(abs_dir + os.sep) and os.path.exists(abs_old):
+            os.remove(abs_old)
+
+    selection.ppt_filename = ""
+    selection.ppt_path = ""
+    selection.ppt_uploaded_at = None
+    db.session.commit()
+    flash("PPT 已删除，可以重新上传", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/reading/ppt/<int:selection_id>")
+@login_required
+def reading_ppt(selection_id):
+    selection = db.session.get(ReadingSelection, selection_id)
+    if not selection or not selection.ppt_path:
+        abort(404)
+    if not os.path.exists(selection.ppt_path):
+        abort(404)
+    return send_file(
+        selection.ppt_path,
+        as_attachment=True,
+        download_name=selection.ppt_filename or os.path.basename(selection.ppt_path),
+    )
+
+
+@app.route("/reading/score/<int:selection_id>", methods=["POST"])
+@login_required
+def reading_score(selection_id):
+    selection = db.session.get(ReadingSelection, selection_id)
+    if not selection:
+        flash("未找到该选文记录，暂不能评分", "error")
+        return redirect(url_for("reading_dashboard"))
+    if selection.user_id == current_user.id:
+        flash("不能给自己评分", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    feedback = request.form.get("feedback", "").strip()
+    try:
+        values = {
+            "content_understanding": int(request.form.get("content_understanding", -1)),
+            "preparation_attitude": int(request.form.get("preparation_attitude", -1)),
+            "clarity_focus": int(request.form.get("clarity_focus", -1)),
+            "inspiration_creativity": int(request.form.get("inspiration_creativity", -1)),
+            "audience_engagement": int(request.form.get("audience_engagement", -1)),
+            "question_answering": int(request.form.get("question_answering", -1)),
+        }
+    except (TypeError, ValueError):
+        flash("评分数据格式错误", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    if any(value < 0 or value > 5 for value in values.values()):
+        flash("每项评分必须在 0 到 5 分之间", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    existing = ReadingScore.query.filter_by(
+        selection_id=selection.id, rater_id=current_user.id
+    ).first()
+    if existing:
+        for key, value in values.items():
+            setattr(existing, key, value)
+        existing.total_score = sum(values.values())
+        existing.feedback = feedback
+        db.session.commit()
+        flash("评分已更新", "success")
+    else:
+        db.session.add(
+            ReadingScore(
+                selection_id=selection.id,
+                rater_id=current_user.id,
+                **values,
+                total_score=sum(values.values()),
+                feedback=feedback,
+            )
+        )
+        db.session.commit()
+        flash("评分提交成功", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/reading/export")
+@admin_required
+def reading_export():
+    selections = ReadingSelection.query.order_by(
+        ReadingSelection.week_label, ReadingSelection.selected_at
+    ).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "学号",
+        "姓名",
+        "周次",
+        "主题",
+        "文献标题",
+        "PPT",
+        "评分人学号",
+        "评分人姓名",
+        "内容理解",
+        "学习态度",
+        "讲授思路",
+        "启发性",
+        "激发听众",
+        "回答问题",
+        "总分",
+        "反馈",
+        "评分时间",
+    ])
+    for selection in selections:
+        theme = selection.item.reading_list.theme if selection.item.reading_list else ""
+        scores = selection.scores.all()
+        if not scores:
+            writer.writerow([
+                selection.user.student_id,
+                selection.user.name,
+                selection.week_label,
+                theme,
+                selection.item.title,
+                selection.ppt_filename or "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+            ])
+        for score in scores:
+            writer.writerow([
+                selection.user.student_id,
+                selection.user.name,
+                selection.week_label,
+                theme,
+                selection.item.title,
+                selection.ppt_filename or "",
+                score.rater.student_id,
+                score.rater.name,
+                score.content_understanding,
+                score.preparation_attitude,
+                score.clarity_focus,
+                score.inspiration_creativity,
+                score.audience_engagement,
+                score.question_answering,
+                score.total_score,
+                score.feedback or "",
+                _format_reading_dt(score.created_at),
+            ])
+    data = output.getvalue().encode("utf-8-sig")
+    return Response(
+        data,
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=reading_scores.csv"},
+    )
+
+
+@app.route("/reading/export-final-reviews")
+@admin_required
+def reading_export_final_reviews():
+    reviews = FinalReview.query.order_by(
+        FinalReview.submitted_at.desc()
+    ).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "学号",
+        "姓名",
+        "综述标题",
+        "文件名",
+        "评分",
+        "教师反馈",
+        "提交时间",
+        "评分时间",
+    ])
+    for review in reviews:
+        writer.writerow([
+            review.user.student_id,
+            review.user.name,
+            review.title,
+            review.filename,
+            review.score if review.score is not None else "",
+            review.feedback,
+            _format_reading_dt(review.submitted_at),
+            _format_reading_dt(review.reviewed_at),
+        ])
+    data = output.getvalue().encode("utf-8-sig")
+    return Response(
+        data,
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=final_reviews.csv"},
+    )
+
+
+@app.route("/reading/feedback/<int:selection_id>", methods=["POST"])
+@admin_required
+def reading_teacher_feedback(selection_id):
+    selection = db.session.get(ReadingSelection, selection_id)
+    if not selection:
+        abort(404)
+    selection.teacher_feedback = request.form.get("feedback", "").strip()
+    selection.teacher_feedback_at = datetime.now(timezone.utc)
+    db.session.commit()
+    flash("教师反馈已保存", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/final-review/upload", methods=["POST"])
+@login_required
+def final_review_upload():
+    if current_user.is_admin:
+        flash("教师端不提交期末综述", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    title = request.form.get("title", "").strip()
+    file_storage = request.files.get("final_review_file")
+    if not title:
+        flash("请填写期末综述标题", "error")
+        return redirect(url_for("reading_dashboard"))
+    if not file_storage or not file_storage.filename:
+        flash("请选择期末综述文件", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    filename = secure_filename(file_storage.filename)
+    ext = os.path.splitext(filename)[1].lower()
+    if not filename or ext not in FINAL_REVIEW_ALLOWED_EXT:
+        flash("仅支持 docx / pdf / txt / md / csv 文件", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    existing = FinalReview.query.filter_by(user_id=current_user.id).first()
+    if existing and existing.feedback:
+        flash("教师已给出反馈，不能重新上传", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    review_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "uploads", "final_reviews"
+    )
+    os.makedirs(review_dir, exist_ok=True)
+    stored_name = f"user_{current_user.id}_{uuid.uuid4().hex}{ext}"
+    stored_path = os.path.join(review_dir, stored_name)
+    file_storage.save(stored_path)
+
+    if existing:
+        old_path = existing.file_path
+        if old_path and os.path.exists(old_path):
+            abs_old = os.path.abspath(old_path)
+            abs_dir = os.path.abspath(review_dir)
+            if abs_old.startswith(abs_dir + os.sep):
+                os.remove(abs_old)
+        existing.title = title
+        existing.filename = filename
+        existing.file_path = stored_path
+        existing.submitted_at = datetime.now(timezone.utc)
+        existing.score = None
+        existing.feedback = ""
+        existing.reviewed_at = None
+    else:
+        db.session.add(
+            FinalReview(
+                user_id=current_user.id,
+                title=title,
+                filename=filename,
+                file_path=stored_path,
+            )
+        )
+    db.session.commit()
+    flash("期末综述上传成功", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/final-review/delete", methods=["POST"])
+@login_required
+def final_review_delete():
+    review = FinalReview.query.filter_by(user_id=current_user.id).first()
+    if not review:
+        flash("没有找到可删除的期末综述", "error")
+        return redirect(url_for("reading_dashboard"))
+    if review.feedback:
+        flash("教师已给出反馈，不能删除该综述", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    old_path = review.file_path
+    if old_path:
+        review_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "uploads", "final_reviews"
+        )
+        abs_old = os.path.abspath(old_path)
+        abs_dir = os.path.abspath(review_dir)
+        if abs_old.startswith(abs_dir + os.sep) and os.path.exists(abs_old):
+            os.remove(abs_old)
+
+    db.session.delete(review)
+    db.session.commit()
+    flash("期末综述已删除，可以重新上传", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/final-review/<int:review_id>/download")
+@login_required
+def final_review_download(review_id):
+    review = db.session.get(FinalReview, review_id)
+    if not review:
+        abort(404)
+    if not current_user.is_admin and review.user_id != current_user.id:
+        abort(403)
+    if not os.path.exists(review.file_path):
+        abort(404)
+    return send_file(
+        review.file_path,
+        as_attachment=True,
+        download_name=review.filename,
+    )
+
+
+@app.route("/final-review/<int:review_id>/review", methods=["POST"])
+@admin_required
+def final_review_review(review_id):
+    review = db.session.get(FinalReview, review_id)
+    if not review:
+        abort(404)
+    try:
+        score = int(request.form.get("score", "").strip())
+    except (TypeError, ValueError):
+        score = -1
+    if score < 0 or score > 100:
+        flash("期末综述评分必须在 0 到 100 分之间", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    review.score = score
+    review.feedback = request.form.get("feedback", "").strip()
+    review.reviewed_at = datetime.now(timezone.utc)
+    db.session.commit()
+    flash("期末综述评分与反馈已保存", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
 @app.after_request
 def no_cache(response):
     if 'text/html' in response.content_type:
@@ -1736,11 +3657,6 @@ def set_lang(lang_code):
     next_page = request.args.get('next', url_for('index'))
     return redirect(next_page)
 
-
-@app.route("/optimization-log")
-@login_required
-def optimization_log():
-    return render_template("optimization_log.html")
 
 @app.context_processor
 def inject_globals():
@@ -1762,22 +3678,81 @@ def fromjson_filter(value):
     except: return []
 
 
+def _ensure_schema_updates():
+    """Apply small SQLite-compatible upgrades for installations without Alembic."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(db.engine)
+    upgrades = {
+        "literature_items": {
+            "openalex_id": "VARCHAR(50)",
+        },
+        "api_keys": {
+            "endpoint": "VARCHAR(500) DEFAULT ''",
+            "model_name": "VARCHAR(100) DEFAULT ''",
+            "deployment": "VARCHAR(200) DEFAULT ''",
+            "api_style": "VARCHAR(30) DEFAULT 'auto'",
+        },
+        "protocol_collections": {
+            "category": "VARCHAR(100) DEFAULT 'general'",
+            "flowchart_steps": "TEXT DEFAULT ''",
+        },
+        "daily_learning_sessions": {
+            "requested_target": "INTEGER DEFAULT 0",
+            "study_mode": "VARCHAR(20) DEFAULT 'mixed'",
+            "difficulty_filter": "VARCHAR(20) DEFAULT 'all'",
+            "content_filter": "VARCHAR(200) DEFAULT ''",
+            "library_id": "INTEGER DEFAULT 0",
+        },
+        "daily_learning_queue_entries": {
+            "answered_at": "DATETIME",
+            "submitted_answer": "TEXT DEFAULT ''",
+            "answer_score": "INTEGER DEFAULT 0",
+            "answer_correct": "BOOLEAN DEFAULT 0",
+        },
+        "user_knowledge_libraries": {
+            "study_mode": "VARCHAR(20) DEFAULT 'mixed'",
+            "difficulty_filter": "VARCHAR(20) DEFAULT 'all'",
+            "content_filter": "VARCHAR(200) DEFAULT ''"
+        },
+        "knowledge_memory_states": {
+            "answered_at": "DATETIME",
+        },
+        "reading_selections": {
+            "ppt_filename": "VARCHAR(255) DEFAULT ''",
+            "ppt_path": "VARCHAR(500) DEFAULT ''",
+            "ppt_uploaded_at": "DATETIME",
+            "teacher_feedback": "TEXT DEFAULT ''",
+            "teacher_feedback_at": "DATETIME",
+        },
+        "reading_list_files": {
+            "is_open": "BOOLEAN DEFAULT 0",
+            "selection_start_at": "DATETIME",
+            "selection_end_at": "DATETIME",
+            "manual_closed": "BOOLEAN DEFAULT 0",
+        },
+        "reading_scores": {
+            "feedback": "TEXT DEFAULT ''",
+        },
+    }
+    with db.engine.begin() as connection:
+        for table_name, columns in upgrades.items():
+            existing = {column["name"] for column in inspector.get_columns(table_name)}
+            for column_name, definition in columns.items():
+                if column_name not in existing:
+                    connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}"))
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_literature_items_openalex_id ON literature_items (openalex_id)"))
+        connection.execute(text(
+            "DELETE FROM citation_links WHERE id NOT IN "
+            "(SELECT MIN(id) FROM citation_links GROUP BY source_id, target_id)"
+        ))
+        connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_citation_source_target ON citation_links (source_id, target_id)"))
+
+
 def init_db():
     with app.app_context():
         db.create_all()
-        # Migration: add new columns if they don't exist (safe for existing DB)
-        try:
-            db.session.execute(db.text("ALTER TABLE knowledge_points ADD COLUMN correction_count INTEGER DEFAULT 0"))
-        except:
-            pass
-        try:
-            db.session.execute(db.text("ALTER TABLE knowledge_points ADD COLUMN last_corrected_at DATETIME"))
-        except:
-            pass
-        try:
-            db.session.commit()
-        except:
-            pass
+        _ensure_schema_updates()
         # Seed knowledge points if empty
         if KnowledgePoint.query.count() == 0:
             from knowledge_points import KNOWLEDGE_POINTS
@@ -1802,6 +3777,16 @@ def init_db():
             db.session.add(admin)
             db.session.commit()
             print("Default admin created: admin / admin123")
+
+
+def _ensure_schema():
+    if db.engine.dialect.name != "sqlite":
+        return
+    with db.engine.begin() as conn:
+        cols = [row[1] for row in conn.exec_driver_sql("PRAGMA table_info(users)").fetchall()]
+        if "phone" not in cols:
+            conn.exec_driver_sql("ALTER TABLE users ADD COLUMN phone VARCHAR(30)")
+            conn.exec_driver_sql("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_phone ON users (phone)")
 
 
 scheduler = BackgroundScheduler()
@@ -1834,8 +3819,7 @@ if __name__ == "__main__":
     init_db()
     setup_scheduler(app)
     print("=" * 50)
-    print("  EM Course Website")
+    print(f"  {PLATFORM_NAME}")
     print("  http://127.0.0.1:5001")
     print("=" * 50)
     app.run(host="0.0.0.0", port=5001, debug=True)
-
