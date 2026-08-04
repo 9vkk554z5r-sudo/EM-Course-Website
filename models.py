@@ -332,6 +332,9 @@ class UserKnowledgeLibrary(db.Model):
     source_filename = db.Column(db.String(255), default="")
     daily_new_count = db.Column(db.Integer, default=5)
     review_limit = db.Column(db.Integer, default=50)
+    study_mode = db.Column(db.String(20), default="mixed", nullable=False)
+    difficulty_filter = db.Column(db.String(20), default="all", nullable=False)
+    content_filter = db.Column(db.String(200), default="")
     is_active = db.Column(db.Boolean, default=False, nullable=False)
     is_archived = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -422,3 +425,127 @@ class KnowledgeFile(db.Model):
     content = db.Column(db.Text, nullable=False)
     uploaded_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     user = db.relationship("User", backref="knowledge_files")
+
+
+class ReadingListFile(db.Model):
+    __tablename__ = "reading_list_files"
+
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(255), nullable=False)
+    theme = db.Column(db.String(200), default="")
+    file_type = db.Column(db.String(20), default="txt")
+    week_order = db.Column(db.Integer, default=0, nullable=False, index=True)
+    is_open = db.Column(db.Boolean, default=False, nullable=False)
+    uploaded_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    uploaded_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    uploader = db.relationship("User", backref="reading_list_files", foreign_keys=[uploaded_by])
+    items = db.relationship(
+        "ReadingListItem",
+        backref="reading_list",
+        lazy="dynamic",
+        cascade="all, delete-orphan",
+        order_by="ReadingListItem.item_order",
+    )
+
+
+class ReadingListItem(db.Model):
+    __tablename__ = "reading_list_items"
+
+    id = db.Column(db.Integer, primary_key=True)
+    reading_list_id = db.Column(
+        db.Integer, db.ForeignKey("reading_list_files.id"), nullable=False, index=True
+    )
+    title = db.Column(db.String(600), nullable=False)
+    authors = db.Column(db.String(500), default="")
+    journal = db.Column(db.String(300), default="")
+    year = db.Column(db.Integer)
+    doi = db.Column(db.String(200), default="")
+    url = db.Column(db.String(500), default="")
+    item_order = db.Column(db.Integer, default=0, index=True)
+
+    selections = db.relationship(
+        "ReadingSelection",
+        backref="item",
+        lazy="dynamic",
+        cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        db.Index("ix_reading_item_list_order", "reading_list_id", "item_order"),
+    )
+
+
+class ReadingSelection(db.Model):
+    __tablename__ = "reading_selections"
+
+    id = db.Column(db.Integer, primary_key=True)
+    reading_list_item_id = db.Column(
+        db.Integer, db.ForeignKey("reading_list_items.id"), nullable=False, index=True
+    )
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    week_label = db.Column(db.String(20), nullable=False, index=True)
+    selected_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    ppt_filename = db.Column(db.String(255), default="")
+    ppt_path = db.Column(db.String(500), default="")
+    ppt_uploaded_at = db.Column(db.DateTime)
+    teacher_feedback = db.Column(db.Text, default="")
+    teacher_feedback_at = db.Column(db.DateTime)
+
+    user = db.relationship("User", backref="reading_selections")
+    scores = db.relationship(
+        "ReadingScore",
+        backref="selection",
+        lazy="dynamic",
+        cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint("reading_list_item_id", "week_label", name="uq_reading_item_week"),
+        db.UniqueConstraint("user_id", "week_label", name="uq_reading_user_week"),
+    )
+
+
+class ReadingScore(db.Model):
+    __tablename__ = "reading_scores"
+
+    id = db.Column(db.Integer, primary_key=True)
+    selection_id = db.Column(
+        db.Integer, db.ForeignKey("reading_selections.id"), nullable=False, index=True
+    )
+    rater_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    content_understanding = db.Column(db.Integer, nullable=False)
+    preparation_attitude = db.Column(db.Integer, nullable=False)
+    clarity_focus = db.Column(db.Integer, nullable=False)
+    inspiration_creativity = db.Column(db.Integer, nullable=False)
+    audience_engagement = db.Column(db.Integer, nullable=False)
+    question_answering = db.Column(db.Integer, nullable=False)
+    total_score = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    rater = db.relationship("User", backref="reading_scores")
+
+    __table_args__ = (
+        db.UniqueConstraint("selection_id", "rater_id", name="uq_reading_score_rater"),
+    )
+
+
+class FinalReview(db.Model):
+    __tablename__ = "final_reviews"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    title = db.Column(db.String(300), nullable=False)
+    filename = db.Column(db.String(255), nullable=False)
+    file_path = db.Column(db.String(500), nullable=False)
+    score = db.Column(db.Integer)
+    feedback = db.Column(db.Text, default="")
+    submitted_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    reviewed_at = db.Column(db.DateTime)
+
+    user = db.relationship("User", backref="final_reviews")
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", name="uq_final_review_user"),
+    )
+

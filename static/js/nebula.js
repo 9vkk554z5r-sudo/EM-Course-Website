@@ -61,8 +61,9 @@ document.addEventListener('DOMContentLoaded', function () {
             event.preventDefault();
             var query = document.getElementById('nebula-query').value.trim();
             var type = document.getElementById('nebula-query-type').value;
+            var limit = document.getElementById('nebula-limit').value || 45;
             if (!query) return;
-            loadGraph('/api/nebula-data?q=' + encodeURIComponent(query) + '&type=' + encodeURIComponent(type));
+            loadGraph('/api/nebula-data?q=' + encodeURIComponent(query) + '&type=' + encodeURIComponent(type) + '&limit=' + encodeURIComponent(limit));
         });
     }
 

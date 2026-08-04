@@ -33,3 +33,6 @@ uploads/
 # IDE
 .vscode/
 .idea/
+
+# Archives
+*.zip

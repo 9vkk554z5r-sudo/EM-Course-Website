@@ -1,5 +1,5 @@
 ﻿{% extends "base.html" %}
-{% block title %}OBSERVATORY｜{{ selected_course.name }}科研台 - {{ platform_name }}{% endblock %}
+{% block title %}{{ selected_course.name }}科研台 - {{ platform_name }}{% endblock %}
 {% block body_class %}course-workbench-route life-product-theme{% endblock %}
 {% block content %}
 <div class="research-dashboard">
@@ -72,6 +72,7 @@
                 <button class="btn btn-primary" onclick="sendChat()" data-loading-text="{{ _('发送中', 'Sending') }}">{{ _('发送', 'Send') }}</button>
             </div>
             <div class="prompt-row pixel-prompt-row">
+    <div style="text-align:right;margin-top:4px;width:100%"><span style="font-size:0.65rem;color:var(--text-muted);cursor:pointer" onclick="clearChat()">{{ _("\u6e05\u9664\u5386\u53f2", "Clear history") }}</span></div>
                 <button type="button" onclick="quickAsk('{{ _('帮我总结一篇 cryo-EM 论文的核心方法', 'Summarize the core methods of a cryo-EM paper') }}')">{{ _('总结论文', 'Summarize') }}</button>
                 <button type="button" onclick="quickAsk('{{ _('找出 single particle analysis 的关键论文', 'Find key papers on single particle analysis') }}')">{{ _('关键论文', 'Key Papers') }}</button>
                 <button type="button" onclick="quickAsk('{{ _('提取样品制备 protocol 的步骤', 'Extract sample preparation protocol steps') }}')">{{ _('提取 Protocol', 'Extract Protocol') }}</button>
@@ -86,7 +87,7 @@
                     <p class="section-kicker">NEPHELE · LITERATURE NEBULA</p>
                     <h2>NEPHELE｜文献星云</h2>
                 </div>
-                <a href="{{ url_for('literature_hub') }}" class="btn btn-sm btn-primary">进入星云</a>
+                <a href="{{ url_for('literature_hub') }}" class="btn btn-sm btn-primary">进入文献星云</a>
             </div>
             <a href="{{ url_for('literature_hub') }}" class="literature-nebula-preview" aria-label="{{ _('进入文献星云', 'Enter Literature Nebula') }}">
                 <span class="nebula-stars" aria-hidden="true"></span>
@@ -113,7 +114,7 @@
             <div class="section-head">
                 <div>
                     <p class="section-kicker">PRISM · DAILY FOCUS</p>
-                    <h2>PRISM｜今日光谱</h2>
+                    <h2>PRISM｜今日学习计划</h2>
                 </div>
             </div>
             <div class="daily-task-flow" aria-hidden="true">
@@ -127,7 +128,7 @@
                 <div class="task-flow-route">
                     <span class="task-flow-line"><i></i></span>
                     <span class="task-checkpoint point-a"><b>01</b><em>阅读</em></span>
-                    <span class="task-checkpoint point-b"><b>02</b><em>方法</em></span>
+                    <span class="task-checkpoint point-b"><b>02</b><em>方法工坊</em></span>
                     <span class="task-checkpoint point-c"><b>03</b><em>学习</em></span>
                 </div>
             </div>
@@ -140,7 +141,7 @@
     </section>
     <section class="module-groups">
         <div class="module-group ai-pre-entry-card">
-            <div class="section-head"><h2>HERMES｜智能汇报</h2><a href="{{ url_for('agent_presentation') }}">进入星演室</a></div>
+            <div class="section-head"><h2>HERMES｜智能汇报</h2><a href="{{ url_for('agent_presentation') }}">进入智能汇报</a></div>
             <a href="{{ url_for('agent_presentation') }}" class="ai-pre-dashboard-preview" aria-label="{{ _('打开 AI Pre 助手', 'Open AI Pre Assistant') }}">
                 <span class="ai-pre-preview-stars" aria-hidden="true"></span>
                 <span class="ai-pre-preview-grid" aria-hidden="true"></span>
@@ -162,7 +163,7 @@
         </div>
 
         <div class="module-group method-lab-entry-card">
-            <div class="section-head"><h2>FORGE｜方法星铸</h2><a href="{{ url_for('experiments_page') }}">打开工坊</a></div>
+            <div class="section-head"><h2>FORGE｜方法工坊</h2><a href="{{ url_for('experiments_page') }}">打开工坊</a></div>
             <a href="{{ url_for('experiments_page') }}" class="method-lab-preview" aria-label="{{ _('打开实验方法', 'Open Methods') }}">
                 <span class="method-stars" aria-hidden="true"></span>
                 <span class="method-grid" aria-hidden="true"></span>
@@ -172,7 +173,7 @@
                 <span class="method-sample sample-a" aria-hidden="true"></span>
                 <span class="method-sample sample-b" aria-hidden="true"></span>
                 <span class="method-protocol-lines" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="method-core-copy"><strong>FORGE｜方法星铸</strong><span>视频学习与个人 Protocol 收藏统一进入这里</span></span>
+                <span class="method-core-copy"><strong>FORGE｜方法工坊</strong><span>视频学习与个人 Protocol 收藏统一进入这里</span></span>
             </a>
             <div class="method-entry-actions">
                 <a href="{{ url_for('protocols') }}"><strong>LABCAST｜方法影像</strong><span>观看实验操作与流程训练</span></a>
@@ -181,7 +182,7 @@
         </div>
 
         <div class="module-group knowledge-forest-entry-card">
-            <div class="section-head"><h2>GAIA｜知识森域</h2><a href="{{ url_for('knowledge_forest') }}">进入森域</a></div>
+            <div class="section-head"><h2>GAIA｜知识森林</h2><a href="{{ url_for('knowledge_forest') }}">进入知识森林</a></div>
             <a href="{{ url_for('knowledge_forest') }}" class="cyber-forest-preview" aria-label="{{ _('进入知识森林', 'Enter Knowledge Forest') }}">
                 <span class="forest-sky" aria-hidden="true"></span>
                 <span class="forest-grid" aria-hidden="true"></span>
@@ -190,7 +191,7 @@
                 <span class="forest-tree tree-c" aria-hidden="true"></span>
                 <span class="forest-tree tree-d" aria-hidden="true"></span>
                 <span class="forest-scan" aria-hidden="true"></span>
-                <span class="forest-core-copy"><strong>GAIA｜知识森域</strong><span>每日知识点、答题测验与打卡成长统一进入这里</span></span>
+                <span class="forest-core-copy"><strong>GAIA｜知识森林</strong><span>每日知识点、答题测验与打卡成长统一进入这里</span></span>
             </a>
             <div class="forest-entry-actions">
                 <a href="{{ url_for('study') }}"><strong>PRISM｜知识棱镜</strong><span>继续每日知识点训练</span></a>

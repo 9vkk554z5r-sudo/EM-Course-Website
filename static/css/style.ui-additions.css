@@ -823,3 +823,62 @@ body.ai-pre-route .main-content,
     .science-feature-card { padding: 18px 14px; }
     .workflow-step { padding: 16px 12px; }
 }
+/* === Fix text overlapping in literature hub layout === */
+body.literature-hub-route .graph-stage-heading > span {
+    white-space: normal !important;
+    word-break: break-word !important;
+    max-width: 40%;
+    text-align: right;
+    line-height: 1.4;
+}
+
+body.literature-hub-route .literature-filter-sidebar {
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+}
+
+body.literature-hub-route .literature-filter-sidebar select {
+    max-width: 100% !important;
+}
+
+body.literature-hub-route .filter-block label {
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+}
+
+body.literature-hub-route .node-detail,
+body.literature-hub-route .analysis-panel,
+body.literature-hub-route .hub-papers {
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+}
+
+body.literature-hub-route .graph-metrics {
+    flex-wrap: wrap !important;
+    gap: 8px 16px !important;
+}
+
+body.literature-hub-route .graph-metrics span {
+    white-space: normal !important;
+    word-break: break-word !important;
+}
+
+/* Fix insight column content overflow */
+body.literature-hub-route .literature-insight-column > section {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+
+/* Hub papers list fix */
+.hub-papers ol {
+    padding-left: 18px !important;
+    margin-top: 8px !important;
+}
+
+.hub-papers li {
+    overflow-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.5;
+    margin-bottom: 6px;
+    font-size: 0.82rem;
+}

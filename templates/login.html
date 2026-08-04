@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% set course_display = course.name_en if lang == 'en' and course.name_en is defined else course.name %}
-{% block title %}{{ _('登录', 'Login') }} - {{ course_display }} - {{ _('生命科学课程助手', 'Life Science Course Assistant') }}{% endblock %}
+{% block title %}登录 - {{ course.name }} - 生命科学课程助手{% endblock %}
 {% block body_class %}auth-route galaxy-auth-route life-product-theme{% endblock %}
 {% block content %}
 <div class="auth-page course-auth">
@@ -21,7 +21,7 @@
         <section class="auth-card stagger-panel galaxy-glass-form">
             <div class="auth-header"><div class="auth-icon">LS</div><h2>{{ _('登录课程工作台', 'Log In to Course Workspace') }}</h2><p>{{ _('使用学号 / 邮箱 / 手机号 + 密码登录', 'Use student ID, email or phone plus password') }}</p></div>
             <form method="POST" class="auth-form galaxy-login-form"><input type="hidden" name="course" value="{{ course.slug }}"><input type="hidden" name="next" value="{{ next_url }}"><div class="form-group"><label for="identifier">{{ _('账号', 'Account') }}</label><input type="text" id="identifier" name="identifier" placeholder="{{ _('学号 / 邮箱 / 手机号', 'Student ID / Email / Phone') }}" required autofocus autocomplete="username"></div><div class="form-group"><label for="password">{{ _('密码', 'Password') }}</label><input type="password" id="password" name="password" placeholder="{{ _('请输入密码', 'Enter password') }}" required autocomplete="current-password"></div><button type="submit" class="btn btn-primary btn-full" data-loading-text="{{ _('正在登录', 'Logging in') }}">{{ _('登录', 'Login') }}</button></form>
-            <div class="auth-footer"><p>{{ _('还没有账号？', 'No account yet?') }}<a href="{{ url_for('register', course=course.slug) }}">{{ _('立即注册', 'Register Now') }}</a></p><p><a href="{{ url_for('courses') }}">{{ _('重新选择学科星系', 'Choose Another Galaxy') }}</a></p></div>
+            <div class="auth-footer"><p>{{ _('还没有账号？', 'No account yet?') }}<a href="{{ url_for('register', course=course.slug) }}">{{ _('立即注册', 'Register Now') }}</a></p>{% if not em_only_site %}<p><a href="{{ url_for('courses') }}">{{ _('重新选择学科星系', 'Choose Another Galaxy') }}</a></p>{% endif %}</div>
         </section>
     </div>
 </div>

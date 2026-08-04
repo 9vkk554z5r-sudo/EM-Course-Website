@@ -1,0 +1,507 @@
+{% extends "base.html" %}
+{% block title %}课程管理 - {{ platform_name }}{% endblock %}
+{% block body_class %}reading-management-route life-product-theme{% endblock %}
+{% block content %}
+<style>
+.reading-page { max-width: 1360px; margin: 0 auto; padding: 28px 20px 48px; color: var(--text-primary, #e8eef2); }
+.reading-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
+.reading-header h1 { font-size: 1.9rem; margin: 6px 0 0; }
+.reading-header .section-kicker { margin: 0; }
+.reading-header-actions { color: #9fb3c8; font-size: .92rem; }
+.reading-status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.reading-status { border: 1px solid rgba(100,220,255,.18); background: rgba(13,24,38,.72); border-radius: 8px; padding: 16px; min-width: 0; }
+.reading-status strong { display: block; font-size: 1rem; color: #fff; overflow-wrap: anywhere; }
+.reading-status span { color: #9fb3c8; font-size: .85rem; }
+.reading-panel { border: 1px solid rgba(100,220,255,.16); background: rgba(10,20,35,.58); border-radius: 8px; padding: 20px; margin-bottom: 18px; }
+.reading-panel-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 14px; flex-wrap: wrap; }
+.reading-panel-head h2 { margin: 0; font-size: 1.25rem; }
+.reading-panel-head p { margin: 0; }
+.reading-panel-head > span { color: #9fb3c8; font-size: .86rem; }
+.reading-upload-form { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.reading-upload-form input[type="file"] { flex: 1; min-width: 260px; }
+.reading-meta-row { display: flex; gap: 18px; flex-wrap: wrap; padding: 12px 0 14px; color: #9fb3c8; }
+.reading-meta-row strong { color: #fff; }
+.reading-table-wrap { overflow-x: auto; }
+.reading-table { width: 100%; min-width: 820px; border-collapse: collapse; }
+.reading-table th, .reading-table td { text-align: left; padding: 12px; border-bottom: 1px solid rgba(100,220,255,.12); vertical-align: top; word-break: break-word; }
+.reading-table th { color: #9fb3c8; font-size: .82rem; font-weight: 600; }
+.reading-meta { margin-top: 6px; color: #8fa5b8; font-size: .85rem; display: flex; gap: 10px; flex-wrap: wrap; }
+.reading-empty { color: #9fb3c8; padding: 14px 0; }
+.reading-badge { padding: 4px 10px; border-radius: 999px; font-size: .78rem; white-space: nowrap; }
+.reading-badge.is-open { background: rgba(45,212,191,.14); color: #2dd4bf; }
+.reading-badge.is-closed { background: rgba(245,158,11,.14); color: #f59e0b; }
+.reading-tag { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: .76rem; white-space: nowrap; }
+.reading-tag.mine { background: rgba(45,212,191,.15); color: #2dd4bf; }
+.reading-tag.taken { background: rgba(245,158,11,.15); color: #f59e0b; }
+.reading-tag.free { background: rgba(99,179,237,.14); color: #63b3ed; }
+.reading-tag.full { background: rgba(248,113,113,.15); color: #f87171; }
+.score-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; padding-top: 12px; }
+.score-field { display: grid; grid-template-columns: 1fr 90px; gap: 8px; align-items: center; background: rgba(255,255,255,.035); border: 1px solid rgba(100,220,255,.12); border-radius: 8px; padding: 10px; }
+.score-field label { color: #c7d6e4; font-size: .86rem; }
+.score-field select { width: 100%; }
+.score-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.score-actions form { margin: 0; }
+@media (max-width: 600px) {
+    .reading-header { flex-direction: column; align-items: flex-start; }
+    .reading-upload-form { flex-direction: column; align-items: stretch; }
+    .score-field { grid-template-columns: 1fr; }
+}
+</style>
+
+<div class="reading-page">
+    <header class="reading-header">
+        <div>
+            <p class="section-kicker">COURSE READING · WEEKLY ASSIGNMENT</p>
+            <h1>{{ 'READING｜课程管理' if current_user.is_admin else 'READING｜选文与互评' }}</h1>
+        </div>
+        {% if current_user.is_admin and files %}
+        <div class="reading-header-actions">{{ files|length }} 个主题文件</div>
+        {% endif %}
+    </header>
+
+    <section class="reading-status-grid">
+        <div class="reading-status">
+            <strong>{{ active.file.theme if active and active.file else (files[0].theme if files else '本周主题') }}</strong>
+            <span>本周主题</span>
+        </div>
+        <div class="reading-status">
+            <strong>{{ '开放中' if active and active.open else '未开放' }}</strong>
+            <span>选文通道</span>
+        </div>
+        <div class="reading-status">
+            <strong>{{ format_dt(active.next_release) if active else '待教师上传' }}</strong>
+            <span>下次开放</span>
+        </div>
+        <div class="reading-status">
+            <strong>{{ max_students_per_theme }} 位同学 / {{ max_papers_per_theme }} 篇</strong>
+            <span>每个主题名额</span>
+        </div>
+        {% if student_selection %}
+        <div class="reading-status">
+            <strong>{{ student_selection.item.title }}</strong>
+            <span>我的本周选文</span>
+        </div>
+        {% endif %}
+    </section>
+
+    {% if current_user.is_admin %}
+    <section class="reading-panel">
+        <div class="reading-panel-head">
+            <div><p class="section-kicker">TEACHER CONSOLE</p><h2>Reading List 上传</h2></div>
+            <span>支持 Word / txt / md / csv，可一次上传全部文件</span>
+        </div>
+        <form class="reading-upload-form" method="post" enctype="multipart/form-data" action="{{ url_for('reading_upload') }}">
+            <input type="file" name="reading_files" multiple accept=".docx,.doc,.txt,.md,.markdown,.csv" required>
+            <button type="submit" class="btn btn-primary">上传全部文件</button>
+        </form>
+    </section>
+    {% endif %}
+
+    <section class="reading-panel">
+        <div class="reading-panel-head">
+            <div><p class="section-kicker">WEEKLY RELEASE</p><h2>本周选文主题</h2></div>
+            {% if active and active.file %}
+            <span class="reading-badge {{ 'is-open' if active.open else 'is-closed' }}">{{ '开放中' if active.open else '未开放' }}</span>
+            {% endif %}
+        </div>
+        {% if not active %}
+        <p class="reading-empty">教师尚未上传 reading list</p>
+        {% elif not active.file %}
+        {% if files %}
+        <div class="reading-meta-row">
+            <span><strong>下一主题：{{ files[0].theme }}</strong></span>
+        </div>
+        {% endif %}
+        <p class="reading-empty">首次开放：{{ format_dt(active.next_release) }}（Asia/Shanghai）</p>
+        {% else %}
+        <div class="reading-meta-row">
+            <span><strong>{{ active.file.theme }}</strong></span>
+            <span>开放：{{ format_dt(active.release_start) }}</span>
+            <span>关闭：{{ format_dt(active.release_end) }}</span>
+        </div>
+        {% if active_items %}
+        <div class="reading-table-wrap">
+            <table class="admin-table reading-table">
+                <thead><tr><th>#</th><th>文献</th><th>状态</th><th>操作</th></tr></thead>
+                <tbody>
+                {% for row in active_items %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>
+                        <strong>{{ row.item.title }}</strong>
+                        <div class="reading-meta">
+                            {% if row.item.authors %}<span>{{ row.item.authors }}</span>{% endif %}
+                            {% if row.item.year %}<span>{{ row.item.year }}</span>{% endif %}
+                            {% if row.item.doi %}<a href="https://doi.org/{{ row.item.doi }}" target="_blank" rel="noopener">{{ row.item.doi }}</a>{% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        {% if row.mine %}<span class="reading-tag mine">我的</span>
+                        {% elif row.taken %}<span class="reading-tag taken">已选</span>
+                        {% else %}<span class="reading-tag free">可选</span>{% endif %}
+                        {% if row.selection and current_user.is_admin %}<div class="reading-meta">{{ row.selection.user.name }} / {{ row.selection.user.student_id }}</div>{% endif %}
+                    </td>
+                    <td>
+                        {% if current_user.is_admin and row.selection %}
+                        <div class="score-actions">
+                            {% if row.selection.ppt_path %}<a class="btn btn-sm btn-outline" href="{{ url_for('reading_ppt', selection_id=row.selection.id) }}">下载 PPT</a>{% endif %}
+                            <form method="post" action="{{ url_for('reading_delete_selection', selection_id=row.selection.id) }}"><button class="btn btn-sm btn-outline">取消选文</button></form>
+                        </div>
+                        {% elif not current_user.is_admin and active.open and not row.taken and not row.mine %}
+                            {% if row.theme_full %}<span class="reading-tag full">该主题已满</span>
+                            {% else %}<form method="post" action="{{ url_for('reading_select', item_id=row.item.id) }}"><button class="btn btn-sm btn-primary">选择</button></form>{% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="reading-empty">本周文件还没有识别到文献</p>
+        {% endif %}
+        {% endif %}
+    </section>
+
+    {% if not current_user.is_admin %}
+    <section class="reading-panel">
+        <div class="reading-panel-head">
+            <div><p class="section-kicker">MY ASSIGNMENT</p><h2>我的选文与 PPT</h2></div>
+        </div>
+        {% if selections %}
+        <div class="reading-table-wrap">
+            <table class="admin-table reading-table">
+                <thead><tr><th>周次</th><th>主题</th><th>文献</th><th>上传截止</th><th>PPT 状态</th></tr></thead>
+                <tbody>
+                {% for sel in selections %}
+                {% set deadline = deadline_for(sel.week_label) %}
+                {% set can_upload = now_local <= deadline %}
+                <tr>
+                    <td>{{ sel.week_label }}</td>
+                    <td>{{ sel.item.reading_list.theme }}</td>
+                    <td>{{ sel.item.title }}</td>
+                    <td>{{ format_dt(deadline) }}</td>
+                    <td>
+                        {% if sel.ppt_path %}
+                        <div class="score-actions"><span class="reading-tag mine">已上传</span><a class="btn btn-sm btn-outline" href="{{ url_for('reading_ppt', selection_id=sel.id) }}">下载 PPT</a><form method="post" action="{{ url_for('reading_delete_ppt', selection_id=sel.id) }}"><button class="btn btn-sm btn-outline">删除 PPT</button></form></div>
+                        {% endif %}
+                        {% if can_upload %}
+                        <form class="reading-upload-form" method="post" enctype="multipart/form-data" action="{{ url_for('reading_upload_ppt', selection_id=sel.id) }}">
+                            <input type="file" name="ppt_file" accept=".ppt,.pptx,.pdf" required>
+                            <button type="submit" class="btn btn-sm btn-primary">上传/重新上传 PPT</button>
+                        </form>
+                        {% endif %}
+                        {% if not sel.ppt_path and not can_upload %}
+                        <span class="reading-tag full">已截止</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% for sel in selections %}
+        {% if sel.teacher_feedback %}
+        <div class="reading-panel" style="margin-bottom:12px">
+            <div class="reading-meta-row">
+                <span><strong>教师反馈</strong></span>
+                <span>{{ sel.teacher_feedback }}</span>
+                <span>{{ format_dt(sel.teacher_feedback_at) }}</span>
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+        {% else %}
+        <p class="reading-empty">你还没有选文记录</p>
+        {% endif %}
+    </section>
+
+    <section class="reading-panel">
+        <div class="reading-panel-head">
+            <div><p class="section-kicker">PEER REVIEW</p><h2>同学互评</h2></div>
+            <span>仅教师端可查看评分结果</span>
+        </div>
+        {% if scoring_targets %}
+        {% for target in scoring_targets %}
+        <div class="reading-panel" style="margin-bottom:12px">
+            <div class="reading-meta-row">
+                <span><strong>{{ target.user.name }}</strong> / {{ target.user.student_id }}</span>
+                <span>{{ target.week_label }}</span>
+                <span>{{ target.item.reading_list.theme }}</span>
+                <span>{{ target.item.title }}</span>
+                <span><a href="{{ url_for('reading_ppt', selection_id=target.id) }}">查看 PPT</a></span>
+            </div>
+            {% if target.id in my_scores %}
+            <p class="reading-empty">你已完成评分</p>
+            {% else %}
+            <form method="post" action="{{ url_for('reading_score', selection_id=target.id) }}">
+                <div class="score-form">
+                    {% for key, label in score_criteria %}
+                    <div class="score-field">
+                        <label>{{ label }}</label>
+                        <select name="{{ key }}" required>
+                            <option value="0">0 分</option>
+                            <option value="1">1 分</option>
+                            <option value="2">2 分</option>
+                            <option value="3">3 分</option>
+                            <option value="4">4 分</option>
+                            <option value="5" selected>5 分</option>
+                        </select>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="score-actions" style="margin-top:14px">
+                    <button type="submit" class="btn btn-primary">提交评分</button>
+                </div>
+            </form>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="reading-empty">暂无已上传 PPT 的同学可以评分</p>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% if not current_user.is_admin %}
+    <section class="reading-panel" id="final-review">
+        <div class="reading-panel-head">
+            <div><p class="section-kicker">FINAL REVIEW</p><h2>期末综述</h2></div>
+            <span>教师评分与反馈会显示在这里</span>
+        </div>
+        {% if final_reviews %}
+        {% for review in final_reviews %}
+        <div class="reading-meta-row">
+            <span><strong>{{ review.title }}</strong></span>
+            <span><a href="{{ url_for('final_review_download', review_id=review.id) }}">{{ review.filename }}</a></span>
+            <span>提交时间：{{ format_dt(review.submitted_at) }}</span>
+            {% if review.score is not none %}<span>教师评分：{{ review.score }} / 100</span>{% endif %}
+        </div>
+        {% if review.feedback %}
+        <div class="reading-panel" style="margin-bottom:12px">
+            <div class="reading-meta-row">
+                <span><strong>教师反馈</strong></span>
+                <span>{{ review.feedback }}</span>
+                <span>{{ format_dt(review.reviewed_at) }}</span>
+            </div>
+        </div>
+        {% endif %}
+        {% if not review.feedback %}
+        <div class="score-actions" style="align-items:flex-start">
+            <form class="reading-upload-form" method="post" enctype="multipart/form-data" action="{{ url_for('final_review_upload') }}">
+                <input type="text" name="title" value="{{ review.title }}" required>
+                <input type="file" name="final_review_file" accept=".docx,.pdf,.txt,.md,.markdown,.csv" required>
+                <button type="submit" class="btn btn-sm btn-primary">重新上传</button>
+            </form>
+            <form method="post" action="{{ url_for('final_review_delete') }}">
+                <button type="submit" class="btn btn-sm btn-outline">删除综述</button>
+            </form>
+        </div>
+        {% endif %}
+        {% endfor %}
+        {% else %}
+        <form class="reading-upload-form" method="post" enctype="multipart/form-data" action="{{ url_for('final_review_upload') }}">
+            <input type="text" name="title" placeholder="期末综述标题" required>
+            <input type="file" name="final_review_file" accept=".docx,.pdf,.txt,.md,.markdown,.csv" required>
+            <button type="submit" class="btn btn-primary">上传期末综述</button>
+        </form>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% if current_user.is_admin %}
+    <section class="reading-panel">
+        <div class="reading-panel-head">
+            <div><p class="section-kicker">THEME ORDER</p><h2>Reading List 文件</h2></div>
+            <div class="score-actions">
+                <a class="btn btn-sm btn-primary" href="{{ url_for('reading_export') }}">导出文献分享互评表</a>
+            </div>
+        </div>
+        {% if files %}
+        <div class="reading-table-wrap">
+            <table class="admin-table reading-table">
+                <thead><tr><th>顺序</th><th>主题词</th><th>文件名</th><th>文献数</th><th>上传时间</th><th>选文状态</th><th>操作</th></tr></thead>
+                <tbody>
+                {% for file in files %}
+                <tr>
+                    <td>{{ file.week_order }}</td>
+                    <td><strong>{{ file.theme }}</strong></td>
+                    <td>{{ file.filename }}</td>
+                    <td>{{ file.items.count() }}</td>
+                    <td>{{ format_dt(file.uploaded_at) }}</td>
+                    <td>{% if file.is_open %}<span class="reading-tag mine">手动开放</span>{% else %}<span class="reading-tag free">自动/关闭</span>{% endif %}</td>
+                    <td>
+                        <div class="score-actions">
+                            <form method="post" action="{{ url_for('reading_toggle_open', file_id=file.id) }}"><button class="btn btn-sm btn-outline">{{ '关闭手动开放' if file.is_open else '立即开放' }}</button></form>
+                            <form method="post" action="{{ url_for('reading_delete_file', file_id=file.id) }}"><button class="btn btn-sm btn-outline">删除</button></form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="reading-empty">暂无文件</p>
+        {% endif %}
+    </section>
+
+    <section class="reading-panel">
+        <div class="reading-panel-head">
+            <div><p class="section-kicker">STUDENT OVERVIEW</p><h2>学生选文、PPT 与评分概况</h2></div>
+        </div>
+        {% if all_selections %}
+        <div class="reading-table-wrap">
+            <table class="admin-table reading-table">
+                <thead><tr><th>学号</th><th>姓名</th><th>周次</th><th>主题</th><th>文献</th><th>PPT</th><th>评分人数</th><th>平均分</th><th>操作</th></tr></thead>
+                <tbody>
+                {% for sel in all_selections %}
+                {% set stats = score_stats[sel.id] %}
+                <tr>
+                    <td>{{ sel.user.student_id }}</td>
+                    <td>{{ sel.user.name }}</td>
+                    <td>{{ sel.week_label }}</td>
+                    <td>{{ sel.item.reading_list.theme }}</td>
+                    <td>{{ sel.item.title }}</td>
+                    <td>
+                        {% if sel.ppt_path %}<a href="{{ url_for('reading_ppt', selection_id=sel.id) }}">{{ sel.ppt_filename }}</a>
+                        {% else %}<span class="reading-tag full">未上传</span>{% endif %}
+                    </td>
+                    <td>{{ stats.count }}</td>
+                    <td>{{ stats.average if stats.average is not none else '-' }}</td>
+                    <td><form method="post" action="{{ url_for('reading_delete_selection', selection_id=sel.id) }}"><button class="btn btn-sm btn-outline">取消选文</button></form></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="reading-empty">暂无学生选文</p>
+        {% endif %}
+    </section>
+
+    {% if selection_groups %}
+    {% for week_label, week_selections in selection_groups.items() %}
+    <section class="reading-panel">
+        <div class="reading-panel-head">
+            <div><p class="section-kicker">SELECTION RECORDS</p><h2>选文与评分明细 · {{ week_label }}</h2></div>
+            <span>{{ week_selections|length }} 位选文同学</span>
+        </div>
+        {% for sel in week_selections %}
+        <div class="reading-panel" style="margin-bottom:12px">
+            <div class="reading-meta-row">
+                <span><strong>{{ sel.user.name }}</strong> / {{ sel.user.student_id }}</span>
+                <span>{{ sel.item.title }}</span>
+                {% if sel.ppt_path %}<span><a href="{{ url_for('reading_ppt', selection_id=sel.id) }}">PPT</a></span>{% else %}<span>未上传 PPT</span>{% endif %}
+            </div>
+            {% if sel.scores.count() %}
+            <div class="reading-table-wrap">
+                <table class="admin-table reading-table">
+                    <thead><tr><th>评分人学号</th><th>评分人</th><th>内容理解</th><th>学习态度</th><th>讲授思路</th><th>启发性</th><th>激发听众</th><th>回答问题</th><th>总分</th><th>评分时间</th></tr></thead>
+                    <tbody>
+                    {% for score in sel.scores %}
+                    <tr>
+                        <td>{{ score.rater.student_id }}</td>
+                        <td>{{ score.rater.name }}</td>
+                        <td>{{ score.content_understanding }}</td>
+                        <td>{{ score.preparation_attitude }}</td>
+                        <td>{{ score.clarity_focus }}</td>
+                        <td>{{ score.inspiration_creativity }}</td>
+                        <td>{{ score.audience_engagement }}</td>
+                        <td>{{ score.question_answering }}</td>
+                        <td><strong>{{ score.total_score }}</strong></td>
+                        <td>{{ format_dt(score.created_at) }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="reading-empty">暂无评分</p>
+            {% endif %}
+            <form method="post" action="{{ url_for('reading_score', selection_id=sel.id) }}">
+                <div class="score-form">
+                    {% for key, label in score_criteria %}
+                    <div class="score-field">
+                        <label>{{ label }}</label>
+                        <select name="{{ key }}" required>
+                            <option value="0">0 分</option>
+                            <option value="1">1 分</option>
+                            <option value="2">2 分</option>
+                            <option value="3">3 分</option>
+                            <option value="4">4 分</option>
+                            <option value="5" selected>5 分</option>
+                        </select>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="score-actions" style="margin-top:10px">
+                    <button type="submit" class="btn btn-sm btn-primary">提交教师评分</button>
+                </div>
+            </form>
+            <form method="post" action="{{ url_for('reading_teacher_feedback', selection_id=sel.id) }}">
+                <div class="score-field" style="grid-template-columns:1fr">
+                    <label>教师反馈</label>
+                    <textarea name="feedback" rows="3" style="width:100%">{{ sel.teacher_feedback }}</textarea>
+                </div>
+                <div class="score-actions" style="margin-top:10px">
+                    <button type="submit" class="btn btn-sm btn-primary">保存反馈</button>
+                    {% if sel.teacher_feedback_at %}<span>已反馈 {{ format_dt(sel.teacher_feedback_at) }}</span>{% endif %}
+                </div>
+            </form>
+        </div>
+        {% endfor %}
+    </section>
+    {% endfor %}
+    {% endif %}
+    {% if final_reviews %}
+    <section class="reading-panel" id="final-review">
+        <div class="reading-panel-head">
+            <div><p class="section-kicker">FINAL REVIEW</p><h2>期末综述评分与反馈</h2></div>
+            <div class="score-actions">
+                <span>{{ final_reviews|length }} 份</span>
+                <a class="btn btn-sm btn-primary" href="{{ url_for('reading_export_final_reviews') }}">导出期末综述评分表</a>
+            </div>
+        </div>
+        <div class="reading-table-wrap">
+            <table class="admin-table reading-table">
+                <thead><tr><th>学号</th><th>姓名</th><th>标题</th><th>文件</th><th>评分</th><th>提交时间</th></tr></thead>
+                <tbody>
+                {% for review in final_reviews %}
+                <tr>
+                    <td>{{ review.user.student_id }}</td>
+                    <td>{{ review.user.name }}</td>
+                    <td>{{ review.title }}</td>
+                    <td><a href="{{ url_for('final_review_download', review_id=review.id) }}">{{ review.filename }}</a></td>
+                    <td>{{ review.score if review.score is not none else '-' }}</td>
+                    <td>{{ format_dt(review.submitted_at) }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% for review in final_reviews %}
+        <div class="reading-panel" style="margin-bottom:12px">
+            <div class="reading-meta-row">
+                <span><strong>{{ review.user.name }}</strong> / {{ review.user.student_id }}</span>
+                <span>{{ review.title }}</span>
+                <span>{{ review.filename }}</span>
+            </div>
+            <form method="post" action="{{ url_for('final_review_review', review_id=review.id) }}">
+                <div class="score-actions">
+                    <label for="score-{{ review.id }}">评分（0-100）</label>
+                    <input type="number" id="score-{{ review.id }}" name="score" min="0" max="100" value="{{ review.score if review.score is not none else '' }}" required>
+                    <button type="submit" class="btn btn-sm btn-primary">保存评分与反馈</button>
+                </div>
+                <div style="margin-top:14px">
+                    <label for="feedback-{{ review.id }}" style="display:block;margin-bottom:8px">教师反馈</label>
+                    <textarea id="feedback-{{ review.id }}" name="feedback" rows="8" style="width:100%;min-height:180px;resize:vertical">{{ review.feedback }}</textarea>
+                </div>
+            </form>
+        </div>
+        {% endfor %}
+    </section>
+    {% endif %}
+    {% endif %}
+</div>
+{% endblock %}

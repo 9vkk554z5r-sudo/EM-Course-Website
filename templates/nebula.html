@@ -1,5 +1,5 @@
 ﻿{% extends "base.html" %}
-{% block title %}NEXUS｜引用星链 · {{ platform_name }}{% endblock %}
+{% block title %}引用星链 - {{ platform_name }}{% endblock %}
 {% block body_class %}life-product-theme nebula-route literature-workspace-route{% endblock %}
 {% block content %}
 <div class="nebula-page">
@@ -31,7 +31,15 @@
             </div>
             <button id="nebula-submit" type="submit" class="btn btn-primary" data-loading-text="正在生成">检索并生成图谱</button>
         </form>
-        <p id="nebula-status" class="nebula-status" role="status">未输入查询时展示已同步到本地数据库的图谱</p>
+    <p id="nebula-status" class="nebula-status" role="status">未输入查询时展示已同步到本地数据库的图谱</p>
+        <div class="nebula-tier-selector" style="display:flex;align-items:center;gap:10px;margin-top:12px;margin-bottom:4px;justify-content:center">
+            <span style="font-size:13px;color:#8899aa">文献档位</span>
+            <select id="nebula-limit" style="padding:4px 12px;border-radius:6px;background:rgba(10,15,36,0.8);color:#e8eef2;border:1px solid rgba(59,130,246,0.3);font-size:13px">
+                <option value="45">45 篇 · 快速</option>
+                <option value="100" selected>100 篇 · 推荐</option>
+                <option value="200">200 篇 · 大型图谱</option>
+            </select>
+        </div>
     </section>
 
     <div class="nebula-workspace">

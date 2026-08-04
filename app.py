@@ -1,11 +1,12 @@
 ﻿# -*- coding: utf-8 -*-
 import os
 import sys
-from datetime import datetime, date, timezone
+from datetime import datetime, date, time, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from flask import (
     Flask, render_template, redirect, url_for, request,
-    flash, jsonify, abort, session as flask_session
+    flash, jsonify, abort, session as flask_session, Response, send_file
 )
 from flask_login import (
     LoginManager, login_user, logout_user, login_required, current_user
@@ -14,11 +15,16 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from config import SECRET_KEY, SQLALCHEMY_DATABASE_URI, SQLALCHEMY_TRACK_MODIFICATIONS
 from config import WEEKLY_LITERATURE_HOUR, WEEKLY_LITERATURE_MINUTE
-from models import db, User, LiteratureSubscription, LiteratureItem, CitationLink, KnowledgePoint, DailyCheckin, ProtocolVideo, UploadedLiterature, AttendanceReward, Quiz, QuizAttempt, ProtocolCollection, PresentationTemplate, AgentLog, ApiKey, LiteraturePlanet, PlanetPaper, ChatHistory, LiteratureCategory, BookmarkedLiterature, KnowledgeFile, UserStudyPlan
+from models import db, User, LiteratureSubscription, LiteratureItem, CitationLink, KnowledgePoint, DailyCheckin, ProtocolVideo, UploadedLiterature, AttendanceReward, Quiz, QuizAttempt, ProtocolCollection, PresentationTemplate, AgentLog, ApiKey, LiteraturePlanet, PlanetPaper, ChatHistory, LiteratureCategory, BookmarkedLiterature, KnowledgeFile, UserStudyPlan, ReadingListFile, ReadingListItem, ReadingSelection, ReadingScore, FinalReview
 from knowledge_points import DIFFICULTY_LABELS, DIFFICULTY_COLORS
 from knowledge_study_v2 import knowledge_study_bp, build_custom_study_context
 import json
 import re
+import csv
+import io
+import uuid
+import zipfile
+import xml.etree.ElementTree as ET
 import datetime as dt_module
 from functools import wraps
 from werkzeug.utils import secure_filename
@@ -135,7 +141,367 @@ COURSE_REGISTRY = {
 }
 
 
+def _is_em_only():
+    return os.environ.get("EM_ONLY_SITE") == "1"
+
+
+READING_TZ = ZoneInfo("Asia/Shanghai")
+READING_MAX_STUDENTS_PER_THEME = 2
+READING_MAX_PAPERS_PER_THEME = 2
+READING_PPT_ALLOWED_EXT = {".ppt", ".pptx", ".pdf"}
+FINAL_REVIEW_ALLOWED_EXT = {".docx", ".pdf", ".txt", ".md", ".markdown", ".csv"}
+READING_SCORE_CRITERIA = [
+    ("content_understanding", "对文献内容理解充分"),
+    ("preparation_attitude", "学习态度良好，准备充分"),
+    ("clarity_focus", "讲授思路清晰，重点突出，难点剖析清楚"),
+    ("inspiration_creativity", "讲述有启发性，有独立思考，有创新思维"),
+    ("audience_engagement", "能激发听众同学的求知欲和热情"),
+    ("question_answering", "回答问题准确、耐心"),
+]
+
+
+def _as_local(value):
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(READING_TZ)
+
+
+def _format_reading_dt(value):
+    local_value = _as_local(value)
+    if local_value is None:
+        return ""
+    return local_value.strftime("%Y-%m-%d %H:%M")
+
+
+def _week_deadline(week_label):
+    release_date = datetime.strptime(week_label, "%Y-%m-%d").date()
+    return datetime.combine(
+        release_date + timedelta(days=7),
+        time(10, 0),
+        tzinfo=READING_TZ,
+    )
+
+
+def _reading_score_stats(selection):
+    scores = selection.scores.all()
+    if not scores:
+        return {"count": 0, "average": None}
+    average = sum(score.total_score for score in scores) / len(scores)
+    return {"count": len(scores), "average": round(average, 2)}
+
+
+def _next_friday_10(after_dt):
+    after_local = _as_local(after_dt)
+    days_until_friday = (4 - after_local.weekday()) % 7
+    release = datetime.combine(
+        (after_local + timedelta(days=days_until_friday)).date(),
+        time(10, 0),
+        tzinfo=READING_TZ,
+    )
+    if after_local > release:
+        release += timedelta(days=7)
+    return release
+
+
+def _active_reading_week(files=None, now=None):
+    if files is None:
+        files = ReadingListFile.query.order_by(
+            ReadingListFile.week_order, ReadingListFile.id
+        ).all()
+    if not files:
+        return None
+
+    now_local = now or datetime.now(READING_TZ)
+    if now_local.tzinfo is None:
+        now_local = now_local.replace(tzinfo=READING_TZ)
+
+    first_release = _next_friday_10(files[0].uploaded_at)
+    if now_local < first_release:
+        if files[0].is_open:
+            return {
+                "file": files[0],
+                "open": True,
+                "week_label": first_release.date().strftime("%Y-%m-%d"),
+                "release_start": now_local,
+                "release_end": first_release,
+                "next_release": first_release,
+            }
+        return {
+            "file": None,
+            "open": False,
+            "week_label": None,
+            "release_start": first_release,
+            "release_end": first_release + timedelta(days=7),
+            "next_release": first_release,
+        }
+
+    elapsed_days = (now_local.date() - first_release.date()).days
+    index = (elapsed_days // 7) % len(files)
+    release_start = first_release + timedelta(days=7 * index)
+    release_end = release_start + timedelta(days=7)
+
+    return {
+        "file": files[index],
+        "open": release_start <= now_local < release_end,
+        "week_label": release_start.date().strftime("%Y-%m-%d"),
+        "release_start": release_start,
+        "release_end": release_end,
+        "next_release": release_end,
+    }
+
+
+def _theme_from_filename(filename):
+    stem = os.path.splitext(os.path.basename(filename))[0]
+    stem = re.sub(r"[\s_\-]+", " ", stem).strip()
+    return stem or filename
+
+
+def _infer_theme_from_first_item(first_title):
+    title = (first_title or "").strip()
+    match = re.search(
+        r"^\s*(?:Reading\s*List|RL|Week\s*\d+|第\s*\d+\s*周)\s*\d*\s*[:：]\s*(.+)$",
+        title,
+        re.IGNORECASE,
+    )
+    if match:
+        return match.group(1).strip()
+    return ""
+
+
+def _refresh_reading_list_themes():
+    files = ReadingListFile.query.order_by(
+        ReadingListFile.week_order, ReadingListFile.id
+    ).all()
+    changed = False
+    for reading_list in files:
+        first_item = reading_list.items.order_by(
+            ReadingListItem.item_order
+        ).first()
+        if not first_item:
+            continue
+        inferred = _infer_theme_from_first_item(first_item.title)
+        if inferred and (
+            not reading_list.theme
+            or reading_list.theme == _theme_from_filename(reading_list.filename)
+        ):
+            reading_list.theme = inferred
+            changed = True
+    if changed:
+        db.session.commit()
+
+
+def _detect_reading_theme(raw, filename):
+    lines = [line.strip() for line in (raw or "").splitlines() if line.strip()]
+    if not lines:
+        return _theme_from_filename(filename)
+
+    marker_patterns = [
+        r"(?:主题词|主题|关键词)\s*[:：]\s*(.+)",
+        r"(?:Theme|Topic|Keywords?)\s*[:：]\s*(.+)",
+        r"(?:Week|第\s*\d+\s*周)\s*\d*\s*[:：\-]\s*(.+)",
+    ]
+    for line in lines[:20]:
+        for pattern in marker_patterns:
+            match = re.search(pattern, line, re.IGNORECASE)
+            if match:
+                value = match.group(1).strip().strip("[]()（）")
+                if value:
+                    return value
+
+    first = lines[0]
+    if "," in first and any(
+        key in first.lower()
+        for key in ("title", "authors", "author", "year", "doi", "标题", "作者", "年份")
+    ):
+        return _theme_from_filename(filename)
+    if (
+        len(first) <= 60
+        and not re.search(r"DOI[:：]?\s*10\.\S+|https?://", first, re.IGNORECASE)
+        and not re.match(r"^\s*(?:\d+[\.\)、]|[•*\-])", first)
+    ):
+        if not first.endswith(".") or len(first) <= 30:
+            return first
+
+    return _theme_from_filename(filename)
+
+
+def _extract_docx_text(content):
+    with zipfile.ZipFile(io.BytesIO(content)) as zf:
+        xml_bytes = zf.read("word/document.xml")
+    root = ET.fromstring(xml_bytes)
+    ns = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+    paragraphs = []
+    for paragraph in root.iter(ns + "p"):
+        text = "".join(node.text or "" for node in paragraph.iter(ns + "t"))
+        if text.strip():
+            paragraphs.append(text)
+    return "\n".join(paragraphs)
+
+
+def _csv_value(row, *keys):
+    for key in keys:
+        if key in row and row[key] is not None:
+            value = str(row[key]).strip()
+            if value:
+                return value
+    return ""
+
+
+def _parse_reading_list_text(raw):
+    raw = (raw or "").replace("\r\n", "\n").replace("\r", "\n")
+    items = []
+    first_line = next((line.strip() for line in raw.splitlines() if line.strip()), "")
+    low_header = first_line.lower()
+
+    if "," in first_line and any(
+        key in low_header for key in ("title", "标题", "doi", "authors", "作者")
+    ):
+        reader = csv.DictReader(io.StringIO(raw))
+        for row in reader:
+            title = _csv_value(row, "title", "标题", "Title")
+            if not title:
+                continue
+            year_text = _csv_value(
+                row, "year", "年份", "publication_year", "pub_year"
+            )
+            year = None
+            year_match = re.search(r"(19|20)\d{2}", year_text)
+            if year_match:
+                year = int(year_match.group())
+            items.append(
+                {
+                    "title": title,
+                    "authors": _csv_value(
+                        row, "authors", "作者", "author", "creator"
+                    ),
+                    "journal": _csv_value(
+                        row, "journal", "期刊", "container-title"
+                    ),
+                    "year": year,
+                    "doi": _csv_value(row, "doi", "DOI", "identifier"),
+                    "url": _csv_value(row, "url", "link", "URL"),
+                }
+            )
+        return items
+
+    blocks = re.split(r"\n\s*\n+", raw)
+    if len(blocks) <= 1 and re.search(
+        r"(?m)^\s*(?:\d+[\.\)、]|[•*\-])\s*", raw
+    ):
+        blocks = [
+            block
+            for block in re.split(
+                r"(?m)(?=^\s*(?:\d+[\.\)、]|[•*\-])\s*)", raw
+            )
+            if block.strip()
+        ]
+    elif len(blocks) <= 1:
+        lines = [line for line in raw.splitlines() if line.strip()]
+        entry_boundary = re.compile(
+            r"DOI[:：]?\s*10\.\S+|https?://\S+", re.IGNORECASE
+        )
+        if any(entry_boundary.search(line) for line in lines):
+            blocks = []
+            current = []
+            for line in lines:
+                current.append(line)
+                if entry_boundary.search(line):
+                    blocks.append("\n".join(current))
+                    current = []
+            if current:
+                blocks.append("\n".join(current))
+        else:
+            blocks = lines
+
+    for block in blocks:
+        lines = [line.strip() for line in block.splitlines() if line.strip()]
+        if not lines:
+            continue
+        text = " ".join(lines)
+
+        doi = ""
+        doi_match = re.search(r"DOI[:：]?\s*(10\.\S+)", text, re.IGNORECASE)
+        if doi_match:
+            doi = doi_match.group(1).rstrip(".,;")
+        if not doi:
+            doi_match = re.search(
+                r"https?://(?:dx\.)?doi\.org/(10\.\S+)", text, re.IGNORECASE
+            )
+            if doi_match:
+                doi = doi_match.group(1).rstrip(".,;")
+
+        url = ""
+        url_match = re.search(r"https?://\S+", text)
+        if url_match:
+            url = url_match.group(0).rstrip(".,;")
+
+        title = re.sub(
+            r"^\s*(?:\d+[\.\)、]|[•*\-])\s*", "", lines[0]
+        ).strip()
+        title = re.sub(r"DOI[:：]?\s*10\.\S+", "", title, flags=re.IGNORECASE)
+        title = re.sub(r"https?://\S+", "", title).strip(" .,;")
+        if not title:
+            continue
+
+        authors = lines[1] if len(lines) > 1 else ""
+        authors = re.sub(r"DOI[:：]?\s*10\.\S+", "", authors, flags=re.IGNORECASE).strip()
+
+        year = None
+        year_match = re.search(r"(19|20)\d{2}", text)
+        if year_match:
+            year = int(year_match.group())
+
+        items.append(
+            {
+                "title": title,
+                "authors": authors,
+                "journal": "",
+                "year": year,
+                "doi": doi,
+                "url": url,
+            }
+        )
+
+    return items
+
+
+def _parse_reading_file(file_storage):
+    raw_filename = (file_storage.filename or "reading.txt").replace("\\", "/")
+    filename = raw_filename.rsplit("/", 1)[-1].strip() or "reading.txt"
+    filename = re.sub(r'[\\/:*?"<>|]', "_", filename)
+    ext = os.path.splitext(filename)[1].lower()
+    content = file_storage.read()
+
+    if ext in (".txt", ".md", ".markdown", ".csv"):
+        raw = content.decode("utf-8-sig", errors="replace")
+    elif ext == ".docx":
+        raw = _extract_docx_text(content)
+    else:
+        raise ValueError("仅支持 txt / md / csv / docx 文件")
+
+    theme = _detect_reading_theme(raw, filename)
+    raw_for_items = re.sub(
+        r"(?im)^\s*(?:主题词|主题|关键词)\s*[:：].*$", "", raw
+    )
+    raw_for_items = re.sub(
+        r"(?im)^\s*(?:Theme|Topic|Keywords?)\s*[:：].*$",
+        "",
+        raw_for_items,
+    )
+    raw_for_items = re.sub(
+        r"(?im)^\s*(?:Week|第\s*\d+\s*周)\s*\d*\s*[:：\-].*$",
+        "",
+        raw_for_items,
+    )
+    items = _parse_reading_list_text(raw_for_items)
+    return filename, ext.lstrip(".") or "txt", theme, items
+
+
 def _selected_course():
+    if _is_em_only():
+        return COURSE_REGISTRY["electron-microscopy"]
     slug = (
         request.args.get("course")
         or flask_session.get("selected_course")
@@ -147,7 +513,8 @@ def _selected_course():
 @app.context_processor
 def inject_platform_context():
     return {
-        "platform_name": PLATFORM_NAME,
+        "platform_name": "电子显微学课程" if _is_em_only() else PLATFORM_NAME,
+        "em_only_site": _is_em_only(),
         "course_registry": COURSE_REGISTRY,
         "selected_course": _selected_course(),
     }
@@ -165,16 +532,24 @@ def load_user(user_id):
 
 @app.route('/')
 def index():
+    if _is_em_only():
+        if current_user.is_authenticated:
+            return redirect(url_for("dashboard"))
+        return redirect(url_for("login", course="electron-microscopy"))
     return render_template("platform_home.html")
 
 
 @app.route('/courses')
 def courses():
+    if _is_em_only():
+        return redirect(url_for("index"))
     return render_template("course_select.html", courses=COURSE_REGISTRY)
 
 
 @app.route('/course/<slug>')
 def course_entry(slug):
+    if _is_em_only():
+        return redirect(url_for("index"))
     course = COURSE_REGISTRY.get(slug)
     if not course:
         abort(404)
@@ -191,11 +566,13 @@ def course_entry(slug):
 def login():
     if current_user.is_authenticated:
         return redirect(request.args.get("next") or url_for('dashboard'))
-    course_slug = request.args.get("course") or flask_session.get("selected_course") or "electron-microscopy"
+    course_slug = "electron-microscopy" if _is_em_only() else (
+        request.args.get("course") or flask_session.get("selected_course") or "electron-microscopy"
+    )
     course = COURSE_REGISTRY.get(course_slug, COURSE_REGISTRY["electron-microscopy"])
     flask_session["selected_course"] = course["slug"]
     if request.method == 'POST':
-        course_slug = request.form.get("course") or course["slug"]
+        course_slug = "electron-microscopy" if _is_em_only() else (request.form.get("course") or course["slug"])
         course = COURSE_REGISTRY.get(course_slug, COURSE_REGISTRY["electron-microscopy"])
         flask_session["selected_course"] = course["slug"]
         identifier = request.form.get('identifier', '').strip()
@@ -455,7 +832,7 @@ def nebula_data():
     if query:
         from literature_agent import sync_citation_network
         try:
-            graph, stats = sync_citation_network(query, query_type=query_type, topic=query, max_nodes=45)
+            graph, stats = sync_citation_network(query, query_type=query_type, topic=query, max_nodes=request.args.get("limit", default=45, type=int))
             graph["sync"] = stats
             graph["query"] = query
             return jsonify(graph)
@@ -2203,6 +2580,677 @@ def profile():
     )
 
 
+@app.route("/reading")
+@login_required
+def reading_dashboard():
+    _refresh_reading_list_themes()
+    files = ReadingListFile.query.order_by(
+        ReadingListFile.week_order, ReadingListFile.id
+    ).all()
+    active = _active_reading_week(files)
+    all_selections = ReadingSelection.query.order_by(
+        ReadingSelection.selected_at.desc()
+    ).all()
+    selections = (
+        all_selections
+        if current_user.is_admin
+        else [
+            selection
+            for selection in all_selections
+            if selection.user_id == current_user.id
+        ]
+    )
+    active_items = []
+    student_selection = None
+
+    if active and active.get("file"):
+        active_file = active["file"]
+        week_label = active["week_label"]
+        theme_selection_count = ReadingSelection.query.filter_by(
+            week_label=week_label
+        ).filter(
+            ReadingSelection.reading_list_item_id.in_(
+                [item.id for item in active_file.items]
+            )
+        ).count()
+        theme_full = theme_selection_count >= READING_MAX_STUDENTS_PER_THEME
+        for item in active_file.items:
+            selection = ReadingSelection.query.filter_by(
+                reading_list_item_id=item.id, week_label=week_label
+            ).first()
+            active_items.append(
+                {
+                    "item": item,
+                    "selection": selection,
+                    "taken": bool(
+                        selection and selection.user_id != current_user.id
+                    ),
+                    "mine": bool(
+                        selection and selection.user_id == current_user.id
+                    ),
+                    "theme_full": theme_full,
+                }
+            )
+        if not current_user.is_admin:
+            student_selection = ReadingSelection.query.filter_by(
+                user_id=current_user.id, week_label=week_label
+            ).first()
+
+    selection_groups = {}
+    for selection in selections:
+        selection_groups.setdefault(selection.week_label, []).append(selection)
+
+    my_scores = {
+        score.selection_id: score
+        for score in ReadingScore.query.filter_by(
+            rater_id=current_user.id
+        ).all()
+    }
+    scoring_targets = [
+        selection
+        for selection in all_selections
+        if selection.ppt_path and selection.user_id != current_user.id
+    ]
+    score_stats = {}
+    for selection in all_selections:
+        score_stats[selection.id] = _reading_score_stats(selection)
+    if current_user.is_admin:
+        final_reviews = FinalReview.query.order_by(
+            FinalReview.submitted_at.desc()
+        ).all()
+    else:
+        final_reviews = FinalReview.query.filter_by(
+            user_id=current_user.id
+        ).all()
+
+    return render_template(
+        "course_reading.html",
+        files=files,
+        active=active,
+        now_local=datetime.now(READING_TZ),
+        active_items=active_items,
+        selections=selections,
+        all_selections=all_selections,
+        selection_groups=selection_groups,
+        student_selection=student_selection,
+        scoring_targets=scoring_targets,
+        my_scores=my_scores,
+        score_stats=score_stats,
+        final_reviews=final_reviews,
+        score_criteria=READING_SCORE_CRITERIA,
+        max_students_per_theme=READING_MAX_STUDENTS_PER_THEME,
+        max_papers_per_theme=READING_MAX_PAPERS_PER_THEME,
+        deadline_for=_week_deadline,
+        format_dt=_format_reading_dt,
+    )
+
+
+@app.route("/reading/upload", methods=["POST"])
+@admin_required
+def reading_upload():
+    uploaded = request.files.getlist("reading_files")
+    if not uploaded or all(not f.filename for f in uploaded):
+        flash("请选择要上传的 reading list 文件", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    parsed = []
+    total_items = 0
+    for file_storage in uploaded:
+        if not file_storage or not file_storage.filename:
+            continue
+        try:
+            filename, file_type, theme, items = _parse_reading_file(file_storage)
+        except ValueError as exc:
+            flash(f"{file_storage.filename}: {exc}", "error")
+            continue
+        if not items:
+            flash(f"{file_storage.filename}: 未识别到文献条目", "error")
+            continue
+        parsed.append((filename, theme, file_type, items))
+        total_items += len(items)
+
+    if not parsed:
+        return redirect(url_for("reading_dashboard"))
+
+    max_order = (
+        db.session.query(db.func.max(ReadingListFile.week_order)).scalar() or 0
+    )
+    order = max_order
+    first_in_system = max_order == 0
+    for index, (filename, theme, file_type, items) in enumerate(parsed):
+        order += 1
+        reading_list = ReadingListFile(
+            filename=filename,
+            theme=theme,
+            file_type=file_type,
+            week_order=order,
+            uploaded_by=current_user.id,
+            is_open=first_in_system and index == 0,
+        )
+        db.session.add(reading_list)
+        db.session.flush()
+        for index, item in enumerate(items, start=1):
+            db.session.add(
+                ReadingListItem(
+                    reading_list_id=reading_list.id,
+                    title=item["title"],
+                    authors=item.get("authors", ""),
+                    journal=item.get("journal", ""),
+                    year=item.get("year"),
+                    doi=item.get("doi", ""),
+                    url=item.get("url", ""),
+                    item_order=index,
+                )
+            )
+
+    db.session.commit()
+    flash(
+        f"已上传 {len(parsed)} 个 reading list，共 {total_items} 篇文献",
+        "success",
+    )
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/reading/select/<int:item_id>", methods=["POST"])
+@login_required
+def reading_select(item_id):
+    item = db.session.get(ReadingListItem, item_id)
+    if not item:
+        abort(404)
+
+    files = ReadingListFile.query.order_by(
+        ReadingListFile.week_order, ReadingListFile.id
+    ).all()
+    active = _active_reading_week(files)
+    if not active or not active.get("open") or active.get("file") is None:
+        flash("选文通道尚未开放", "error")
+        return redirect(url_for("reading_dashboard"))
+    if active["file"].id != item.reading_list_id:
+        flash("该文献不属于本周主题", "error")
+        return redirect(url_for("reading_dashboard"))
+    if current_user.is_admin:
+        flash("教师账号无需选文", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    week_label = active["week_label"]
+    existing_user_selection = ReadingSelection.query.filter_by(
+        user_id=current_user.id, week_label=week_label
+    ).first()
+    if existing_user_selection:
+        flash("本周已选择过文献，不能重复选择", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    existing_item_selection = ReadingSelection.query.filter_by(
+        reading_list_item_id=item.id, week_label=week_label
+    ).first()
+    if existing_item_selection:
+        flash("该文献已被其他同学选择", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    theme_item_ids = [child.id for child in item.reading_list.items]
+    theme_selection_count = ReadingSelection.query.filter(
+        ReadingSelection.reading_list_item_id.in_(theme_item_ids),
+        ReadingSelection.week_label == week_label,
+    ).count()
+    if theme_selection_count >= READING_MAX_STUDENTS_PER_THEME:
+        flash("该主题已由两位同学选择两篇文献，本次选文已满", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    db.session.add(
+        ReadingSelection(
+            reading_list_item_id=item.id,
+            user_id=current_user.id,
+            week_label=week_label,
+        )
+    )
+    try:
+        db.session.commit()
+        flash("选文成功，该文献已锁定给你", "success")
+    except Exception:
+        db.session.rollback()
+        flash("选文冲突，该文献可能刚被其他同学选中", "error")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/reading/delete/<int:file_id>", methods=["POST"])
+@admin_required
+def reading_delete_file(file_id):
+    reading_list = db.session.get(ReadingListFile, file_id)
+    if not reading_list:
+        abort(404)
+    db.session.delete(reading_list)
+    db.session.commit()
+    flash("已删除该 reading list", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/reading/toggle-open/<int:file_id>", methods=["POST"])
+@admin_required
+def reading_toggle_open(file_id):
+    reading_list = db.session.get(ReadingListFile, file_id)
+    if not reading_list:
+        abort(404)
+    reading_list.is_open = not reading_list.is_open
+    db.session.commit()
+    flash(
+        "已手动开放该主题选文" if reading_list.is_open else "已关闭手动开放",
+        "success",
+    )
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/reading/selection/<int:selection_id>/delete", methods=["POST"])
+@admin_required
+def reading_delete_selection(selection_id):
+    selection = db.session.get(ReadingSelection, selection_id)
+    if not selection:
+        abort(404)
+    db.session.delete(selection)
+    db.session.commit()
+    flash("已取消该学生的选文记录", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/reading/upload-ppt/<int:selection_id>", methods=["POST"])
+@login_required
+def reading_upload_ppt(selection_id):
+    selection = db.session.get(ReadingSelection, selection_id)
+    if not selection:
+        abort(404)
+    if selection.user_id != current_user.id and not current_user.is_admin:
+        flash("只能上传自己选文的 PPT", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    deadline = _week_deadline(selection.week_label)
+    if datetime.now(READING_TZ) > deadline:
+        flash("已超过该周 PPT 上传截止时间", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    file_storage = request.files.get("ppt_file")
+    if not file_storage or not file_storage.filename:
+        flash("请选择 PPT 文件", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    filename = secure_filename(file_storage.filename)
+    ext = os.path.splitext(filename)[1].lower()
+    if not filename or ext not in READING_PPT_ALLOWED_EXT:
+        flash("仅支持 ppt / pptx / pdf 文件", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    ppt_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "uploads", "reading_ppts"
+    )
+    os.makedirs(ppt_dir, exist_ok=True)
+    stored_name = f"{selection.id}_{uuid.uuid4().hex}{ext}"
+    stored_path = os.path.join(ppt_dir, stored_name)
+    file_storage.save(stored_path)
+
+    old_path = selection.ppt_path
+    if old_path:
+        abs_old = os.path.abspath(old_path)
+        abs_dir = os.path.abspath(ppt_dir)
+        if (
+            abs_old.startswith(abs_dir + os.sep)
+            and os.path.exists(abs_old)
+        ):
+            os.remove(abs_old)
+
+    selection.ppt_filename = filename
+    selection.ppt_path = stored_path
+    selection.ppt_uploaded_at = datetime.now(timezone.utc)
+    db.session.commit()
+    flash("PPT 上传成功", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/reading/delete-ppt/<int:selection_id>", methods=["POST"])
+@login_required
+def reading_delete_ppt(selection_id):
+    selection = db.session.get(ReadingSelection, selection_id)
+    if not selection:
+        abort(404)
+    if selection.user_id != current_user.id and not current_user.is_admin:
+        flash("只能删除自己选文的 PPT", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    old_path = selection.ppt_path
+    if old_path:
+        ppt_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "uploads", "reading_ppts"
+        )
+        abs_old = os.path.abspath(old_path)
+        abs_dir = os.path.abspath(ppt_dir)
+        if abs_old.startswith(abs_dir + os.sep) and os.path.exists(abs_old):
+            os.remove(abs_old)
+
+    selection.ppt_filename = ""
+    selection.ppt_path = ""
+    selection.ppt_uploaded_at = None
+    db.session.commit()
+    flash("PPT 已删除，可以重新上传", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/reading/ppt/<int:selection_id>")
+@login_required
+def reading_ppt(selection_id):
+    selection = db.session.get(ReadingSelection, selection_id)
+    if not selection or not selection.ppt_path:
+        abort(404)
+    if not os.path.exists(selection.ppt_path):
+        abort(404)
+    return send_file(
+        selection.ppt_path,
+        as_attachment=True,
+        download_name=selection.ppt_filename or os.path.basename(selection.ppt_path),
+    )
+
+
+@app.route("/reading/score/<int:selection_id>", methods=["POST"])
+@login_required
+def reading_score(selection_id):
+    selection = db.session.get(ReadingSelection, selection_id)
+    if not selection or not selection.ppt_path:
+        flash("该同学尚未上传 PPT，暂不能评分", "error")
+        return redirect(url_for("reading_dashboard"))
+    if selection.user_id == current_user.id:
+        flash("不能给自己评分", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    try:
+        values = {
+            "content_understanding": int(request.form.get("content_understanding", -1)),
+            "preparation_attitude": int(request.form.get("preparation_attitude", -1)),
+            "clarity_focus": int(request.form.get("clarity_focus", -1)),
+            "inspiration_creativity": int(request.form.get("inspiration_creativity", -1)),
+            "audience_engagement": int(request.form.get("audience_engagement", -1)),
+            "question_answering": int(request.form.get("question_answering", -1)),
+        }
+    except (TypeError, ValueError):
+        flash("评分数据格式错误", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    if any(value < 0 or value > 5 for value in values.values()):
+        flash("每项评分必须在 0 到 5 分之间", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    existing = ReadingScore.query.filter_by(
+        selection_id=selection.id, rater_id=current_user.id
+    ).first()
+    if existing:
+        for key, value in values.items():
+            setattr(existing, key, value)
+        existing.total_score = sum(values.values())
+        db.session.commit()
+        flash("评分已更新", "success")
+    else:
+        db.session.add(
+            ReadingScore(
+                selection_id=selection.id,
+                rater_id=current_user.id,
+                **values,
+                total_score=sum(values.values()),
+            )
+        )
+        db.session.commit()
+        flash("评分提交成功", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/reading/export")
+@admin_required
+def reading_export():
+    selections = ReadingSelection.query.order_by(
+        ReadingSelection.week_label, ReadingSelection.selected_at
+    ).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "学号",
+        "姓名",
+        "周次",
+        "主题",
+        "文献标题",
+        "PPT",
+        "评分人学号",
+        "评分人姓名",
+        "内容理解",
+        "学习态度",
+        "讲授思路",
+        "启发性",
+        "激发听众",
+        "回答问题",
+        "总分",
+        "评分时间",
+    ])
+    for selection in selections:
+        theme = selection.item.reading_list.theme if selection.item.reading_list else ""
+        scores = selection.scores.all()
+        if not scores:
+            writer.writerow([
+                selection.user.student_id,
+                selection.user.name,
+                selection.week_label,
+                theme,
+                selection.item.title,
+                selection.ppt_filename or "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+            ])
+        for score in scores:
+            writer.writerow([
+                selection.user.student_id,
+                selection.user.name,
+                selection.week_label,
+                theme,
+                selection.item.title,
+                selection.ppt_filename or "",
+                score.rater.student_id,
+                score.rater.name,
+                score.content_understanding,
+                score.preparation_attitude,
+                score.clarity_focus,
+                score.inspiration_creativity,
+                score.audience_engagement,
+                score.question_answering,
+                score.total_score,
+                _format_reading_dt(score.created_at),
+            ])
+    data = output.getvalue().encode("utf-8-sig")
+    return Response(
+        data,
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=reading_scores.csv"},
+    )
+
+
+@app.route("/reading/export-final-reviews")
+@admin_required
+def reading_export_final_reviews():
+    reviews = FinalReview.query.order_by(
+        FinalReview.submitted_at.desc()
+    ).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "学号",
+        "姓名",
+        "综述标题",
+        "文件名",
+        "评分",
+        "教师反馈",
+        "提交时间",
+        "评分时间",
+    ])
+    for review in reviews:
+        writer.writerow([
+            review.user.student_id,
+            review.user.name,
+            review.title,
+            review.filename,
+            review.score if review.score is not None else "",
+            review.feedback,
+            _format_reading_dt(review.submitted_at),
+            _format_reading_dt(review.reviewed_at),
+        ])
+    data = output.getvalue().encode("utf-8-sig")
+    return Response(
+        data,
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=final_reviews.csv"},
+    )
+
+
+@app.route("/reading/feedback/<int:selection_id>", methods=["POST"])
+@admin_required
+def reading_teacher_feedback(selection_id):
+    selection = db.session.get(ReadingSelection, selection_id)
+    if not selection:
+        abort(404)
+    selection.teacher_feedback = request.form.get("feedback", "").strip()
+    selection.teacher_feedback_at = datetime.now(timezone.utc)
+    db.session.commit()
+    flash("教师反馈已保存", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/final-review/upload", methods=["POST"])
+@login_required
+def final_review_upload():
+    if current_user.is_admin:
+        flash("教师端不提交期末综述", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    title = request.form.get("title", "").strip()
+    file_storage = request.files.get("final_review_file")
+    if not title:
+        flash("请填写期末综述标题", "error")
+        return redirect(url_for("reading_dashboard"))
+    if not file_storage or not file_storage.filename:
+        flash("请选择期末综述文件", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    filename = secure_filename(file_storage.filename)
+    ext = os.path.splitext(filename)[1].lower()
+    if not filename or ext not in FINAL_REVIEW_ALLOWED_EXT:
+        flash("仅支持 docx / pdf / txt / md / csv 文件", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    existing = FinalReview.query.filter_by(user_id=current_user.id).first()
+    if existing and existing.feedback:
+        flash("教师已给出反馈，不能重新上传", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    review_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "uploads", "final_reviews"
+    )
+    os.makedirs(review_dir, exist_ok=True)
+    stored_name = f"user_{current_user.id}_{uuid.uuid4().hex}{ext}"
+    stored_path = os.path.join(review_dir, stored_name)
+    file_storage.save(stored_path)
+
+    if existing:
+        old_path = existing.file_path
+        if old_path and os.path.exists(old_path):
+            abs_old = os.path.abspath(old_path)
+            abs_dir = os.path.abspath(review_dir)
+            if abs_old.startswith(abs_dir + os.sep):
+                os.remove(abs_old)
+        existing.title = title
+        existing.filename = filename
+        existing.file_path = stored_path
+        existing.submitted_at = datetime.now(timezone.utc)
+        existing.score = None
+        existing.feedback = ""
+        existing.reviewed_at = None
+    else:
+        db.session.add(
+            FinalReview(
+                user_id=current_user.id,
+                title=title,
+                filename=filename,
+                file_path=stored_path,
+            )
+        )
+    db.session.commit()
+    flash("期末综述上传成功", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/final-review/delete", methods=["POST"])
+@login_required
+def final_review_delete():
+    review = FinalReview.query.filter_by(user_id=current_user.id).first()
+    if not review:
+        flash("没有找到可删除的期末综述", "error")
+        return redirect(url_for("reading_dashboard"))
+    if review.feedback:
+        flash("教师已给出反馈，不能删除该综述", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    old_path = review.file_path
+    if old_path:
+        review_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "uploads", "final_reviews"
+        )
+        abs_old = os.path.abspath(old_path)
+        abs_dir = os.path.abspath(review_dir)
+        if abs_old.startswith(abs_dir + os.sep) and os.path.exists(abs_old):
+            os.remove(abs_old)
+
+    db.session.delete(review)
+    db.session.commit()
+    flash("期末综述已删除，可以重新上传", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
+@app.route("/final-review/<int:review_id>/download")
+@login_required
+def final_review_download(review_id):
+    review = db.session.get(FinalReview, review_id)
+    if not review:
+        abort(404)
+    if not current_user.is_admin and review.user_id != current_user.id:
+        abort(403)
+    if not os.path.exists(review.file_path):
+        abort(404)
+    return send_file(
+        review.file_path,
+        as_attachment=True,
+        download_name=review.filename,
+    )
+
+
+@app.route("/final-review/<int:review_id>/review", methods=["POST"])
+@admin_required
+def final_review_review(review_id):
+    review = db.session.get(FinalReview, review_id)
+    if not review:
+        abort(404)
+    try:
+        score = int(request.form.get("score", "").strip())
+    except (TypeError, ValueError):
+        score = -1
+    if score < 0 or score > 100:
+        flash("期末综述评分必须在 0 到 100 分之间", "error")
+        return redirect(url_for("reading_dashboard"))
+
+    review.score = score
+    review.feedback = request.form.get("feedback", "").strip()
+    review.reviewed_at = datetime.now(timezone.utc)
+    db.session.commit()
+    flash("期末综述评分与反馈已保存", "success")
+    return redirect(url_for("reading_dashboard"))
+
+
 @app.after_request
 def no_cache(response):
     if 'text/html' in response.content_type:
@@ -2269,8 +3317,23 @@ def _ensure_schema_updates():
         "daily_learning_queue_entries": {
             "answered_at": "DATETIME",
         },
+        "user_knowledge_libraries": {
+            "study_mode": "VARCHAR(20) DEFAULT 'mixed'",
+            "difficulty_filter": "VARCHAR(20) DEFAULT 'all'",
+            "content_filter": "VARCHAR(200) DEFAULT ''"
+        },
         "knowledge_memory_states": {
             "answered_at": "DATETIME",
+        },
+        "reading_selections": {
+            "ppt_filename": "VARCHAR(255) DEFAULT ''",
+            "ppt_path": "VARCHAR(500) DEFAULT ''",
+            "ppt_uploaded_at": "DATETIME",
+            "teacher_feedback": "TEXT DEFAULT ''",
+            "teacher_feedback_at": "DATETIME",
+        },
+        "reading_list_files": {
+            "is_open": "BOOLEAN DEFAULT 0",
         },
     }
     with db.engine.begin() as connection:
@@ -2361,4 +3424,6 @@ if __name__ == "__main__":
     print("  http://127.0.0.1:5001")
     print("=" * 50)
     app.run(host="0.0.0.0", port=5001, debug=True)
+
+
 

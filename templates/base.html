@@ -15,7 +15,7 @@
 <body class="{% block body_class %}{% endblock %}">
     <nav class="navbar platform-nav">
         <div class="nav-inner">
-            <a href="{{ url_for('index') }}" class="nav-brand" aria-label="{{ _('Life Astra 生命星穹', 'Life Astra') }}">
+            <a href="{{ url_for('index') }}" class="nav-brand" aria-label="{{ _('电子显微学课程', 'EM Course') if em_only_site else _('Life Astra 生命星穹', 'Life Astra') }}">
                 <span class="brand-icon" aria-hidden="true">
                     <svg viewBox="0 0 32 32" width="24" height="24">
                         <path d="M6 21c6.2-10.8 15.1-13.8 22-9.3-4.1.7-6.4 4.4-7.3 8.4-4.3-2.1-9.5-.8-14.7.9Z" fill="currentColor"/>
@@ -23,19 +23,22 @@
                         <path d="M5 25h22" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".42"/>
                     </svg>
                 </span>
-                <span class="brand-text">{{ _('Life Astra 生命星穹', 'Life Astra') }}</span>
+                <span class="brand-text">{{ _('电子显微学课程', 'EM Course') if em_only_site else _('Life Astra 生命星穹', 'Life Astra') }}</span>
             </a>
 
             <div class="nav-links">
-                <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">{{ _('ASTRA｜首页', 'ASTRA | Home') }}</a>
+                <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">{{ _('EM｜首页', 'EM | Home') if em_only_site else _('ASTRA｜首页', 'ASTRA | Home') }}</a>
+                {% if not em_only_site %}
                 <a href="{{ url_for('courses') }}" class="nav-link {% if request.endpoint in ['courses', 'course_entry'] %}active{% endif %}">{{ _('COSMOS｜星系', 'COSMOS | Galaxies') }}</a>
+                {% endif %}
                 {% if current_user.is_authenticated %}
                 <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">{{ _('OBSERVATORY｜科研台', 'OBSERVATORY | Workspace') }}</a>
-                <a href="{{ url_for('literature_hub') }}" class="nav-link {% if request.endpoint in ['literature_hub', 'nebula', 'planets'] %}active{% endif %}">{{ _('NEPHELE｜星云', 'NEPHELE | Nebula') }}</a>
-                <a href="{{ url_for('knowledge_forest') }}" class="nav-link {% if request.endpoint in ['knowledge_forest', 'study', 'study_quiz', 'rewards'] %}active{% endif %}">{{ _('GAIA｜森域', 'GAIA | Knowledge Forest') }}</a>
+                <a href="{{ url_for('literature_hub') }}" class="nav-link {% if request.endpoint in ['literature_hub', 'nebula', 'planets'] %}active{% endif %}">{{ _('NEPHELE｜文献星云', 'NEPHELE | Nebula') }}</a>
+                <a href="{{ url_for('knowledge_forest') }}" class="nav-link {% if request.endpoint in ['knowledge_forest', 'study', 'study_quiz', 'rewards'] %}active{% endif %}">{{ _('GAIA｜知识森林', 'GAIA | Knowledge Forest') }}</a>
+                <a href="{{ url_for('reading_dashboard') }}" class="nav-link {% if request.endpoint and request.endpoint.startswith('reading_') %}active{% endif %}">{{ _('READING｜课程管理', 'READING | Course Admin') if current_user.is_admin else _('READING｜选文通道', 'READING | Paper Pick') }}</a>
                 <a href="{{ url_for('agent_presentation') }}" class="nav-link {% if request.endpoint == 'agent_presentation' %}active{% endif %}">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-                    {{ _('HERMES｜星演', 'HERMES | Present') }}
+                    {{ _('HERMES｜智能汇报', 'HERMES | Present') }}
                 </a>
                 {% if current_user.is_admin %}
                 <a href="{{ url_for('admin_dashboard') }}" class="nav-link {% if request.endpoint and 'admin' in request.endpoint %}active{% endif %}">{{ _('HELM｜星舵', 'HELM | Admin') }}</a>
@@ -51,7 +54,9 @@
                 <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline">{{ _('退出', 'Logout') }}</a>
                 {% else %}
                 <a href="{{ url_for('login', course=selected_course.slug) }}" class="btn btn-sm btn-outline">{{ _('登录', 'Login') }}</a>
+                {% if not em_only_site %}
                 <a href="{{ url_for('courses') }}" class="btn btn-sm btn-primary">{{ _('选择学科星系', 'Choose Galaxy') }}</a>
+                {% endif %}
                 {% endif %}
             </div>
         </div>
