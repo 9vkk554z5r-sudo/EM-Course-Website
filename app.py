@@ -3169,6 +3169,7 @@ def reading_score(selection_id):
         flash("不能给自己评分", "error")
         return redirect(url_for("reading_dashboard"))
 
+    feedback = request.form.get("feedback", "").strip()
     try:
         values = {
             "content_understanding": int(request.form.get("content_understanding", -1)),
@@ -3193,6 +3194,7 @@ def reading_score(selection_id):
         for key, value in values.items():
             setattr(existing, key, value)
         existing.total_score = sum(values.values())
+        existing.feedback = feedback
         db.session.commit()
         flash("评分已更新", "success")
     else:
@@ -3202,6 +3204,7 @@ def reading_score(selection_id):
                 rater_id=current_user.id,
                 **values,
                 total_score=sum(values.values()),
+                feedback=feedback,
             )
         )
         db.session.commit()
@@ -3233,6 +3236,7 @@ def reading_export():
         "激发听众",
         "回答问题",
         "总分",
+        "反馈",
         "评分时间",
     ])
     for selection in selections:
@@ -3274,6 +3278,7 @@ def reading_export():
                 score.audience_engagement,
                 score.question_answering,
                 score.total_score,
+                score.feedback or "",
                 _format_reading_dt(score.created_at),
             ])
     data = output.getvalue().encode("utf-8-sig")
@@ -3528,6 +3533,9 @@ def _ensure_schema_updates():
         },
         "daily_learning_queue_entries": {
             "answered_at": "DATETIME",
+            "submitted_answer": "TEXT DEFAULT ''",
+            "answer_score": "INTEGER DEFAULT 0",
+            "answer_correct": "BOOLEAN DEFAULT 0",
         },
         "user_knowledge_libraries": {
             "study_mode": "VARCHAR(20) DEFAULT 'mixed'",
@@ -3546,6 +3554,9 @@ def _ensure_schema_updates():
         },
         "reading_list_files": {
             "is_open": "BOOLEAN DEFAULT 0",
+        },
+        "reading_scores": {
+            "feedback": "TEXT DEFAULT ''",
         },
     }
     with db.engine.begin() as connection:

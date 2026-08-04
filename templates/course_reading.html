@@ -336,6 +336,10 @@
                     </div>
                     {% endfor %}
                 </div>
+                <div class="form-group">
+                    <label for="feedback-{{ target.id }}">对其他同学文献分享的反馈（可选）</label>
+                    <textarea id="feedback-{{ target.id }}" name="feedback" rows="4" style="width:100%">{{ my_scores[target.id].feedback if target.id in my_scores else '' }}</textarea>
+                </div>
                 <div class="score-actions" style="margin-top:14px">
                     <button type="submit" class="btn btn-primary">提交评分</button>
                 </div>
@@ -488,7 +492,7 @@
             {% if sel.scores.count() %}
             <div class="reading-table-wrap">
                 <table class="admin-table reading-table">
-                    <thead><tr><th>评分人学号</th><th>评分人</th><th>内容理解</th><th>学习态度</th><th>讲授思路</th><th>启发性</th><th>激发听众</th><th>回答问题</th><th>总分</th><th>评分时间</th></tr></thead>
+                    <thead><tr><th>评分人学号</th><th>评分人</th><th>内容理解</th><th>学习态度</th><th>讲授思路</th><th>启发性</th><th>激发听众</th><th>回答问题</th><th>总分</th><th>反馈</th><th>评分时间</th></tr></thead>
                     <tbody>
                     {% for score in sel.scores %}
                     <tr>
@@ -501,6 +505,7 @@
                         <td>{{ score.audience_engagement }}</td>
                         <td>{{ score.question_answering }}</td>
                         <td><strong>{{ score.total_score }}</strong></td>
+                        <td>{{ score.feedback if score.feedback else '-' }}</td>
                         <td>{{ format_dt(score.created_at) }}</td>
                     </tr>
                     {% endfor %}

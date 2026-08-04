@@ -521,6 +521,7 @@ class ReadingScore(db.Model):
     audience_engagement = db.Column(db.Integer, nullable=False)
     question_answering = db.Column(db.Integer, nullable=False)
     total_score = db.Column(db.Integer, nullable=False)
+    feedback = db.Column(db.Text, default="")
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     rater = db.relationship("User", backref="reading_scores")

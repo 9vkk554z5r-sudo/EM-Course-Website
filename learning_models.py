@@ -75,6 +75,9 @@ class DailyLearningQueueEntry(db.Model):
     completed_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
     answered_at = db.Column(db.DateTime)
+    submitted_answer = db.Column(db.Text, default="")
+    answer_score = db.Column(db.Integer, default=0)
+    answer_correct = db.Column(db.Boolean, default=False)
 
     session = db.relationship("DailyLearningSession", backref="queue_entries")
     task = db.relationship("DailyLearningTask", backref="queue_entries")
