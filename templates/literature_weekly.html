@@ -1,13 +1,13 @@
 ﻿{% extends "base.html" %}
-{% block title %}前沿脉冲{% endblock %}
+{% block title %}关键词订阅{% endblock %}
 {% block body_class %}life-product-theme literature-weekly-route literature-workspace-route{% endblock %}
 {% block content %}
 <div class="weekly-literature-page">
     <section class="weekly-lit-hero">
         <div class="weekly-lit-copy">
-            <p class="section-kicker">前沿脉冲</p>
-            <h1>前沿脉冲</h1>
-            <p>{{ _("围绕研究关键词扫描近一周论文，把值得优先阅读的文献、期刊和 DOI 放入同一个推荐界面。", "Scan recent papers around a research keyword and keep priority reading, journals and DOI in one recommendation workspace.") }}</p>
+            <p class="section-kicker">关键词订阅</p>
+            <h1>关键词订阅</h1>
+            <p>{{ _("围绕研究关键词从 OpenAlex 获取近一周真实论文，把值得优先阅读的文献、期刊和 DOI 放入同一个推荐界面。", "Fetch real recent papers from OpenAlex around a research keyword and keep priority reading, journals and DOI in one recommendation workspace.") }}</p>
             <form method="POST" class="weekly-lit-search">
                 <input type="text" name="keyword" placeholder="{{ _("cryo-EM, single-particle analysis...", "cryo-EM, single-particle analysis...") }}" value="{{ keyword }}" required>
                 <select name="days">
@@ -37,7 +37,7 @@
     <section class="weekly-lit-results">
         <div class="section-head">
             <div>
-                <p class="section-kicker">{{ _("脉冲信号", "Pulsar Signals") }}</p>
+                <p class="section-kicker">{{ _("订阅结果", "Subscription Results") }}</p>
                 <h2>{{ result.keyword }}</h2>
             </div>
         </div>

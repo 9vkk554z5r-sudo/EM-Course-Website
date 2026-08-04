@@ -1748,15 +1748,7 @@ def agent_literature_info():
 @app.route("/agent/subscription", methods=["GET", "POST"])
 @login_required
 def agent_subscription():
-    """Skill 2: Subscribe and fetch recent lit"""
-    result = None
-    keyword = ""
-    if request.method == "POST":
-        keyword = request.form.get("keyword", "")
-        days = int(request.form.get("days", 7))
-        from agent_skills import skill_literature_subscription
-        result, ok = skill_literature_subscription(db, current_user.id, keyword, days)
-    return render_template("agent_subscription.html", result=result, keyword=keyword)
+    return redirect(url_for("literature_collection"))
 
 
 @app.route("/agent/citation", methods=["GET", "POST"])
@@ -2298,7 +2290,21 @@ def literature_collection_view():
     planets = LiteraturePlanet.query.filter_by(user_id=current_user.id).all()
     cats = LiteratureCategory.query.filter_by(user_id=current_user.id).all()
     bookmarks = BookmarkedLiterature.query.filter_by(user_id=current_user.id).order_by(BookmarkedLiterature.added_at.desc()).all()
-    return render_template("literature_collection.html", planets=planets, categories=cats, bookmarks=bookmarks)
+    total_count = len(bookmarks)
+    category_counts = {
+        c.id: BookmarkedLiterature.query.filter_by(user_id=current_user.id, category_id=c.id).count()
+        for c in cats
+    }
+    category_names = {c.id: c.name for c in cats}
+    return render_template(
+        "literature_collection.html",
+        planets=planets,
+        categories=cats,
+        bookmarks=bookmarks,
+        total_count=total_count,
+        category_counts=category_counts,
+        category_names=category_names,
+    )
 
 
 @app.route("/planets")
@@ -2598,12 +2604,21 @@ def literature_collection():
         try: q = q.filter_by(category_id=int(cat_filter))
         except: pass
     bookmarks = q.order_by(BookmarkedLiterature.added_at.desc()).all()
-    # Add count to each category for display
-    enriched_cats = []
-    for c in cats:
-        cnt = BookmarkedLiterature.query.filter_by(user_id=current_user.id, category_id=c.id).count()
-        enriched_cats.append(c)
-    return render_template("literature_collection.html", planets=planets, categories=cats, bookmarks=bookmarks)
+    total_count = BookmarkedLiterature.query.filter_by(user_id=current_user.id).count()
+    category_counts = {
+        c.id: BookmarkedLiterature.query.filter_by(user_id=current_user.id, category_id=c.id).count()
+        for c in cats
+    }
+    category_names = {c.id: c.name for c in cats}
+    return render_template(
+        "literature_collection.html",
+        planets=planets,
+        categories=cats,
+        bookmarks=bookmarks,
+        total_count=total_count,
+        category_counts=category_counts,
+        category_names=category_names,
+    )
 
 @app.route("/admin/knowledge/llm-generate", methods=["POST"])
 @admin_required

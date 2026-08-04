@@ -23,8 +23,8 @@
             <button type="button" class="btn btn-sm btn-outline" data-example-query="exoplanet atmosphere" style="margin:2px">天体物理</button>
         </div>
         <nav class="literature-service-links" aria-label="文献服务">
-            <a href="{{ url_for('literature_weekly') }}"><span class="service-index">01</span><span><strong>前沿脉冲</strong><small>围绕当前方向整理论文与阅读优先级</small></span><i>进入</i></a>
-            <a href="{{ url_for('agent_subscription') }}"><span class="service-index">02</span><span><strong>主题信标</strong><small>追踪研究主题并接收文献更新提醒</small></span><i>管理</i></a>
+            <a href="{{ url_for('literature_weekly') }}"><span class="service-index">01</span><span><strong>关键词订阅</strong><small>使用 OpenAlex 获取近一周真实文献并整理阅读优先级</small></span><i>进入</i></a>
+            <a href="{{ url_for('literature_collection') }}"><span class="service-index">02</span><span><strong>文献收藏</strong><small>查看我的收藏夹与已收藏文献</small></span><i>打开</i></a>
             <a href="{{ url_for('nebula') }}"><span class="service-index">03</span><span><strong>引用星链</strong><small>查看真实引用关系与论文连接</small></span><i>打开</i></a>
         </nav>
     </header>

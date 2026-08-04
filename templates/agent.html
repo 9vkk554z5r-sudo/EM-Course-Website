@@ -18,9 +18,13 @@
                     <span class="skill-icon">📄</span>
                     <span><strong>{{ _('文献信息整理', 'Lit Info') }}</strong><span>{{ _('输入 DOI/标题，获取核心要点、通讯作者', 'Get paper details via OpenAlex') }}</span></span>
                 </a>
-                <a href="{{ url_for('agent_subscription') }}" class="skill-card">
-                    <span class="skill-icon">📬</span>
-                    <span><strong>{{ _('文献订阅', 'Subscribe') }}</strong><span>{{ _('按关键词获取近一周文献', 'Get weekly papers by keyword') }}</span></span>
+                <a href="{{ url_for('literature_weekly') }}" class="skill-card">
+                    <span class="skill-icon">🔎</span>
+                    <span><strong>关键词订阅</strong><span>使用 OpenAlex 获取真实文献推荐</span></span>
+                </a>
+                <a href="{{ url_for('literature_collection') }}" class="skill-card">
+                    <span class="skill-icon">📚</span>
+                    <span><strong>文献收藏</strong><span>查看我的收藏夹与收藏文献</span></span>
                 </a>
                 <a href="{{ url_for('agent_citation') }}" class="skill-card">
                     <span class="skill-icon">🌐</span>

@@ -27,12 +27,11 @@
             </a>
 
             <div class="nav-links">
-                <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">首页</a>
+                <a href="{{ url_for('dashboard') if current_user.is_authenticated else url_for('index') }}" class="nav-link {% if request.endpoint in ['index', 'dashboard'] %}active{% endif %}">首页</a>
                 {% if not em_only_site %}
                 <a href="{{ url_for('courses') }}" class="nav-link {% if request.endpoint in ['courses', 'course_entry'] %}active{% endif %}">星系</a>
                 {% endif %}
                 {% if current_user.is_authenticated %}
-                <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">科研台</a>
                 <a href="{{ url_for('literature_hub') }}" class="nav-link {% if request.endpoint in ['literature_hub', 'nebula', 'planets'] %}active{% endif %}">文献星云</a>
                 <a href="{{ url_for('knowledge_forest') }}" class="nav-link {% if request.endpoint in ['knowledge_forest', 'study', 'study_quiz', 'rewards'] %}active{% endif %}">知识森林</a>
                 <a href="{{ url_for('reading_dashboard') }}" class="nav-link {% if request.endpoint and request.endpoint.startswith('reading_') %}active{% endif %}">{{ '课程管理' if current_user.is_admin else '选文通道' }}</a>
