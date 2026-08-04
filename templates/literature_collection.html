@@ -1,136 +1,319 @@
 {% extends "base.html" %}
 {% block title %}文献收藏{% endblock %}
+{% block body_class %}life-product-theme literature-subscribe-route cosmic-task-route{% endblock %}
 {% block content %}
 <style>
-.zotero-library { display: grid; grid-template-columns: 260px minmax(360px, 1.4fr) minmax(320px, 1fr); gap: 16px; align-items: start; margin-top: 18px; }
-.zotero-pane { border: 1px solid rgba(100,220,255,.16); background: rgba(10,20,35,.58); border-radius: 8px; overflow: hidden; min-height: 420px; }
-.zotero-pane-header { padding: 14px 16px; border-bottom: 1px solid rgba(100,220,255,.12); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.zotero-pane-header h2 { margin: 0; font-size: 1.05rem; }
-.zotero-pane-body { padding: 12px; }
-.zotero-nav-item { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 9px 10px; border: 1px solid transparent; border-radius: 6px; background: none; color: var(--text-primary); cursor: pointer; text-align: left; }
-.zotero-nav-item:hover, .zotero-nav-item.active { background: rgba(45,212,191,.1); border-color: rgba(45,212,191,.25); }
-.zotero-nav-item .count { color: #9fb3c8; font-size: .8rem; }
-.zotero-create-row { display: flex; gap: 8px; margin-top: 12px; }
-.zotero-create-row input { flex: 1; min-width: 0; }
-.zotero-search { width: 100%; margin-bottom: 10px; }
-.zotero-list { display: flex; flex-direction: column; gap: 10px; }
-.zotero-item { padding: 12px 14px; border: 1px solid rgba(100,220,255,.14); border-radius: 8px; background: rgba(13,24,38,.58); cursor: pointer; transition: border-color .2s; }
-.zotero-item:hover, .zotero-item.is-active { border-color: rgba(45,212,191,.55); background: rgba(45,212,191,.08); }
-.zotero-item h3 { margin: 0 0 6px; font-size: .98rem; line-height: 1.45; }
-.zotero-item p { margin: 0 0 8px; color: #9fb3c8; font-size: .84rem; }
-.zotero-tag { display: inline-block; padding: 2px 8px; border-radius: 999px; background: rgba(99,179,237,.12); color: #63b3ed; font-size: .74rem; }
-.zotero-detail { padding: 0; }
-.zotero-detail-body { padding: 16px; }
-.zotero-detail h3 { margin: 0 0 10px; font-size: 1.15rem; line-height: 1.5; }
-.zotero-detail dl { display: grid; grid-template-columns: 90px 1fr; gap: 8px 12px; margin: 0 0 14px; }
-.zotero-detail dt { color: #9fb3c8; }
-.zotero-detail dd { margin: 0; word-break: break-word; }
-.zotero-detail .abstract-box { padding: 12px; background: rgba(10,15,36,.4); border-radius: 8px; border-left: 2px solid rgba(45,212,191,.35); color: #c7d6e4; font-size: .88rem; line-height: 1.6; }
-.zotero-empty { color: #9fb3c8; text-align: center; padding: 48px 12px; }
-@media (max-width: 1050px) { .zotero-library { grid-template-columns: 240px 1fr; } .zotero-detail { grid-column: 1 / -1; min-height: auto; } }
-@media (max-width: 720px) { .zotero-library { grid-template-columns: 1fr; } }
+.collection-layout {
+    display: grid;
+    grid-template-columns: 250px minmax(0, 1.55fr) minmax(300px, 0.95fr);
+    gap: 16px;
+    align-items: start;
+    margin-top: 6px;
+}
+.collection-layout .card {
+    margin-bottom: 0;
+    min-width: 0;
+}
+.collection-stats {
+    margin-bottom: 18px;
+}
+.collection-card-list {
+    display: grid;
+    gap: 8px;
+}
+.category-btn {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 11px;
+    border: 1px solid rgba(223, 235, 238, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.035);
+    color: var(--ls-text);
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    transition: border-color .18s ease, background .18s ease, transform .18s ease;
+}
+.category-btn:hover,
+.category-btn.active {
+    border-color: rgba(94, 234, 212, 0.38);
+    background: rgba(94, 234, 212, 0.08);
+    transform: translateY(-1px);
+}
+.category-btn .count {
+    color: var(--ls-muted);
+    font-size: .78rem;
+}
+.category-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.category-row .category-btn {
+    min-width: 0;
+}
+.category-row .btn {
+    flex: 0 0 auto;
+    padding: 6px 8px;
+    font-size: .72rem;
+}
+.category-create-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+.category-create-row input {
+    flex: 1;
+    min-width: 0;
+}
+.collection-search {
+    width: min(280px, 100%);
+}
+.paper-item {
+    cursor: pointer;
+}
+.paper-item.active {
+    border-color: rgba(94, 234, 212, 0.5);
+    background: rgba(94, 234, 212, 0.08);
+}
+.paper-item .paper-title {
+    text-decoration: none;
+}
+.paper-item .paper-title:hover {
+    color: var(--ls-teal);
+    text-decoration: underline;
+}
+.paper-doi {
+    color: var(--ls-teal);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+.paper-doi:hover {
+    text-decoration: underline;
+}
+.collection-detail-title {
+    margin: 0 0 10px;
+    font-size: 1.05rem;
+    line-height: 1.5;
+    color: var(--cosmic-text);
+    overflow-wrap: anywhere;
+}
+.collection-detail-box {
+    margin-top: 12px;
+    padding: 12px;
+    border: 1px solid rgba(223, 235, 238, 0.12);
+    border-left: 2px solid rgba(94, 234, 212, 0.45);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+}
+.collection-detail-box strong {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--ls-soft);
+}
+.collection-detail-box p {
+    margin: 0;
+    color: var(--ls-muted);
+    font-size: .84rem;
+    line-height: 1.65;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.collection-empty {
+    display: grid;
+    place-items: center;
+    min-height: 220px;
+    color: var(--ls-muted);
+    text-align: center;
+    padding: 32px 16px;
+}
+@media (max-width: 1120px) {
+    .collection-layout {
+        grid-template-columns: 230px minmax(0, 1fr);
+    }
+    .collection-detail-panel {
+        grid-column: 1 / -1;
+    }
+}
+@media (max-width: 760px) {
+    .collection-layout {
+        grid-template-columns: 1fr;
+    }
+    .collection-detail-panel {
+        grid-column: auto;
+    }
+    .collection-search {
+        width: 100%;
+    }
+}
 </style>
-<div class="page-header"><h1>文献收藏</h1><p class="text-muted">以文献库形式查看我的收藏夹和已收藏文献</p></div>
-<div class="zotero-library">
-  <aside class="zotero-pane">
-    <div class="zotero-pane-header"><h2>我的文献库</h2></div>
-    <div class="zotero-pane-body">
-      <button type="button" class="zotero-nav-item active" onclick="filterCategory('', this)"><span>全部文献</span><span class="count">{{ total_count or 0 }}</span></button>
-      <div style="margin:14px 0 8px;color:#9fb3c8;font-size:.8rem">收藏夹</div>
-      {% for c in categories or [] %}
-      <div style="display:flex;align-items:center;gap:4px">
-        <button type="button" class="zotero-nav-item" data-cat-id="{{ c.id }}" onclick="filterCategory({{ c.id }}, this)"><span>{{ c.name }}</span><span class="count">{{ category_counts.get(c.id, 0) }}</span></button>
-        <button type="button" class="btn btn-sm btn-outline" onclick="deleteCategory({{ c.id }})">删除</button>
-      </div>
-      {% endfor %}
-      <div class="zotero-create-row">
-        <input type="text" id="catName" placeholder="新收藏夹名称">
-        <button type="button" class="btn btn-primary btn-sm" onclick="addCategory()">创建</button>
-      </div>
+<div class="page-header">
+    <div>
+        <p class="eyebrow">文献星云</p>
+        <h1>文献收藏</h1>
+        <p class="text-muted">按收藏夹整理已收藏文献，点击标题或 DOI 可直接打开真实文献。</p>
     </div>
-  </aside>
-  <section class="zotero-pane">
-    <div class="zotero-pane-header"><h2>收藏文献</h2><span id="visibleCount">{{ bookmarks|length }}</span></div>
-    <div class="zotero-pane-body">
-      <input type="search" id="librarySearch" class="zotero-search" placeholder="搜索标题或作者" oninput="applyFilters()">
-      <div class="zotero-list" id="libraryList">
-      {% for b in bookmarks or [] %}
-        <article class="zotero-item" data-id="{{ b.id }}" data-cat="{{ b.category_id or '' }}" data-title="{{ b.title|e }}" data-authors="{{ b.authors|e }}" data-journal="{{ b.journal|e }}" data-year="{{ b.year or '' }}" data-doi="{{ b.doi|e }}" data-abstract="{{ b.abstract|e }}" data-notes="{{ b.notes|e }}" data-source="{{ b.source|e }}" data-added="{{ b.added_at.strftime('%Y-%m-%d') if b.added_at else '' }}" onclick="showDetail(this)">
-          <h3>{{ b.title }}</h3>
-          <p>{{ b.authors or '未知作者' }} · {{ b.journal or '未知期刊' }} ({{ b.year or '未知年份' }})</p>
-          <span class="zotero-tag">{{ category_names.get(b.category_id, '未分类') }}</span>
-        </article>
-      {% else %}
-        <div class="zotero-empty">还没有收藏文献</div>
-      {% endfor %}
-      </div>
+    <div class="header-actions">
+        <a href="{{ url_for('literature_weekly') }}" class="btn btn-outline">关键词订阅</a>
     </div>
-  </section>
-  <aside class="zotero-pane zotero-detail">
-    <div class="zotero-pane-header"><h2>文献详情</h2></div>
-    <div class="zotero-detail-body" id="detailBody"><p class="zotero-empty">选择一篇文献查看详情</p></div>
-  </aside>
+</div>
+
+<div class="stats-grid collection-stats">
+    <div class="stat-card">
+        <div class="stat-icon">文</div>
+        <div class="stat-info">
+            <strong class="stat-value">{{ total_count or 0 }}</strong>
+            <span class="stat-label">全部文献</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">夹</div>
+        <div class="stat-info">
+            <strong class="stat-value">{{ categories|length }}</strong>
+            <span class="stat-label">收藏夹</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">目</div>
+        <div class="stat-info">
+            <strong class="stat-value" id="visibleCount">{{ bookmarks|length }}</strong>
+            <span class="stat-label">当前显示</span>
+        </div>
+    </div>
+</div>
+
+<div class="collection-layout">
+    <aside class="card">
+        <div class="card-header"><h2>我的文献库</h2></div>
+        <div class="card-body">
+            <div class="collection-card-list">
+                <button type="button" class="category-btn active" onclick="filterCategory('', this)">
+                    <span>全部文献</span>
+                    <span class="count">{{ total_count or 0 }}</span>
+                </button>
+                {% for c in categories or [] %}
+                <div class="category-row">
+                    <button type="button" class="category-btn" data-cat-id="{{ c.id }}" onclick="filterCategory({{ c.id }}, this)">
+                        <span>{{ c.name }}</span>
+                        <span class="count">{{ category_counts.get(c.id, 0) }}</span>
+                    </button>
+                    <button type="button" class="btn btn-outline" onclick="deleteCategory({{ c.id }})">删除</button>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="category-create-row">
+                <input type="text" id="catName" placeholder="新收藏夹名称">
+                <button type="button" class="btn btn-primary" onclick="addCategory()">创建</button>
+            </div>
+        </div>
+    </aside>
+
+    <section class="card">
+        <div class="card-header">
+            <h2>收藏文献</h2>
+            <input type="search" id="librarySearch" class="collection-search" placeholder="搜索标题或作者" oninput="applyFilters()">
+        </div>
+        <div class="card-body">
+            {% if bookmarks %}
+            <div class="paper-list" id="libraryList">
+                {% for b in bookmarks %}
+                <article class="paper-item" data-id="{{ b.id }}" data-cat="{{ b.category_id or '' }}" data-title="{{ b.title|e }}" data-authors="{{ b.authors|e }}" data-journal="{{ b.journal|e }}" data-year="{{ b.year or '' }}" data-doi="{{ b.doi|e }}" data-abstract="{{ b.abstract|e }}" data-notes="{{ b.notes|e }}" data-source="{{ b.source|e }}" data-added="{{ b.added_at.strftime('%Y-%m-%d') if b.added_at else '' }}" onclick="showDetail(this)">
+                    {% if b.doi %}
+                    <a class="paper-title" href="https://doi.org/{{ b.doi }}" target="_blank" rel="noopener" onclick="event.stopPropagation()">{{ b.title or '未命名文献' }}</a>
+                    {% else %}
+                    <span class="paper-title">{{ b.title or '未命名文献' }}</span>
+                    {% endif %}
+                    <div class="paper-meta">
+                        <span>{{ b.authors or '未知作者' }}</span>
+                        <span>· {{ b.journal or '未知期刊' }} ({{ b.year or '未知年份' }})</span>
+                        <span class="paper-topic">#{{ category_names.get(b.category_id, '未分类') }}</span>
+                        {% if b.doi %}
+                        <a class="paper-doi" href="https://doi.org/{{ b.doi }}" target="_blank" rel="noopener" onclick="event.stopPropagation()">DOI: {{ b.doi }}</a>
+                        {% endif %}
+                    </div>
+                    {% if b.abstract %}
+                    <p class="paper-abstract">{{ b.abstract[:160] }}{% if b.abstract|length > 160 %}...{% endif %}</p>
+                    {% endif %}
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="collection-empty">还没有收藏文献，可先到关键词订阅中收藏真实论文。</div>
+            {% endif %}
+        </div>
+    </section>
+
+    <aside class="card collection-detail-panel">
+        <div class="card-header"><h2>文献详情</h2></div>
+        <div class="card-body" id="detailBody"><div class="collection-empty">选择一篇文献查看详情。</div></div>
+    </aside>
 </div>
 <script>
 var activeCategory = '';
 var activeButton = null;
-function esc(v){ return String(v == null ? '' : v).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+function esc(v){
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function(c){
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+    });
+}
 function filterCategory(id, btn){
-  activeCategory = id || '';
-  if(activeButton) activeButton.classList.remove('active');
-  activeButton = btn || document.querySelector('.zotero-nav-item[data-cat-id="' + id + '"]');
-  if(activeButton) activeButton.classList.add('active');
-  document.querySelectorAll('.zotero-nav-item').forEach(function(el){ if(el !== activeButton) el.classList.remove('active'); });
-  applyFilters();
+    activeCategory = id === null || id === undefined ? '' : String(id);
+    if(activeButton) activeButton.classList.remove('active');
+    activeButton = btn || document.querySelector('.category-btn[data-cat-id="' + activeCategory + '"]');
+    if(activeButton) activeButton.classList.add('active');
+    applyFilters();
 }
 function applyFilters(){
-  var q = (document.getElementById('librarySearch').value || '').trim().toLowerCase();
-  var visible = 0;
-  document.querySelectorAll('.zotero-item').forEach(function(el){
-    var catOk = !activeCategory || el.getAttribute('data-cat') === String(activeCategory);
-    var title = (el.getAttribute('data-title') || '').toLowerCase();
-    var authors = (el.getAttribute('data-authors') || '').toLowerCase();
-    var qOk = !q || title.indexOf(q) > -1 || authors.indexOf(q) > -1;
-    var show = catOk && qOk;
-    el.style.display = show ? '' : 'none';
-    if(show) visible++;
-  });
-  document.getElementById('visibleCount').textContent = visible;
+    var q = (document.getElementById('librarySearch').value || '').trim().toLowerCase();
+    var visible = 0;
+    document.querySelectorAll('.paper-item').forEach(function(el){
+        var catOk = !activeCategory || el.getAttribute('data-cat') === activeCategory;
+        var title = (el.getAttribute('data-title') || '').toLowerCase();
+        var authors = (el.getAttribute('data-authors') || '').toLowerCase();
+        var qOk = !q || title.indexOf(q) > -1 || authors.indexOf(q) > -1;
+        var show = catOk && qOk;
+        el.style.display = show ? '' : 'none';
+        if(show) visible++;
+    });
+    document.getElementById('visibleCount').textContent = visible;
 }
 function showDetail(el){
-  document.querySelectorAll('.zotero-item').forEach(function(x){ x.classList.remove('is-active'); });
-  el.classList.add('is-active');
-  var doi = el.getAttribute('data-doi') || '';
-  var body = document.getElementById('detailBody');
-  body.innerHTML = '<h3>' + esc(el.getAttribute('data-title')) + '</h3>' +
-    '<dl>' +
-    '<dt>作者</dt><dd>' + esc(el.getAttribute('data-authors') || '未知作者') + '</dd>' +
-    '<dt>期刊</dt><dd>' + esc(el.getAttribute('data-journal') || '未知期刊') + '</dd>' +
-    '<dt>年份</dt><dd>' + esc(el.getAttribute('data-year') || '未知') + '</dd>' +
-    '<dt>来源</dt><dd>' + esc(el.getAttribute('data-source') || '手动收藏') + '</dd>' +
-    '<dt>收藏时间</dt><dd>' + esc(el.getAttribute('data-added') || '未知') + '</dd>' +
-    (doi ? '<dt>DOI</dt><dd><a href="https://doi.org/' + esc(doi) + '" target="_blank" rel="noopener">' + esc(doi) + '</a></dd>' : '') +
-    '</dl>' +
-    (el.getAttribute('data-abstract') ? '<div class="abstract-box"><strong>摘要</strong><p>' + esc(el.getAttribute('data-abstract')) + '</p></div>' : '') +
-    (el.getAttribute('data-notes') ? '<div class="abstract-box" style="margin-top:10px"><strong>笔记</strong><p>' + esc(el.getAttribute('data-notes')) + '</p></div>' : '') +
-    '<div class="score-actions" style="margin-top:16px">' +
-    (doi ? '<a class="btn btn-sm btn-primary" href="https://doi.org/' + esc(doi) + '" target="_blank" rel="noopener">打开原文</a>' : '') +
-    '<button type="button" class="btn btn-sm btn-outline" onclick="deleteBookmark(' + el.getAttribute('data-id') + ')">删除文献</button>' +
-    '</div>';
+    document.querySelectorAll('.paper-item').forEach(function(x){ x.classList.remove('active'); });
+    el.classList.add('active');
+    var doi = el.getAttribute('data-doi') || '';
+    var body = document.getElementById('detailBody');
+    body.innerHTML = '<h3 class="collection-detail-title">' + esc(el.getAttribute('data-title')) + '</h3>' +
+        '<div class="detail-meta">' +
+        '<span>作者：' + esc(el.getAttribute('data-authors') || '未知作者') + '</span>' +
+        '<span>期刊：' + esc(el.getAttribute('data-journal') || '未知期刊') + '</span>' +
+        '<span>年份：' + esc(el.getAttribute('data-year') || '未知') + '</span>' +
+        '<span>来源：' + esc(el.getAttribute('data-source') || '手动收藏') + '</span>' +
+        '<span>收藏时间：' + esc(el.getAttribute('data-added') || '未知') + '</span>' +
+        (doi ? '<span>DOI：<a class="paper-doi" href="https://doi.org/' + esc(doi) + '" target="_blank" rel="noopener">' + esc(doi) + '</a></span>' : '') +
+        '</div>' +
+        (el.getAttribute('data-abstract') ? '<div class="collection-detail-box"><strong>摘要</strong><p>' + esc(el.getAttribute('data-abstract')) + '</p></div>' : '') +
+        (el.getAttribute('data-notes') ? '<div class="collection-detail-box"><strong>笔记</strong><p>' + esc(el.getAttribute('data-notes')) + '</p></div>' : '') +
+        '<div class="detail-actions">' +
+        (doi ? '<a class="btn btn-sm btn-primary" href="https://doi.org/' + esc(doi) + '" target="_blank" rel="noopener">打开原文</a>' : '') +
+        '<button type="button" class="btn btn-sm btn-outline" onclick="deleteBookmark(' + el.getAttribute('data-id') + ')">删除文献</button>' +
+        '</div>';
 }
 function addCategory(){
-  var name = document.getElementById('catName').value.trim();
-  if(!name) return alert('请输入收藏夹名称');
-  fetch('/api/literature/categories', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:name})})
-    .then(function(r){ return r.json(); }).then(function(d){ if(d.ok) location.reload(); else alert('创建失败'); });
+    var name = document.getElementById('catName').value.trim();
+    if(!name) return alert('请输入收藏夹名称');
+    fetch('/api/literature/categories', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:name})})
+        .then(function(r){ return r.json(); }).then(function(d){ if(d.ok) location.reload(); else alert('创建失败'); });
 }
 function deleteCategory(id){
-  if(!confirm('确定删除该收藏夹？文献会保留。')) return;
-  fetch('/api/literature/category/delete/' + id).then(function(){ location.reload(); });
+    if(!confirm('确定删除该收藏夹？文献会保留。')) return;
+    fetch('/api/literature/category/delete/' + id).then(function(){ location.reload(); });
 }
 function deleteBookmark(id){
-  if(!confirm('确定删除这篇收藏文献？')) return;
-  fetch('/api/literature/bookmark/delete/' + id).then(function(){ location.reload(); });
+    if(!confirm('确定删除这篇收藏文献？')) return;
+    fetch('/api/literature/bookmark/delete/' + id).then(function(){ location.reload(); });
 }
 </script>
 {% endblock %}
